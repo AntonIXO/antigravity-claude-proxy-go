@@ -1,0 +1,28 @@
+syntax = "proto2";
+
+package pb;
+
+import "net/proto2/proto/descriptor.proto";
+
+message InternalOptionsForce {
+  enum Enum {
+    UNSPECIFIED = 0;
+    FORCE_ON = 1;
+    FORCE_OFF = 2;
+  }
+
+}
+
+message InternalFieldOptionsCpp {
+  message MicroString {
+    optional .pb.InternalOptionsForce.Enum force = 1;
+    optional int32 sso_size = 2;
+  }
+
+  optional .pb.InternalFieldOptionsCpp.MicroString micro_string = 1;
+}
+
+message InternalFieldOptions {
+  optional .pb.InternalFieldOptionsCpp cpp = 1;
+}
+

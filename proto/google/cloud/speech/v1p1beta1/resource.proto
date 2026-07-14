@@ -1,0 +1,105 @@
+syntax = "proto3";
+
+package google.cloud.speech.v1p1beta1;
+
+option java_package = "com.google.cloud.speech.v1p1beta1";
+option java_outer_classname = "SpeechResourceProto";
+option java_multiple_files = true;
+option objc_class_prefix = "GCS";
+
+import "google/api/field_behavior.proto";
+import "google/api/inclusion.proto";
+import "google/api/policy.proto";
+import "google/api/resource.proto";
+import "google/api/visibility.proto";
+import "google/protobuf/timestamp.proto";
+import "storage/datapol/annotations/proto/semantic_annotations.proto";
+
+message CustomClass {
+  message ClassItem {
+    string value = 1;
+  }
+
+  message AnnotationsEntry {
+    string key = 1;
+    string value = 2;
+  }
+
+  enum State {
+    STATE_UNSPECIFIED = 0;
+    ACTIVE = 2;
+    DELETED = 4;
+  }
+
+  string name = 1;
+  string custom_class_id = 2;
+  repeated .google.cloud.speech.v1p1beta1.CustomClass.ClassItem items = 3;
+  .google.protobuf.Timestamp create_time = 4;
+  .google.protobuf.Timestamp update_time = 5;
+  string kms_key_name = 6;
+  string kms_key_version_name = 7;
+  string uid = 8;
+  string display_name = 9;
+  .google.cloud.speech.v1p1beta1.CustomClass.State state = 10;
+  .google.protobuf.Timestamp delete_time = 11;
+  .google.protobuf.Timestamp expire_time = 12;
+  repeated .google.cloud.speech.v1p1beta1.CustomClass.AnnotationsEntry annotations = 13;
+  string etag = 14;
+  bool reconciling = 15;
+}
+
+message PhraseSet {
+  message Phrase {
+    string value = 1;
+    float boost = 2;
+  }
+
+  message AnnotationsEntry {
+    string key = 1;
+    string value = 2;
+  }
+
+  enum State {
+    STATE_UNSPECIFIED = 0;
+    ACTIVE = 2;
+    DELETED = 4;
+  }
+
+  string name = 1;
+  repeated .google.cloud.speech.v1p1beta1.PhraseSet.Phrase phrases = 2;
+  float boost = 4;
+  .google.protobuf.Timestamp create_time = 5;
+  .google.protobuf.Timestamp update_time = 6;
+  string kms_key_name = 7;
+  string kms_key_version_name = 8;
+  string uid = 9;
+  string display_name = 10;
+  .google.cloud.speech.v1p1beta1.PhraseSet.State state = 11;
+  .google.protobuf.Timestamp delete_time = 12;
+  .google.protobuf.Timestamp expire_time = 13;
+  repeated .google.cloud.speech.v1p1beta1.PhraseSet.AnnotationsEntry annotations = 14;
+  string etag = 15;
+  bool reconciling = 16;
+}
+
+message SpeechAdaptation {
+  message ABNFGrammar {
+    repeated string abnf_strings = 1;
+  }
+
+  repeated .google.cloud.speech.v1p1beta1.PhraseSet phrase_sets = 1;
+  repeated string phrase_set_references = 2;
+  repeated .google.cloud.speech.v1p1beta1.CustomClass custom_classes = 3;
+  .google.cloud.speech.v1p1beta1.SpeechAdaptation.ABNFGrammar abnf_grammar = 4;
+}
+
+message TranscriptNormalization {
+  message Entry {
+    string search = 1;
+    string replace = 2;
+    bool case_sensitive = 3;
+  }
+
+  repeated .google.cloud.speech.v1p1beta1.TranscriptNormalization.Entry entries = 1;
+}
+

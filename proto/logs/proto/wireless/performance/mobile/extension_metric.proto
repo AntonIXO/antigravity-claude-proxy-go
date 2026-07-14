@@ -1,0 +1,12 @@
+syntax = "proto2";
+
+package logs.proto.wireless.performance.mobile;
+
+option java_package = "logs.proto.wireless.performance.mobile";
+option objc_class_prefix = "PRMS";
+
+import "storage/datapol/annotations/proto/semantic_annotations.proto";
+
+message MetricExtension {
+}
+

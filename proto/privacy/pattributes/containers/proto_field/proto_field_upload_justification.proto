@@ -1,0 +1,20 @@
+syntax = "proto2";
+
+package pattributes;
+
+option java_package = "com.google.pattributes.proto";
+option java_multiple_files = true;
+
+import "privacy/data_governance/attributes/proto/purpose.proto";
+import "privacy/pattributes/public/proto/collection_basis.proto";
+import "privacy/pattributes/public/proto/collection_basis_expression.proto";
+
+message ProtoFieldUploadJustification {
+  optional string external_transparency_description = 5173;
+  repeated .privacy.data_governance.attributes.ProcessingPurpose.Purpose purposes = 5176;
+  oneof collection_basis_oneof {
+    .pattributes.CollectionBasisAnd collection_basis_and = 5174;
+    .pattributes.CollectionBasis collection_basis = 5175;
+  }
+}
+

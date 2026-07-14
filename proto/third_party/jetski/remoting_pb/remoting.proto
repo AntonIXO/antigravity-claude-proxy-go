@@ -1,0 +1,93 @@
+syntax = "proto3";
+
+package exa.remoting;
+
+option java_outer_classname = "Remoting";
+option java_multiple_files = true;
+
+import "google/rpc/status.proto";
+
+service RemotingService {
+  rpc ConnectRemote (.exa.remoting.ConnectRemoteRequest) returns (stream .exa.remoting.ConnectRemoteResponse) {}
+  rpc RespondToPrompt (.exa.remoting.RespondToPromptRequest) returns (.exa.remoting.RespondToPromptResponse) {}
+  rpc DisconnectRemote (.exa.remoting.DisconnectRemoteRequest) returns (.exa.remoting.DisconnectRemoteResponse) {}
+  rpc SaveRemote (.exa.remoting.SaveRemoteRequest) returns (.exa.remoting.SaveRemoteResponse) {}
+  rpc DeleteRemote (.exa.remoting.DeleteRemoteRequest) returns (.exa.remoting.DeleteRemoteResponse) {}
+  rpc ListRemotes (.exa.remoting.ListRemotesRequest) returns (.exa.remoting.ListRemotesResponse) {}
+  rpc ListConnectedRemotes (.exa.remoting.ListConnectedRemotesRequest) returns (.exa.remoting.ListConnectedRemotesResponse) {}
+}
+
+message RemoteDescriptor {
+  string remote_multi_hop = 1;
+  string name = 2;
+  string description = 3;
+  string type = 4;
+}
+
+message RemoteConnectionPrompt {
+  string message = 1;
+  bool is_secret = 2;
+}
+
+message ConnectRemoteRequest {
+  string remote_multi_hop = 1;
+}
+
+message ConnectRemoteResponse {
+  string remote_id = 3;
+  oneof update {
+    .exa.remoting.RemoteConnectionPrompt prompt = 1;
+    .google.rpc.Status status = 2;
+  }
+}
+
+message DisconnectRemoteRequest {
+  string remote_id = 1;
+}
+
+message DisconnectRemoteResponse {
+}
+
+message RespondToPromptRequest {
+  string remote_id = 1;
+  string response = 2;
+}
+
+message RespondToPromptResponse {
+}
+
+message SaveRemoteRequest {
+  .exa.remoting.RemoteDescriptor descriptor = 1;
+}
+
+message SaveRemoteResponse {
+}
+
+message DeleteRemoteRequest {
+  string remote_id = 1;
+}
+
+message DeleteRemoteResponse {
+}
+
+message ListRemotesRequest {
+  bool include_autodetected = 1;
+  bool include_saved = 2;
+}
+
+message ListRemotesResponse {
+  repeated .exa.remoting.RemoteDescriptor remotes = 1;
+}
+
+message ListConnectedRemotesRequest {
+}
+
+message ListConnectedRemotesResponse {
+  message RemotesEntry {
+    string key = 1;
+    .exa.remoting.RemoteDescriptor value = 2;
+  }
+
+  repeated .exa.remoting.ListConnectedRemotesResponse.RemotesEntry remotes = 1;
+}
+

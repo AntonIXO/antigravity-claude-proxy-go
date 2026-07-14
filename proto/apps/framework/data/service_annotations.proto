@@ -1,0 +1,20 @@
+syntax = "proto2";
+
+package af.data;
+
+option java_package = "com.google.apps.framework.data";
+option java_multiple_files = true;
+option go_package = "google.golang.org/genproto/apps/framework/data";
+option cc_enable_arenas = true;
+option objc_class_prefix = "AFD";
+
+import "net/proto2/proto/descriptor.proto";
+import "storage/datapol/annotations/proto/semantic_annotations.proto";
+
+enum FrontendMethodType {
+  UNKNOWN_FRONTEND_METHOD_TYPE = 0;
+  FETCH = 1;
+  MUTATE = 2;
+  SERVER_STREAM = 3;
+}
+

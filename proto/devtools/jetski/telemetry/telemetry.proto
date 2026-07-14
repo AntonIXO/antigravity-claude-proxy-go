@@ -1,0 +1,59 @@
+edition = "2024";
+
+package devtools.jetski.telemetry;
+
+option java_outer_classname = "Telemetry";
+
+import "devtools/jetski/telemetry/extensions/analytics_event_metadata.proto";
+import "devtools/jetski/telemetry/extensions/battle_mode_metadata.proto";
+import "devtools/jetski/telemetry/extensions/command_usage_metadata.proto";
+import "devtools/jetski/telemetry/extensions/completions_metadata.proto";
+import "devtools/jetski/telemetry/extensions/cortex_execution_metadata.proto";
+import "devtools/jetski/telemetry/extensions/cortex_generator_metadata.proto";
+import "devtools/jetski/telemetry/extensions/cortex_metrics.proto";
+import "devtools/jetski/telemetry/extensions/cortex_trajectory.proto";
+import "devtools/jetski/telemetry/extensions/cortex_trajectory_step.proto";
+import "devtools/jetski/telemetry/extensions/error_trace_metadata.proto";
+import "devtools/jetski/telemetry/extensions/feedback_metadata.proto";
+import "devtools/jetski/telemetry/extensions/observability_data.proto";
+import "devtools/jetski/telemetry/extensions/read_url_content.proto";
+import "devtools/jetski/telemetry/extensions/rpc_metadata.proto";
+import "devtools/jetski/telemetry/extensions/state_initialization_data.proto";
+import "devtools/jetski/telemetry/extensions/trajectory_segment_analytics_metadata.proto";
+import "devtools/jetski/telemetry/extensions/trajectory_segment_events_metadata.proto";
+import "storage/datapol/annotations/proto/semantic_annotations.proto";
+
+message JetskiTelemetryExtension {
+  reserved 1;
+  reserved 21;
+  string ide_name = 16;
+  string ide_version = 17;
+  string os = 18;
+  string arch = 19;
+  string user_tier_id = 22;
+  repeated string user_tags = 23;
+  bool is_redacted = 24;
+  string region_code = 25;
+  string product_name = 27;
+  uint64 hashed_gaia_id = 20;
+  oneof payload {
+    .devtools.jetski.telemetry.extensions.CortexExecutionMetadata cortex_execution_metadata = 2;
+    .devtools.jetski.telemetry.extensions.CortexGeneratorMetadata cortex_generator_metadata = 3;
+    .devtools.jetski.telemetry.extensions.CommandUsageMetadata command_usage_metadata = 4;
+    .devtools.jetski.telemetry.extensions.CompletionsMetadata completions_metadata = 5;
+    .devtools.jetski.telemetry.extensions.AnalyticsEventMetadata analytics_event_metadata = 6;
+    .devtools.jetski.telemetry.extensions.FeedbackMetadata feedback_metadata = 7;
+    .devtools.jetski.telemetry.proto.ReadUrlContentMetadata read_url_content_metadata = 8;
+    .devtools.jetski.telemetry.extensions.TrajectorySegmentAnalyticsMetadata trajectory_segment_analytics_metadata = 9;
+    .devtools.jetski.telemetry.extensions.TrajectorySegmentEventsMetadata trajectory_segment_events_metadata = 10;
+    .devtools.jetski.telemetry.extensions.CortexTrajectory cortex_trajectory = 11;
+    .devtools.jetski.telemetry.extensions.CortexTrajectoryStep cortex_trajectory_step = 12;
+    .devtools.jetski.telemetry.extensions.StateInitializationData state_initialization_data = 13;
+    .devtools.jetski.telemetry.extensions.CortexMetrics cortex_metrics = 14;
+    .devtools.jetski.telemetry.extensions.ErrorTraceMetadata error_trace_metadata = 15;
+    .devtools.jetski.telemetry.extensions.ObservabilityData observability_data = 26;
+    .devtools.jetski.telemetry.extensions.BattleModeMetadata battle_mode_metadata = 28;
+    .devtools.jetski.telemetry.extensions.RpcMetadata rpc_metadata = 29;
+  }
+}
+

@@ -1,0 +1,14 @@
+edition = "2023";
+
+package perftools.tracing;
+
+message AnnotationValue {
+  message Int32List {
+    repeated int32 value = 1;
+  }
+
+  oneof value {
+    .perftools.tracing.AnnotationValue.Int32List int32_list = 1;
+  }
+}
+

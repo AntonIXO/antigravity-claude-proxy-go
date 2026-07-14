@@ -1,0 +1,14 @@
+syntax = "proto2";
+
+package google.api;
+
+option java_package = "com.google.api";
+option java_outer_classname = "AnnotationsProto";
+option java_multiple_files = true;
+option go_package = "google.golang.org/genproto/googleapis/api/annotations;annotations";
+option cc_enable_arenas = true;
+option objc_class_prefix = "GAPI";
+
+import "google/api/http.proto";
+import "net/proto2/proto/descriptor.proto";
+

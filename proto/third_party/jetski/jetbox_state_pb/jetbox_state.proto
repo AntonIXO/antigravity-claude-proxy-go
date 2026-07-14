@@ -1,0 +1,207 @@
+syntax = "proto3";
+
+package jetbox_state_pb;
+
+option go_package = "google3/third_party/jetski/jetbox_state_pb";
+
+import "third_party/jetski/codeium_common_pb/codeium_common.proto";
+import "third_party/jetski/cortex_pb/cortex.proto";
+import "third_party/jetski/project_pb/project.proto";
+import "third_party/jetski/vcs_pb/vcs.proto";
+
+message PostOnboardingState {
+  repeated .jetbox_state_pb.PostOnboardingStepType completed_steps = 1;
+}
+
+message UserSettings {
+  reserved 15;
+  reserved 16;
+  reserved 32;
+  .exa.codeium_common_pb.CascadeCommandsAutoExecution auto_execution_policy = 1;
+  .exa.codeium_common_pb.ArtifactReviewMode artifact_review_mode = 2;
+  repeated string allowed_commands = 4;
+  repeated string denied_commands = 5;
+  .exa.codeium_common_pb.PlanningMode planning_mode = 6;
+  .exa.codeium_common_pb.PermissionGrantsConfig global_permission_grants = 11;
+  .jetbox_state_pb.ThemeMode theme_mode = 20;
+  .jetbox_state_pb.CustomThemeSeeds custom_theme_seeds_light = 21;
+  .jetbox_state_pb.CustomThemeSeeds custom_theme_seeds_dark = 22;
+  .exa.codeium_common_pb.BrowserJsExecutionPolicy browser_js_execution_policy = 23;
+  optional bool allow_agent_access_non_workspace_files = 3;
+  optional bool secure_mode_enabled = 7;
+  optional bool allow_cascade_access_gitignore_files = 8;
+  optional bool enable_terminal_sandbox = 9;
+  optional bool disable_default_customizations = 10;
+  optional .jetbox_state_pb.AgentEnvironment agent_environment = 12;
+  optional bool verbose_agent_chat = 13;
+  optional bool sandbox_allow_network = 14;
+  optional .exa.codeium_common_pb.AgentSettingPolicy non_workspace_file_access_policy = 17;
+  optional .exa.codeium_common_pb.AgentSettingPolicy internet_access_policy = 18;
+  optional bool allow_agent_access_gitignore_files = 19;
+  optional int32 max_cloned_workspaces = 24;
+  optional int32 max_clones_per_workspace = 25;
+  optional bool disable_eager_cloning = 26;
+  optional string gcp_region = 27;
+  optional bool remote_control_enabled = 28;
+  optional bool use_ai_credits = 29;
+  optional string active_profile = 30;
+  optional .jetbox_state_pb.ConversationWidth conversation_width = 31;
+  optional string remote_control_hostname = 33;
+  optional .exa.cortex_pb.MessageDeliveryStrategy queued_message_delivery_strategy = 34;
+  optional .jetbox_state_pb.GoogleSpecificConfig google_config = 35;
+  optional bool enable_business_login = 36;
+}
+
+message SidebarWorkspaceInfo {
+  optional bool is_collapsed = 1;
+  optional bool is_hidden = 2;
+}
+
+message CustomModelsConfig {
+  message CustomModelsEntry {
+    string key = 1;
+    .exa.codeium_common_pb.ModelInfo value = 2;
+  }
+
+  repeated .jetbox_state_pb.CustomModelsConfig.CustomModelsEntry custom_models = 1;
+}
+
+message CustomThemeSeeds {
+  optional string background = 1;
+  optional string primary = 2;
+  optional string foreground_override = 3;
+  optional string primary_foreground_override = 4;
+}
+
+message GoogleSpecificConfig {
+  optional .exa.vcs_pb.VcsType magic_workspace_vcs = 1;
+}
+
+message GoogleSpecificSettings {
+  bool google3_project_created = 1;
+}
+
+message SeenNuxUids {
+  repeated int32 uids = 1;
+}
+
+message JetboxAppState {
+  reserved "verbose_agent_chat";
+  reserved "migrate_existing_convos_into_projects";
+  reserved 7;
+  reserved 8;
+  reserved 9;
+  reserved 12;
+  reserved 15;
+  message SidebarWorkspacesEntry {
+    string key = 1;
+    .jetbox_state_pb.SidebarWorkspaceInfo value = 2;
+  }
+
+  message MigrationsEntry {
+    int32 key = 1;
+    .jetbox_state_pb.MigrationStatus value = 2;
+  }
+
+  .jetbox_state_pb.PostOnboardingState post_onboarding = 1;
+  .jetbox_state_pb.SeenNuxUids seen_nuxs = 2;
+  bool sidebar_workspaces_migrated = 3;
+  .jetbox_state_pb.GoogleSpecificSettings google_settings = 4;
+  .jetbox_state_pb.AgentOnboardingState agent_onboarding_completed = 5;
+  repeated .jetbox_state_pb.JetboxAppState.SidebarWorkspacesEntry sidebar_workspaces = 6;
+  .exa.codeium_common_pb.Model last_selected_agent_model = 10;
+  .jetbox_state_pb.CustomModelsConfig custom_models_config = 11;
+  .jetbox_state_pb.AgentEnvironment agent_environment = 13;
+  .jetbox_state_pb.MigrationStatus migrate_convos_into_projects = 16;
+  .jetbox_state_pb.MigrationStatus migrate_internal_projects = 18;
+  .jetbox_state_pb.RetroactiveMigrationStatus migrate_retroactive_projects = 19;
+  repeated .jetbox_state_pb.JetboxAppState.MigrationsEntry migrations = 21;
+  optional bool user_config_migrated = 14;
+  optional string installation_uuid = 17;
+  optional int64 opted_out_best_of_n_auto_trigger_at = 20;
+}
+
+message State {
+  reserved 8;
+  reserved 9;
+  reserved 12;
+  message SidebarWorkspacesEntry {
+    string key = 1;
+    .jetbox_state_pb.SidebarWorkspaceInfo value = 2;
+  }
+
+  .jetbox_state_pb.PostOnboardingState post_onboarding = 1;
+  .jetbox_state_pb.UserSettings user_settings = 2;
+  repeated .jetbox_state_pb.State.SidebarWorkspacesEntry sidebar_workspaces = 3;
+  .exa.codeium_common_pb.Model last_selected_agent_model = 4;
+  .jetbox_state_pb.CustomModelsConfig custom_models_config = 5;
+  repeated uint32 seen_nux_uids = 6;
+  .jetbox_state_pb.ThemeMode theme_mode = 7;
+  .jetbox_state_pb.Projects project_store = 10;
+  bool sidebar_workspaces_migrated = 11;
+  .jetbox_state_pb.CustomThemeSeeds custom_theme_seeds_light = 13;
+  .jetbox_state_pb.CustomThemeSeeds custom_theme_seeds_dark = 14;
+  bool google3_project_created = 15;
+  .jetbox_state_pb.AgentOnboardingState agent_onboarding_completed = 16;
+}
+
+message Projects {
+  repeated .exa.project_pb.Project projects = 1;
+}
+
+enum PostOnboardingStepType {
+  POST_ONBOARDING_STEP_TYPE_UNSPECIFIED = 0;
+  POST_ONBOARDING_STEP_TYPE_MANAGER_WELCOME = 1;
+  POST_ONBOARDING_STEP_TYPE_USAGE_MODE = 2;
+  POST_ONBOARDING_STEP_TYPE_AGENT_CONFIGURATION = 3;
+  POST_ONBOARDING_STEP_TYPE_ADD_WORKSPACE = 4;
+}
+
+enum AgentEnvironment {
+  AGENT_ENVIRONMENT_UNSPECIFIED = 0;
+  AGENT_ENVIRONMENT_LOCAL = 1;
+  AGENT_ENVIRONMENT_BACKGROUND_WORKTREE = 2;
+  AGENT_ENVIRONMENT_BACKGROUND_CITC_WORKSPACE = 3;
+  AGENT_ENVIRONMENT_BACKGROUND_CITC_WORKSPACE_CLONE = 4;
+}
+
+enum ThemeMode {
+  THEME_MODE_UNSPECIFIED = 0;
+  THEME_MODE_DARK = 1;
+  THEME_MODE_LIGHT = 2;
+  THEME_MODE_INHERIT = 3;
+}
+
+enum ConversationWidth {
+  CONVERSATION_WIDTH_UNSPECIFIED = 0;
+  CONVERSATION_WIDTH_DEFAULT = 1;
+  CONVERSATION_WIDTH_NARROW = 2;
+  CONVERSATION_WIDTH_WIDE = 3;
+}
+
+enum AgentOnboardingState {
+  AGENT_ONBOARDING_STATE_UNSPECIFIED = 0;
+  AGENT_ONBOARDING_STATE_INCOMPLETE = 1;
+  AGENT_ONBOARDING_STATE_COMPLETED = 2;
+}
+
+enum MigrationID {
+  MIGRATION_ID_UNSPECIFIED = 0;
+  MIGRATION_ID_SIDECAR_USER_CONFIG_BYPASS = 1;
+  MIGRATION_ID_POPULATE_PROJECT_UPDATED_AT = 2;
+}
+
+enum MigrationStatus {
+  MIGRATION_STATUS_UNSPECIFIED = 0;
+  MIGRATION_STATUS_STARTED = 1;
+  MIGRATION_STATUS_COMPLETED = 2;
+  MIGRATION_STATUS_FAILED = 3;
+}
+
+enum RetroactiveMigrationStatus {
+  RETROACTIVE_MIGRATION_STATUS_UNSPECIFIED = 0;
+  RETROACTIVE_MIGRATION_STATUS_STARTED = 1;
+  RETROACTIVE_MIGRATION_STATUS_COMPLETED_RAN = 2;
+  RETROACTIVE_MIGRATION_STATUS_COMPLETED_UNNECESSARY = 3;
+}
+

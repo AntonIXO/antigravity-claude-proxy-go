@@ -1,0 +1,14 @@
+edition = "2024";
+
+package wireless_android_play_playlog;
+
+option java_package = "com.google.wireless.android.play.playlog.proto";
+
+import "storage/datapol/annotations/proto/semantic_annotations.proto";
+import "wireless/android/play/playlog/proto/logger_enum.proto";
+
+message AggregationMetadata {
+  .wireless_android_play_playlog.logger_enum.LoggerId logger_id = 1;
+  int64 aggregation_config_hash = 2;
+}
+

@@ -1,0 +1,17 @@
+syntax = "proto3";
+
+package google.rpc.context;
+
+option java_package = "com.google.rpc.context";
+option java_outer_classname = "VisibilityContextProto";
+option java_multiple_files = true;
+option objc_class_prefix = "RPC";
+
+import "google/api/visibility.proto";
+import "google/protobuf/timestamp.proto";
+
+message VisibilityContext {
+  repeated string labels = 1;
+  .google.protobuf.Timestamp read_time = 2;
+}
+

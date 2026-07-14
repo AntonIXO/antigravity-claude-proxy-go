@@ -1,0 +1,318 @@
+syntax = "proto3";
+
+package google.cloud.speech.v1p1beta1;
+
+option java_package = "com.google.cloud.speech.v1p1beta1";
+option java_outer_classname = "SpeechProto";
+option java_multiple_files = true;
+option objc_class_prefix = "GCS";
+
+import "google/api/annotations.proto";
+import "google/api/auditing.proto";
+import "google/api/client.proto";
+import "google/api/field_behavior.proto";
+import "google/api/inclusion.proto";
+import "google/api/policy.proto";
+import "google/api/visibility.proto";
+import "google/cloud/speech/v1p1beta1/resource.proto";
+import "google/longrunning/operations.proto";
+import "google/protobuf/any.proto";
+import "google/protobuf/duration.proto";
+import "google/protobuf/timestamp.proto";
+import "google/protobuf/wrappers.proto";
+import "google/rpc/status.proto";
+import "storage/datapol/annotations/proto/semantic_annotations.proto";
+
+service Speech {
+  rpc Recognize (.google.cloud.speech.v1p1beta1.RecognizeRequest) returns (.google.cloud.speech.v1p1beta1.RecognizeResponse) {}
+  rpc LongRunningRecognize (.google.cloud.speech.v1p1beta1.LongRunningRecognizeRequest) returns (.google.longrunning.Operation) {}
+  rpc StreamingRecognize (stream .google.cloud.speech.v1p1beta1.StreamingRecognizeRequest) returns (stream .google.cloud.speech.v1p1beta1.StreamingRecognizeResponse) {}
+}
+
+message RecognizeRequest {
+  .google.cloud.speech.v1p1beta1.RecognitionConfig config = 1;
+  .google.cloud.speech.v1p1beta1.RecognitionAudio audio = 2;
+  string name = 3;
+}
+
+message LongRunningRecognizeRequest {
+  .google.cloud.speech.v1p1beta1.RecognitionConfig config = 1;
+  .google.cloud.speech.v1p1beta1.RecognitionAudio audio = 2;
+  string name = 3;
+  .google.cloud.speech.v1p1beta1.TranscriptOutputConfig output_config = 4;
+}
+
+message TranscriptOutputConfig {
+  oneof output_type {
+    string gcs_uri = 1;
+  }
+}
+
+message StreamingRecognizeRequest {
+  oneof streaming_request {
+    .google.cloud.speech.v1p1beta1.StreamingRecognitionConfig streaming_config = 1;
+    bytes audio_content = 2;
+  }
+}
+
+message StreamingRecognitionConfig {
+  reserved 22;
+  message VoiceActivityTimeout {
+    .google.protobuf.Duration speech_start_timeout = 1;
+    .google.protobuf.Duration speech_end_timeout = 2;
+  }
+
+  .google.cloud.speech.v1p1beta1.RecognitionConfig config = 1;
+  bool single_utterance = 2;
+  bool interim_results = 3;
+  bool enable_voice_activity_events = 5;
+  .google.cloud.speech.v1p1beta1.StreamingRecognitionConfig.VoiceActivityTimeout voice_activity_timeout = 6;
+}
+
+message RecognitionConfig {
+  reserved 1001;
+  enum AudioEncoding {
+    ENCODING_UNSPECIFIED = 0;
+    LINEAR16 = 1;
+    FLAC = 2;
+    MULAW = 3;
+    AMR = 4;
+    AMR_WB = 5;
+    OGG_OPUS = 6;
+    SPEEX_WITH_HEADER_BYTE = 7;
+    MP3 = 8;
+    WEBM_OPUS = 9;
+    ALAW = 10;
+  }
+
+  .google.cloud.speech.v1p1beta1.RecognitionConfig.AudioEncoding encoding = 1;
+  int32 sample_rate_hertz = 2;
+  int32 audio_channel_count = 7;
+  bool enable_separate_recognition_per_channel = 12;
+  string language_code = 3;
+  repeated string alternative_language_codes = 18;
+  int32 max_alternatives = 4;
+  bool profanity_filter = 5;
+  .google.cloud.speech.v1p1beta1.SpeechAdaptation adaptation = 20;
+  .google.cloud.speech.v1p1beta1.TranscriptNormalization transcript_normalization = 24;
+  repeated .google.cloud.speech.v1p1beta1.SpeechContext speech_contexts = 6;
+  bool enable_word_time_offsets = 8;
+  bool enable_word_confidence = 15;
+  bool enable_automatic_punctuation = 11;
+  .google.protobuf.BoolValue enable_spoken_punctuation = 22;
+  .google.protobuf.BoolValue enable_spoken_emojis = 23;
+  bool enable_speaker_diarization = 16;
+  int32 diarization_speaker_count = 17;
+  .google.cloud.speech.v1p1beta1.SpeakerDiarizationConfig diarization_config = 19;
+  .google.cloud.speech.v1p1beta1.RecognitionMetadata metadata = 9;
+  string model = 13;
+  bool use_enhanced = 14;
+  .google.cloud.speech.v1p1beta1.Endpointer endpointer = 21;
+  repeated .google.protobuf.Any internal_extensions = 1000;
+  bool use_cloudspeech_client = 1002;
+  string initial_speech_prompt = 25;
+  .google.cloud.speech.v1p1beta1.WhisperVadParams whisper_vad_params = 26;
+  bool use_conformer_models = 27;
+  bool use_cloud_experimental_models = 28;
+  bool use_cloud_long_update = 29;
+}
+
+message WhisperVadParams {
+  float threshold = 1;
+  int32 min_speech_duration_ms = 2;
+  int32 min_silence_duration_ms = 3;
+}
+
+message Endpointer {
+  int32 sensitivity = 1;
+  bool confirmation_mode = 2;
+}
+
+message SpeakerDiarizationConfig {
+  bool enable_speaker_diarization = 1;
+  int32 min_speaker_count = 2;
+  int32 max_speaker_count = 3;
+  int32 speaker_tag = 5;
+}
+
+message RecognitionMetadata {
+  enum InteractionType {
+    INTERACTION_TYPE_UNSPECIFIED = 0;
+    DISCUSSION = 1;
+    PRESENTATION = 2;
+    PHONE_CALL = 3;
+    VOICEMAIL = 4;
+    PROFESSIONALLY_PRODUCED = 5;
+    VOICE_SEARCH = 6;
+    VOICE_COMMAND = 7;
+    DICTATION = 8;
+  }
+
+  enum MicrophoneDistance {
+    MICROPHONE_DISTANCE_UNSPECIFIED = 0;
+    NEARFIELD = 1;
+    MIDFIELD = 2;
+    FARFIELD = 3;
+  }
+
+  enum OriginalMediaType {
+    ORIGINAL_MEDIA_TYPE_UNSPECIFIED = 0;
+    AUDIO = 1;
+    VIDEO = 2;
+  }
+
+  enum RecordingDeviceType {
+    RECORDING_DEVICE_TYPE_UNSPECIFIED = 0;
+    SMARTPHONE = 1;
+    PC = 2;
+    PHONE_LINE = 3;
+    VEHICLE = 4;
+    OTHER_OUTDOOR_DEVICE = 5;
+    OTHER_INDOOR_DEVICE = 6;
+  }
+
+  .google.cloud.speech.v1p1beta1.RecognitionMetadata.InteractionType interaction_type = 1;
+  uint32 industry_naics_code_of_audio = 3;
+  .google.cloud.speech.v1p1beta1.RecognitionMetadata.MicrophoneDistance microphone_distance = 4;
+  .google.cloud.speech.v1p1beta1.RecognitionMetadata.OriginalMediaType original_media_type = 5;
+  .google.cloud.speech.v1p1beta1.RecognitionMetadata.RecordingDeviceType recording_device_type = 6;
+  string recording_device_name = 7;
+  string original_mime_type = 8;
+  int64 obfuscated_id = 9;
+  string audio_topic = 10;
+  repeated string tags = 11;
+  int64 data_logs_project_number_override = 12;
+}
+
+message SpeechContext {
+  reserved 2;
+  repeated string phrases = 1;
+  repeated .google.cloud.speech.v1p1beta1.PhraseWithBoost phrases_with_boost = 3;
+  float boost = 4;
+}
+
+message PhraseWithBoost {
+  string phrase = 1;
+  float boost = 2;
+}
+
+message RecognitionAudio {
+  oneof audio_source {
+    bytes content = 1;
+    string uri = 2;
+    string cns = 3;
+  }
+}
+
+message RecognizeResponse {
+  repeated .google.cloud.speech.v1p1beta1.SpeechRecognitionResult results = 2;
+  .google.protobuf.Duration total_billed_time = 3;
+  string recognizer_mode = 4;
+  string s3_condition = 5;
+  .google.cloud.speech.v1p1beta1.RecognizerMetadata recognizer_metadata = 6;
+  .google.cloud.speech.v1p1beta1.SpeechAdaptationInfo speech_adaptation_info = 7;
+  int64 request_id = 8;
+  bool using_legacy_models = 9;
+  bool using_legacy_experimental_models = 10;
+  repeated .google.protobuf.Any internal_extensions = 1000;
+}
+
+message LongRunningRecognizeResponse {
+  repeated .google.cloud.speech.v1p1beta1.SpeechRecognitionResult results = 2;
+  .google.protobuf.Duration total_billed_time = 3;
+  string recognizer_mode = 4;
+  string s3_condition = 5;
+  .google.cloud.speech.v1p1beta1.TranscriptOutputConfig output_config = 6;
+  .google.rpc.Status output_error = 7;
+  .google.cloud.speech.v1p1beta1.SpeechAdaptationInfo speech_adaptation_info = 8;
+  int64 request_id = 9;
+  bool using_legacy_models = 10;
+  bool using_legacy_experimental_models = 11;
+  repeated .google.protobuf.Any internal_extensions = 1000;
+}
+
+message SpeechOperationMetadata {
+  int32 progress_percent = 1;
+  .google.protobuf.Timestamp start_time = 2;
+  .google.protobuf.Timestamp last_update_time = 3;
+  string works_on = 4;
+}
+
+message LongRunningRecognizeMetadata {
+  int32 progress_percent = 1;
+  .google.protobuf.Timestamp start_time = 2;
+  .google.protobuf.Timestamp last_update_time = 3;
+  string uri = 4;
+  .google.cloud.speech.v1p1beta1.TranscriptOutputConfig output_config = 5;
+}
+
+message StreamingRecognizeResponse {
+  enum SpeechEventType {
+    SPEECH_EVENT_UNSPECIFIED = 0;
+    END_OF_SINGLE_UTTERANCE = 1;
+    SPEECH_ACTIVITY_BEGIN = 2;
+    SPEECH_ACTIVITY_END = 3;
+    SPEECH_ACTIVITY_TIMEOUT = 4;
+  }
+
+  .google.rpc.Status error = 1;
+  repeated .google.cloud.speech.v1p1beta1.StreamingRecognitionResult results = 2;
+  .google.cloud.speech.v1p1beta1.StreamingRecognizeResponse.SpeechEventType speech_event_type = 4;
+  .google.protobuf.Duration speech_event_time = 8;
+  .google.protobuf.Duration total_billed_time = 5;
+  string recognizer_mode = 6;
+  string s3_condition = 7;
+  .google.cloud.speech.v1p1beta1.SpeechAdaptationInfo speech_adaptation_info = 9;
+  int64 request_id = 10;
+  bool using_legacy_models = 11;
+  bool using_legacy_experimental_models = 12;
+  repeated .google.protobuf.Any internal_extensions = 1000;
+}
+
+message StreamingRecognitionResult {
+  reserved 7;
+  repeated .google.cloud.speech.v1p1beta1.SpeechRecognitionAlternative alternatives = 1;
+  bool is_final = 2;
+  float stability = 3;
+  .google.protobuf.Duration result_end_time = 4;
+  int32 channel_tag = 5;
+  string language_code = 6;
+}
+
+message SpeechRecognitionResult {
+  reserved 6;
+  repeated .google.cloud.speech.v1p1beta1.SpeechRecognitionAlternative alternatives = 1;
+  int32 channel_tag = 2;
+  .google.protobuf.Duration result_end_time = 4;
+  string language_code = 5;
+}
+
+message SpeechRecognitionAlternative {
+  string transcript = 1;
+  float confidence = 2;
+  repeated .google.cloud.speech.v1p1beta1.WordInfo words = 3;
+}
+
+message WordInfo {
+  .google.protobuf.Duration start_time = 1;
+  .google.protobuf.Duration end_time = 2;
+  string word = 3;
+  float confidence = 4;
+  int32 speaker_tag = 5;
+  string speaker_label = 6;
+}
+
+message SpeechAdaptationInfo {
+  reserved 2;
+  reserved 3;
+  bool adaptation_timeout = 1;
+  string timeout_message = 4;
+}
+
+message RecognizerMetadata {
+  string s3_service = 1;
+  string mode = 2;
+  string language_code = 3;
+  string model_info_label = 4;
+}
+

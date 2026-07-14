@@ -1,0 +1,10 @@
+edition = "2024";
+
+package pb.enumvalue;
+
+import "net/proto2/proto/descriptor.proto";
+
+message JsonEnumValueOptions {
+  string string = 1;
+}
+

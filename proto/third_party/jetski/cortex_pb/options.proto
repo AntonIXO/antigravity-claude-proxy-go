@@ -1,0 +1,9 @@
+syntax = "proto2";
+
+package exa.cortex_pb;
+
+option java_package = "com.exafunction.codeium.cortex";
+option java_multiple_files = true;
+
+import "net/proto2/proto/descriptor.proto";
+

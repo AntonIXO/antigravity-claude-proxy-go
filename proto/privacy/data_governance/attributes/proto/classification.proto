@@ -1,0 +1,7 @@
+syntax = "proto2";
+
+package privacy.data_governance.attributes.classification;
+
+import "google/api/inclusion.proto";
+import "net/proto2/proto/descriptor.proto";
+

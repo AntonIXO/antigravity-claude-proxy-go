@@ -1,0 +1,113 @@
+syntax = "proto3";
+
+package google.internal.cloud.code.v1internal;
+
+option java_package = "com.google.internal.cloud.code.v1internal";
+option java_outer_classname = "PredictionServiceProto";
+option java_multiple_files = true;
+
+import public "google/internal/cloud/code/v1internal/model_configs.proto";
+import "apps/framework/data/service_annotations.proto";
+import "google/api/annotations.proto";
+import "google/api/field_behavior.proto";
+import "google/api/policy.proto";
+import "google/cloud/aiplatform/master/prediction_service.proto";
+import "google/internal/cloud/code/v1internal/credits.proto";
+import "google/internal/cloud/code/v1internal/remote_context.proto";
+import "google/protobuf/timestamp.proto";
+import "storage/datapol/annotations/proto/semantic_annotations.proto";
+
+service PredictionService {
+  rpc GenerateContent (.google.internal.cloud.code.v1internal.GenerateContentRequest) returns (.google.internal.cloud.code.v1internal.GenerateContentResponse) {}
+  rpc StreamGenerateContent (.google.internal.cloud.code.v1internal.GenerateContentRequest) returns (stream .google.internal.cloud.code.v1internal.GenerateContentResponse) {}
+  rpc CountTokens (.google.internal.cloud.code.v1internal.CountTokensRequest) returns (.google.internal.cloud.code.v1internal.CountTokensResponse) {}
+  rpc RetrieveUserQuota (.google.internal.cloud.code.v1internal.RetrieveUserQuotaRequest) returns (.google.internal.cloud.code.v1internal.RetrieveUserQuotaResponse) {}
+  rpc FetchAvailableModels (.google.internal.cloud.code.v1internal.FetchAvailableModelsRequest) returns (.google.internal.cloud.code.v1internal.FetchAvailableModelsResponse) {}
+  rpc RetrieveUserQuotaSummary (.google.internal.cloud.code.v1internal.RetrieveUserQuotaSummaryRequest) returns (.google.internal.cloud.code.v1internal.RetrieveUserQuotaSummaryResponse) {}
+}
+
+message GenerateContentRequest {
+  string project = 1;
+  string request_id = 2;
+  .google.cloud.aiplatform.master.GenerateContentRequest request = 3;
+  string model = 4;
+  string user_prompt_id = 5;
+  string user_agent = 6;
+  string request_type = 7;
+  repeated .google.internal.cloud.code.v1internal.Credits.CreditType enabled_credit_types = 8;
+}
+
+message GenerateContentResponse {
+  message Metadata {
+    .google.internal.cloud.code.v1internal.RemoteContext remote_context = 1;
+  }
+
+  .google.cloud.aiplatform.master.GenerateContentResponse response = 1;
+  string trace_id = 2;
+  repeated .google.internal.cloud.code.v1internal.Credits consumed_credits = 3;
+  repeated .google.internal.cloud.code.v1internal.Credits remaining_credits = 4;
+  .google.internal.cloud.code.v1internal.GenerateContentResponse.Metadata metadata = 5;
+}
+
+message CountTokensRequest {
+  .google.cloud.aiplatform.master.CountTokensRequest request = 1;
+}
+
+message CountTokensResponse {
+  int32 total_tokens = 1;
+}
+
+message RetrieveUserQuotaRequest {
+  reserved 2;
+  string project = 1;
+}
+
+message RetrieveUserQuotaResponse {
+  message BucketInfo {
+    .google.protobuf.Timestamp reset_time = 2;
+    .google.internal.cloud.code.v1internal.RetrieveUserQuotaResponse.TokenType token_type = 3;
+    string model_id = 4;
+    oneof remaining {
+      int64 remaining_amount = 1;
+      float remaining_fraction = 5;
+    }
+  }
+
+  enum TokenType {
+    TOKEN_TYPE_UNSPECIFIED = 0;
+    REQUESTS = 1;
+    WTUS = 2;
+  }
+
+  repeated .google.internal.cloud.code.v1internal.RetrieveUserQuotaResponse.BucketInfo buckets = 1;
+}
+
+message RetrieveUserQuotaSummaryRequest {
+  string project = 1;
+}
+
+message QuotaSummaryBucket {
+  string bucket_id = 1;
+  string display_name = 2;
+  string description = 7;
+  string window = 3;
+  bool disabled = 8;
+  .google.protobuf.Timestamp reset_time = 6;
+  oneof remaining {
+    float remaining_fraction = 4;
+    int64 remaining_amount = 5;
+  }
+}
+
+message QuotaSummaryGroup {
+  string display_name = 2;
+  string description = 3;
+  repeated .google.internal.cloud.code.v1internal.QuotaSummaryBucket buckets = 1;
+}
+
+message RetrieveUserQuotaSummaryResponse {
+  repeated .google.internal.cloud.code.v1internal.QuotaSummaryBucket buckets = 1;
+  repeated .google.internal.cloud.code.v1internal.QuotaSummaryGroup groups = 2;
+  string description = 3;
+}
+

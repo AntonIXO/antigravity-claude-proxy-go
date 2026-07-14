@@ -1,0 +1,50 @@
+syntax = "proto3";
+
+package google.cloud.aiplatform.v1beta1;
+
+option java_package = "com.google.cloud.aiplatform.v1beta1";
+option java_outer_classname = "UsageMetadataProto";
+option java_multiple_files = true;
+option csharp_namespace = "Google.Cloud.AIPlatform.V1Beta1";
+option php_namespace = "Google\\Cloud\\AIPlatform\\V1beta1";
+option ruby_package = "Google::Cloud::AIPlatform::V1beta1";
+
+import "google/api/field_behavior.proto";
+import "google/api/inclusion.proto";
+import "google/api/visibility.proto";
+import "google/cloud/aiplatform/v1beta1/aai_live_messages.proto";
+import "google/cloud/aiplatform/v1beta1/content.proto";
+
+message UsageMetadata {
+  reserved 6;
+  message BillablleUsage {
+    int32 text_count = 1;
+    int32 image_count = 2;
+    int32 video_duration_seconds = 3;
+    int32 audio_duration_seconds = 4;
+  }
+
+  enum TrafficType {
+    TRAFFIC_TYPE_UNSPECIFIED = 0;
+    ON_DEMAND = 1;
+    ON_DEMAND_PRIORITY = 3;
+    ON_DEMAND_FLEX = 4;
+    PROVISIONED_THROUGHPUT = 2;
+  }
+
+  int32 prompt_token_count = 1;
+  int32 candidates_token_count = 2;
+  int32 total_token_count = 3;
+  int32 tool_use_prompt_token_count = 13;
+  int32 thoughts_token_count = 14;
+  int32 cached_content_token_count = 5;
+  repeated .google.cloud.aiplatform.v1beta1.ModalityTokenCount prompt_tokens_details = 9;
+  repeated .google.cloud.aiplatform.v1beta1.ModalityTokenCount cache_tokens_details = 10;
+  repeated .google.cloud.aiplatform.v1beta1.ModalityTokenCount candidates_tokens_details = 11;
+  repeated .google.cloud.aiplatform.v1beta1.ModalityTokenCount tool_use_prompt_tokens_details = 12;
+  .google.cloud.aiplatform.v1beta1.UsageMetadata.TrafficType traffic_type = 8;
+  .google.cloud.aiplatform.v1beta1.UsageMetadata.BillablleUsage billable_prompt_usage = 4;
+  .google.cloud.aiplatform.v1beta1.UsageMetadata.BillablleUsage billable_cached_content_usage = 7;
+  repeated .google.cloud.aiplatform.v1beta1.ToolCallStats tool_call_stats = 15;
+}
+

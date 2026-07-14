@@ -1,0 +1,38 @@
+syntax = "proto3";
+
+package google.internal.cloud.code.v1internal;
+
+option java_package = "com.google.internal.cloud.code.v1internal";
+option java_outer_classname = "RemoteContextProto";
+option java_multiple_files = true;
+
+import "google/api/field_behavior.proto";
+import "storage/datapol/annotations/proto/semantic_annotations.proto";
+
+message RemoteContext {
+  enum RagState {
+    RAG_STATE_UNSPECIFIED = 0;
+    RAG_DISABLED = 1;
+    RAG_FOUND = 2;
+    RAG_NOT_FOUND = 3;
+    RAG_ERROR = 4;
+  }
+
+  .google.internal.cloud.code.v1internal.RemoteContext.RagState rag_state = 1;
+  repeated .google.internal.cloud.code.v1internal.RemoteSnippet remote_snippets = 2;
+}
+
+message RemoteSnippet {
+  enum SnippetType {
+    UNKNOWN = 0;
+    CODE = 1;
+    SUMMARY = 2;
+  }
+
+  .google.internal.cloud.code.v1internal.RemoteSnippet.SnippetType type = 1;
+  string content = 2;
+  string file_url = 3;
+  string file_path = 4;
+  string repo_url = 5;
+}
+

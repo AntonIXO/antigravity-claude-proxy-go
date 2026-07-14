@@ -1,0 +1,10 @@
+syntax = "proto2";
+
+package pattributes;
+
+option java_package = "com.google.pattributes.annotations";
+option java_outer_classname = "ProtoFieldAnnotations";
+
+import "net/proto2/proto/descriptor.proto";
+import "privacy/pattributes/containers/proto_field/proto_field_attributes.proto";
+

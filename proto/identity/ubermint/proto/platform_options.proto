@@ -1,0 +1,11 @@
+syntax = "proto2";
+
+package ubermint.options;
+
+option java_package = "com.google.identity.ubermint";
+option java_outer_classname = "PlatformOptionsProtoFile";
+option java_multiple_files = true;
+
+import "net/proto2/proto/descriptor.proto";
+import "storage/datapol/annotations/proto/semantic_annotations.proto";
+

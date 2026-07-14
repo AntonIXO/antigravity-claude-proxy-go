@@ -1,0 +1,19 @@
+edition = "2024";
+
+package devtools.jetski.telemetry.extensions;
+
+option java_outer_classname = "CortexTrajectoryStepOuterClass";
+
+import "storage/datapol/annotations/proto/semantic_annotations.proto";
+import "third_party/gemini_coder/proto/trajectory.proto";
+import "third_party/jetski/cortex_pb/cortex.proto";
+
+message CortexTrajectoryStep {
+  .gemini_coder.Step step = 1;
+  .exa.cortex_pb.CortexTrajectoryReference reference = 2;
+  string trajectory_id = 3;
+  string execution_id = 4;
+  int32 metadata_index = 5;
+  string error = 6;
+}
+

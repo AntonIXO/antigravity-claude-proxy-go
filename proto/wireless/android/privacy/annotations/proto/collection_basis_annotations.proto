@@ -1,0 +1,36 @@
+syntax = "proto2";
+
+package wireless.android.privacy;
+
+option java_package = "com.google.protos.android.privacy";
+option java_outer_classname = "AndroidPrivacyAnnotations";
+option go_package = "google.golang.org/genproto/wireless/android/privacy";
+option cc_enable_arenas = true;
+
+import "logs/proto/logs_annotations/logs_annotations.proto";
+import "net/proto2/proto/descriptor.proto";
+import "storage/datapol/annotations/proto/semantic_annotations.proto";
+import "wireless/android/privacy/annotations/proto/collection_basis_annotations_enums.proto";
+
+message CollectionUseCaseWrapped {
+  optional .wireless.android.privacy.CollectionUseCase use_case = 1;
+}
+
+message EligibleUseCaseWrapped {
+  optional .wireless.android.privacy.EligibleUseCase eligible_use = 1;
+}
+
+message MessageAnnotation {
+  repeated string features = 1;
+  repeated .wireless.android.privacy.CollectionUseCase use_cases = 2;
+  repeated .wireless.android.privacy.EligibleUseCase eligible_uses = 5;
+  repeated int32 fields = 3;
+  repeated string field_names = 4;
+}
+
+message FieldAnnotation {
+  repeated string features = 1;
+  repeated .wireless.android.privacy.CollectionUseCase use_cases = 2;
+  repeated .wireless.android.privacy.EligibleUseCase eligible_uses = 5;
+}
+

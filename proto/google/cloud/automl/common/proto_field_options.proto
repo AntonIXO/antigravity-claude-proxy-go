@@ -1,0 +1,24 @@
+syntax = "proto2";
+
+package google.cloud.automl.common;
+
+option java_package = "com.google.cloud.automl.common";
+option java_outer_classname = "ProtoFieldOptions";
+
+import "net/proto2/proto/descriptor.proto";
+
+message FieldAnnotations {
+  enum ResourceNameType {
+    RESOURCE_NAME_TYPE_UNSPECIFIED = 0;
+    REQUESTED_RESOURCE_NAME = 1;
+  }
+
+}
+
+message MethodAnnotations {
+  message MethodNameOverwrittenRule {
+    optional string method_name = 1;
+  }
+
+}
+

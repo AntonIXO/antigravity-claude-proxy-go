@@ -1,0 +1,29 @@
+edition = "2024";
+
+package devtools.jetski.telemetry.extensions;
+
+option java_outer_classname = "FeedbackMetadataOuterClass";
+
+import "storage/datapol/annotations/proto/semantic_annotations.proto";
+import "third_party/jetski/api_server_pb/api_server.proto";
+import "third_party/jetski/codeium_common_pb/codeium_common.proto";
+
+message FeedbackMetadata {
+  string completion_id = 1;
+  string prompt_id = 2;
+  .exa.codeium_common_pb.CompletionSource source = 3;
+  .exa.api_server_pb.FeedbackType feedback = 4;
+  .exa.api_server_pb.FeedbackExtraInfo extra_info = 5;
+  int32 latency_ms = 6;
+  int32 network_latency_ms = 7;
+  int32 debounce_latency_ms = 8;
+  int32 client_latency_ms = 9;
+  int32 feedback_delay_ms = 10;
+  .exa.codeium_common_pb.ProviderSource provider_source = 11;
+  int32 view_columns_open = 12;
+  bool has_active_vim_extension = 13;
+  string ide_version = 14;
+  string ide_name = 15;
+  string os = 16;
+}
+

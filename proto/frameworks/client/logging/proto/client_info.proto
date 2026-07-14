@@ -1,0 +1,20 @@
+edition = "2024";
+
+package frameworks.client.logging.proto;
+
+option java_package = "com.google.frameworks.client.logging.proto";
+option java_outer_classname = "ClientInfoOuterClass";
+option objc_class_prefix = "CLI";
+
+import "storage/datapol/annotations/proto/semantic_annotations.proto";
+
+message ClientInfo {
+  reserved 1;
+  reserved 2;
+  reserved 3;
+  reserved 6;
+  reserved 7;
+  string application_name = 4;
+  string application_version_name = 5;
+}
+

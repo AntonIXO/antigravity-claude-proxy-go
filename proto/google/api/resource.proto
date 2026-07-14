@@ -1,0 +1,72 @@
+syntax = "proto2";
+
+package google.api;
+
+option java_package = "com.google.api";
+option java_outer_classname = "ResourceProto";
+option java_multiple_files = true;
+option go_package = "google.golang.org/genproto/googleapis/api/annotations;annotations";
+option cc_enable_arenas = true;
+option objc_class_prefix = "GAPI";
+
+import "google/api/inclusion.proto";
+import "google/api/visibility.proto";
+import "net/proto2/proto/descriptor.proto";
+
+message ResourceDescriptor {
+  reserved 8;
+  reserved 9;
+  message ResourceNameDescriptor {
+    enum LocationType {
+      LOCATION_TYPE_UNSPECIFIED = 0;
+      CLOUD_ZONE = 1;
+      CLOUD_REGION = 2;
+      GOOGLE_MANAGED_MULTI_REGION = 3;
+      STANDARD_MANAGED_MULTI_REGION = 4;
+      CUSTOMER_MANAGED_MULTI_REGION = 5;
+      GLOBAL = 6;
+    }
+
+    optional string pattern = 1;
+    optional string parent_type = 2;
+    optional string parent_name_extractor = 3;
+    optional string location_extractor = 4;
+    repeated .google.api.ResourceDescriptor.ResourceNameDescriptor.LocationType supported_location_types = 5;
+  }
+
+  enum History {
+    HISTORY_UNSPECIFIED = 0;
+    ORIGINALLY_SINGLE_PATTERN = 1;
+    FUTURE_MULTI_PATTERN = 2;
+  }
+
+  enum Style {
+    STYLE_UNSPECIFIED = 0;
+    DECLARATIVE_FRIENDLY = 1;
+    KRM = 2;
+  }
+
+  optional string type = 1;
+  repeated string pattern = 2;
+  optional string name_field = 3;
+  optional .google.api.ResourceDescriptor.History history = 4;
+  optional string plural = 5;
+  optional string singular = 6;
+  repeated .google.api.ResourceDescriptor.ResourceNameDescriptor name_descriptor = 7;
+  repeated .google.api.ResourceDescriptor.Style style = 10;
+}
+
+message ResourceReference {
+  optional string type = 1;
+  optional string child_type = 2;
+}
+
+message ResourceContainer {
+  repeated .google.api.ResourceContainerRule rules = 1;
+}
+
+message ResourceContainerRule {
+  optional string selector = 1;
+  optional string type = 2;
+}
+

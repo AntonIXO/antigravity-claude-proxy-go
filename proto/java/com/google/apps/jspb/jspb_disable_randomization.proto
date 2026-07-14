@@ -1,0 +1,9 @@
+syntax = "proto2";
+
+package jspb;
+
+option java_package = "com.google.apps.jspb";
+option go_package = "google.golang.org/apps/jspb";
+
+import "net/proto2/proto/descriptor.proto";
+

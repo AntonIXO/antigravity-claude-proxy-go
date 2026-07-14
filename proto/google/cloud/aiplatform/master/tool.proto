@@ -1,0 +1,476 @@
+syntax = "proto3";
+
+package google.cloud.aiplatform.master;
+
+option java_package = "com.google.cloud.aiplatform.master";
+option java_outer_classname = "ToolProto";
+option java_multiple_files = true;
+option csharp_namespace = "Google.Cloud.AIPlatform.Master";
+option php_namespace = "Google\\Cloud\\AIPlatform\\Master";
+option ruby_package = "Google::Cloud::AIPlatform::Master";
+
+import "google/api/field_behavior.proto";
+import "google/api/inclusion.proto";
+import "google/api/resource.proto";
+import "google/api/versioning.proto";
+import "google/api/visibility.proto";
+import "google/cloud/aiplatform/master/api_auth.proto";
+import "google/cloud/aiplatform/master/auth.proto";
+import "google/cloud/aiplatform/master/openapi.proto";
+import "google/protobuf/struct.proto";
+import "google/type/interval.proto";
+import "google/type/latlng.proto";
+import "net/proto2/contrib/validator/annotations.proto";
+import "security/credentials/proto/end_user_credentials.proto";
+import "storage/datapol/annotations/proto/semantic_annotations.proto";
+
+message Tool {
+  reserved 8;
+  reserved 9;
+  message GoogleSearch {
+    message WebSearch {
+    }
+
+    message ImageSearch {
+    }
+
+    message SearchTypes {
+      .google.cloud.aiplatform.master.Tool.GoogleSearch.WebSearch web_search = 1;
+      .google.cloud.aiplatform.master.Tool.GoogleSearch.ImageSearch image_search = 2;
+    }
+
+    .google.type.Interval time_range_filter = 1;
+    .google.cloud.aiplatform.master.EnhancedContent enhanced_content = 2;
+    repeated string exclude_domains = 3;
+    repeated string included_domains = 5;
+    .google.cloud.aiplatform.master.Tool.GoogleSearch.SearchTypes search_types = 6;
+    .google.cloud.aiplatform.master.ExcludedDomainsSource excluded_domains_source = 7;
+    optional .google.cloud.aiplatform.master.Tool.PhishBlockThreshold blocking_confidence = 4;
+  }
+
+  message ParallelAiSearch {
+    string api_key = 1;
+    bool enable_data_retention = 2;
+    bool enable_zero_data_retention = 4;
+    .google.protobuf.Struct custom_configs = 3;
+  }
+
+  message ExaAiSearch {
+    string api_key = 1;
+    .google.protobuf.Struct custom_configs = 2;
+  }
+
+  message ImageSearch {
+  }
+
+  message CodeExecution {
+    repeated .google.cloud.aiplatform.master.ExecutableCode.Language languages = 1;
+  }
+
+  message ComputerUse {
+    enum Environment {
+      ENVIRONMENT_UNSPECIFIED = 0;
+      ENVIRONMENT_BROWSER = 1;
+      ENVIRONMENT_MOBILE = 2;
+      ENVIRONMENT_DESKTOP = 3;
+    }
+
+    enum SafetyPolicy {
+      SAFETY_POLICY_UNSPECIFIED = 0;
+      FINANCIAL_TRANSACTIONS = 1;
+      SENSITIVE_DATA_MODIFICATION = 2;
+      COMMUNICATION_TOOL = 3;
+      ACCOUNT_CREATION = 4;
+      DATA_MODIFICATION = 5;
+      USER_CONSENT_MANAGEMENT = 6;
+      LEGAL_TERMS_AND_AGREEMENTS = 7;
+    }
+
+    .google.cloud.aiplatform.master.Tool.ComputerUse.Environment environment = 1;
+    repeated string excluded_predefined_functions = 2;
+    bool enable_prompt_injection_detection = 3;
+    bool enable_strict_bad_url_check = 4;
+    repeated .google.cloud.aiplatform.master.Tool.ComputerUse.SafetyPolicy disabled_safety_policies = 5;
+  }
+
+  message Bash {
+  }
+
+  enum PhishBlockThreshold {
+    PHISH_BLOCK_THRESHOLD_UNSPECIFIED = 0;
+    BLOCK_LOW_AND_ABOVE = 30;
+    BLOCK_MEDIUM_AND_ABOVE = 40;
+    BLOCK_HIGH_AND_ABOVE = 50;
+    BLOCK_HIGHER_AND_ABOVE = 55;
+    BLOCK_VERY_HIGH_AND_ABOVE = 60;
+    BLOCK_ONLY_EXTREMELY_HIGH = 100;
+  }
+
+  repeated .google.cloud.aiplatform.master.FunctionDeclaration function_declarations = 1;
+  .google.cloud.aiplatform.master.Retrieval retrieval = 2;
+  .google.cloud.aiplatform.master.Tool.GoogleSearch google_search = 7;
+  .google.cloud.aiplatform.master.Tool.ImageSearch image_search = 14;
+  .google.cloud.aiplatform.master.GoogleSearchRetrieval google_search_retrieval = 3;
+  .google.cloud.aiplatform.master.GoogleMaps google_maps = 5;
+  .google.cloud.aiplatform.master.EnterpriseWebSearch enterprise_web_search = 6;
+  .google.cloud.aiplatform.master.Tool.ParallelAiSearch parallel_ai_search = 13;
+  .google.cloud.aiplatform.master.Tool.ExaAiSearch exa_ai_search = 15;
+  .google.cloud.aiplatform.master.Tool.CodeExecution code_execution = 4;
+  .google.cloud.aiplatform.master.UrlContext url_context = 10;
+  .google.cloud.aiplatform.master.Tool.ComputerUse computer_use = 11;
+  .google.cloud.aiplatform.master.Tool.Bash bash = 12;
+}
+
+message UrlContext {
+}
+
+message EnhancedContent {
+  reserved 1;
+  message ImageSearch {
+    int32 max_result_count = 1;
+  }
+
+  message YoutubeSearch {
+  }
+
+  .google.cloud.aiplatform.master.EnhancedContent.ImageSearch image_search = 2;
+  .google.cloud.aiplatform.master.EnhancedContent.YoutubeSearch youtube_search = 3;
+}
+
+message ToolUseExample {
+  message ExtensionOperation {
+    string extension = 1;
+    string operation_id = 2;
+  }
+
+  string display_name = 1;
+  string query = 2;
+  .google.protobuf.Struct request_params = 3;
+  .google.protobuf.Struct response_params = 4;
+  string response_summary = 5;
+  oneof Target {
+    .google.cloud.aiplatform.master.ToolUseExample.ExtensionOperation extension_operation = 10;
+    string function_name = 11;
+  }
+}
+
+message FunctionDeclaration {
+  enum Behavior {
+    UNSPECIFIED = 0;
+    BLOCKING = 1;
+    NON_BLOCKING = 2;
+  }
+
+  string name = 1;
+  string description = 2;
+  .google.cloud.aiplatform.master.Schema parameters = 3;
+  .google.protobuf.Value parameters_json_schema = 5;
+  .google.cloud.aiplatform.master.Schema response = 4;
+  .google.protobuf.Value response_json_schema = 6;
+  bool enable_response_grounding = 7;
+  optional .google.cloud.aiplatform.master.FunctionDeclaration.Behavior behavior = 8;
+}
+
+message FunctionCall {
+  string id = 3;
+  string name = 1;
+  .google.protobuf.Struct args = 2;
+  repeated .google.cloud.aiplatform.master.PartialArg partial_args = 4;
+  bool will_continue = 5;
+}
+
+message PartialArg {
+  string json_path = 1;
+  bool will_continue = 6;
+  oneof delta {
+    .google.protobuf.NullValue null_value = 2;
+    double number_value = 3;
+    string string_value = 4;
+    bool bool_value = 5;
+  }
+}
+
+message FunctionResponsePart {
+  oneof data {
+    .google.cloud.aiplatform.master.FunctionResponseBlob inline_data = 1;
+    .google.cloud.aiplatform.master.FunctionResponseFileData file_data = 2;
+    .google.cloud.aiplatform.master.FunctionResponseRetrievalResult retrieval_result = 3;
+  }
+}
+
+message FunctionResponseBlob {
+  reserved 3;
+  string mime_type = 1;
+  bytes data = 2;
+  string display_name = 4;
+}
+
+message FunctionResponseFileData {
+  string mime_type = 1;
+  string file_uri = 2;
+  string display_name = 3;
+}
+
+message FunctionResponseRetrievalResult {
+  message AnnotationsEntry {
+    string key = 1;
+    string value = 2;
+  }
+
+  string uri = 1;
+  string title = 2;
+  string content = 3;
+  string display_content = 4;
+  string query = 5;
+  repeated .google.cloud.aiplatform.master.FunctionResponseRetrievalResult.AnnotationsEntry annotations = 6;
+}
+
+message FunctionResponse {
+  enum Scheduling {
+    SCHEDULING_UNSPECIFIED = 0;
+    SILENT = 1;
+    WHEN_IDLE = 2;
+    INTERRUPT = 3;
+  }
+
+  string id = 3;
+  string name = 1;
+  .google.protobuf.Struct response = 2;
+  repeated .google.cloud.aiplatform.master.FunctionResponsePart parts = 4;
+  optional .google.cloud.aiplatform.master.FunctionResponse.Scheduling scheduling = 5;
+}
+
+message ExecutableCode {
+  enum Language {
+    LANGUAGE_UNSPECIFIED = 0;
+    PYTHON = 1;
+    BASH = 2;
+  }
+
+  .google.cloud.aiplatform.master.ExecutableCode.Language language = 1;
+  string code = 2;
+}
+
+message CodeExecutionResult {
+  enum Outcome {
+    OUTCOME_UNSPECIFIED = 0;
+    OUTCOME_OK = 1;
+    OUTCOME_FAILED = 2;
+    OUTCOME_DEADLINE_EXCEEDED = 3;
+  }
+
+  .google.cloud.aiplatform.master.CodeExecutionResult.Outcome outcome = 1;
+  string output = 2;
+}
+
+message Retrieval {
+  bool disable_attribution = 3;
+  string name = 7;
+  oneof source {
+    .google.cloud.aiplatform.master.VertexAISearch vertex_ai_search = 2;
+    .google.cloud.aiplatform.master.VertexRagStore vertex_rag_store = 4;
+    .google.cloud.aiplatform.master.ExternalApi external_api = 5;
+    .google.cloud.aiplatform.master.InlineRetrievalResults inline_retrieval_results = 8;
+  }
+}
+
+message VertexRagStore {
+  message RagResource {
+    string rag_corpus = 1;
+    repeated string rag_file_ids = 2;
+  }
+
+  message Ranking {
+    optional float alpha = 1;
+  }
+
+  repeated string rag_corpora = 1;
+  repeated .google.cloud.aiplatform.master.VertexRagStore.RagResource rag_resources = 4;
+  .google.cloud.aiplatform.master.VertexRagStore.Ranking ranking = 5;
+  .google.cloud.aiplatform.master.RagRetrievalConfig rag_retrieval_config = 6;
+  bool store_context = 7;
+  optional int32 similarity_top_k = 2;
+  optional double vector_distance_threshold = 3;
+}
+
+message VertexAISearch {
+  message DataStoreSpec {
+    string data_store = 1;
+    string filter = 2;
+  }
+
+  string datastore = 1;
+  string engine = 2;
+  int32 max_results = 3;
+  string filter = 4;
+  repeated .google.cloud.aiplatform.master.VertexAISearch.DataStoreSpec data_store_specs = 5;
+  .security.credentials.EndUserCredentialsProto end_user_creds = 6;
+}
+
+message ExternalApi {
+  message SimpleSearchParams {
+  }
+
+  message ElasticSearchParams {
+    string index = 1;
+    string search_template = 2;
+    int32 num_hits = 6;
+  }
+
+  enum ApiSpec {
+    API_SPEC_UNSPECIFIED = 0;
+    SIMPLE_SEARCH = 1;
+    ELASTIC_SEARCH = 2;
+  }
+
+  .google.cloud.aiplatform.master.ExternalApi.ApiSpec api_spec = 1;
+  string endpoint = 2;
+  .google.cloud.aiplatform.master.ApiAuth api_auth = 3;
+  .google.cloud.aiplatform.master.AuthConfig auth_config = 7;
+  oneof params {
+    .google.cloud.aiplatform.master.ExternalApi.SimpleSearchParams simple_search_params = 4;
+    .google.cloud.aiplatform.master.ExternalApi.ElasticSearchParams elastic_search_params = 5;
+  }
+}
+
+message InlineRetrievalResults {
+  message Result {
+    string uri = 1;
+    string title = 2;
+    string content = 3;
+    string query = 4;
+  }
+
+  repeated .google.cloud.aiplatform.master.InlineRetrievalResults.Result results = 1;
+}
+
+message GoogleSearchRetrieval {
+  bool disable_attribution = 1;
+  .google.cloud.aiplatform.master.DynamicRetrievalConfig dynamic_retrieval_config = 2;
+  .google.type.Interval time_range_filter = 3;
+}
+
+message GoogleMaps {
+  reserved 1;
+  reserved 2;
+  message StreetviewImagery {
+  }
+
+  message Places {
+  }
+
+  message Routing {
+  }
+
+  message GroundingTypes {
+    .google.cloud.aiplatform.master.GoogleMaps.StreetviewImagery streetview_imagery = 1;
+    .google.cloud.aiplatform.master.GoogleMaps.Places places = 2;
+    .google.cloud.aiplatform.master.GoogleMaps.Routing routing = 3;
+  }
+
+  bool enable_widget = 3;
+  .google.cloud.aiplatform.master.GoogleMaps.GroundingTypes grounding_types = 4;
+}
+
+message EnterpriseWebSearch {
+  repeated string exclude_domains = 1;
+  optional .google.cloud.aiplatform.master.Tool.PhishBlockThreshold blocking_confidence = 4;
+  optional .google.cloud.aiplatform.master.ExcludedDomainsSource excluded_domains_source = 5;
+}
+
+message ExcludedDomainsSource {
+  string uri = 1;
+}
+
+message DynamicRetrievalConfig {
+  enum Mode {
+    MODE_UNSPECIFIED = 0;
+    MODE_DYNAMIC = 1;
+  }
+
+  .google.cloud.aiplatform.master.DynamicRetrievalConfig.Mode mode = 1;
+  optional float dynamic_threshold = 2;
+}
+
+message ToolConfig {
+  .google.cloud.aiplatform.master.FunctionCallingConfig function_calling_config = 1;
+  .google.cloud.aiplatform.master.RetrievalConfig retrieval_config = 2;
+  int32 tool_turn_limit = 3;
+  bool include_server_side_tool_invocations = 4;
+}
+
+message FunctionCallingConfig {
+  message AllowedFunctionNames {
+    repeated string names = 1;
+    bool is_optional = 2;
+  }
+
+  enum Mode {
+    MODE_UNSPECIFIED = 0;
+    AUTO = 1;
+    ANY = 2;
+    NONE = 3;
+    COMPOSITIONAL = 4;
+    VALIDATED = 5;
+    TEST = 6;
+  }
+
+  .google.cloud.aiplatform.master.FunctionCallingConfig.Mode mode = 1;
+  repeated string allowed_function_names = 2;
+  repeated .google.cloud.aiplatform.master.FunctionCallingConfig.AllowedFunctionNames parallel_function_call_config = 3;
+  bool stream_function_call_arguments = 4;
+}
+
+message RetrievalConfig {
+  optional .google.type.LatLng lat_lng = 1;
+  optional string language_code = 2;
+  optional string time_zone = 3;
+}
+
+message RagRetrievalConfig {
+  message HybridSearch {
+    optional float alpha = 1;
+  }
+
+  message Filter {
+    string metadata_filter = 2;
+    oneof vector_db_threshold {
+      double vector_distance_threshold = 3;
+      double vector_similarity_threshold = 4;
+    }
+  }
+
+  message Ranking {
+    message RankService {
+      optional string model_name = 1;
+    }
+
+    message LlmRanker {
+      optional string model_name = 1;
+    }
+
+    oneof ranking_config {
+      .google.cloud.aiplatform.master.RagRetrievalConfig.Ranking.RankService rank_service = 1;
+      .google.cloud.aiplatform.master.RagRetrievalConfig.Ranking.LlmRanker llm_ranker = 3;
+    }
+    optional int32 rank_count = 2;
+  }
+
+  int32 top_k = 1;
+  .google.cloud.aiplatform.master.RagRetrievalConfig.HybridSearch hybrid_search = 2;
+  .google.cloud.aiplatform.master.RagRetrievalConfig.Filter filter = 3;
+  .google.cloud.aiplatform.master.RagRetrievalConfig.Ranking ranking = 4;
+}
+
+enum ToolType {
+  TOOL_TYPE_UNSPECIFIED = 0;
+  CUSTOM = 1;
+  GOOGLE_SEARCH_WEB = 2;
+  GOOGLE_SEARCH_IMAGE = 7;
+  URL_CONTEXT = 3;
+  CODE_EXECUTION = 4;
+  CODE_EXECUTION_BASH = 6;
+  BASH = 5;
+  GOOGLE_MAPS = 8;
+}
+

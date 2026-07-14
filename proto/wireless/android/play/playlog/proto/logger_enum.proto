@@ -1,0 +1,37 @@
+edition = "2023";
+
+package wireless_android_play_playlog.logger_enum;
+
+option java_package = "com.google.wireless.android.play.playlog.proto";
+option java_outer_classname = "LoggerEnum";
+option java_multiple_files = true;
+
+import "java/com/google/protobuf/contrib/j2cl/options/js_enum.proto";
+import "third_party/java/protobuf/java_features.proto";
+
+enum LoggerId {
+  UNSPECIFIED_LOGGER = 0;
+  TEST_LOGGER1 = 100000;
+  TEST_LOGGER2 = 100001;
+  TEST_LOGGER3 = 100002;
+  TEST_LOGGER4 = 100004;
+  TEST_LOGGER5 = 100005;
+  TEST_AGGREGATION = 100006;
+  DEFAULTS = 100003;
+  TIKTOK_STREAMZ = 4;
+  MOBDOG = 5;
+  MOBDOG_AGGREGATION = 16;
+  POPULOUS_LOW_PRIORITY = 6;
+  POPULOUS_HIGH_PRIORITY = 7;
+  SOCIAL_AFFINITY = 11;
+  SOCIAL_AFFINITY_PHOTOS = 12;
+  CHARON = 8;
+  CLIENT_ERROR_LOGGING = 9;
+  CLIENT_ERROR_LOGGING_UNMETERED_OR_DAILY = 13;
+  ALUMINIUM_CAMERA = 10;
+  CALLCORE = 14;
+  SCOPED_CONTEXT_STREAMZ = 15;
+  CALLCORE_DEIDENTIFIED = 17;
+  SEARCH_WEBVIEW_STARTUP = 18;
+}
+

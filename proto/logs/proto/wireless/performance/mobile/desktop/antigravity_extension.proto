@@ -1,0 +1,65 @@
+edition = "2024";
+
+package logs.proto.wireless.performance.mobile.desktop;
+
+option java_outer_classname = "AntigravityExtensionOuterClass";
+
+import "logs/proto/wireless/performance/mobile/desktop/extension_metric.proto";
+import "storage/datapol/annotations/proto/semantic_annotations.proto";
+
+message AntigravityExtension {
+  enum Severity {
+    SEVERITY_UNSPECIFIED = 0;
+    LOW = 1;
+    MEDIUM = 2;
+    HIGH = 3;
+  }
+
+  enum ClientType {
+    CLIENT_TYPE_UNSPECIFIED = 0;
+    IDE = 1;
+    HUB = 2;
+    CLI = 3;
+    SDK = 4;
+  }
+
+  enum UserTier {
+    USER_TIER_UNSPECIFIED = 0;
+    AIDA_TIER = 1;
+    CS_STANDARD_TIER = 2;
+    AGY_BUSINESS_PAYGO_TIER = 3;
+    ENTERPRISE_AGENT_TIER = 4;
+    FREE_TIER = 5;
+    G1_PRO_TIER = 6;
+    G1_ULTRA_TIER = 7;
+    G1_ULTRA_LITE_TIER = 8;
+    GCP_ENTERPRISE_TIER = 9;
+    GCP_GE_PAYGO_TIER = 29;
+    GCP_GE_PLUS_TIER = 10;
+    GCP_GE_STANDARD_TIER = 12;
+    GCP_STANDARD_TIER = 13;
+    GDP_PREMIUM_TIER = 14;
+    GE_BUSINESS_TIER = 15;
+    GE_BUSINESS_TRIAL_TIER = 16;
+    GOOGLER_DOGFOOD_TIER = 17;
+    GOOGLER_TIER = 18;
+    LEGACY_TIER = 19;
+    STANDARD_TIER = 20;
+    UNLICENSED_TIER = 21;
+    WS_AI_ULTRA_BUSINESS_TIER = 22;
+    WS_BIZ_PLUS_TIER = 23;
+    WS_BIZ_STARTER_TIER = 24;
+    WS_BIZ_STD_TIER = 25;
+    WS_ENT_PLUS_TIER = 26;
+    WS_ENT_STARTER_TIER = 27;
+    WS_ENT_STD_TIER = 28;
+  }
+
+  .logs.proto.wireless.performance.mobile.desktop.AntigravityExtension.ClientType client_type = 1;
+  .logs.proto.wireless.performance.mobile.desktop.AntigravityExtension.UserTier user_tier = 2;
+  .logs.proto.wireless.performance.mobile.desktop.AntigravityExtension.Severity severity = 6;
+  string error_id = 3;
+  repeated string backend_trace_id = 4;
+  string installation_id = 5;
+}
+

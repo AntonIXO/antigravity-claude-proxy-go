@@ -1,0 +1,604 @@
+syntax = "proto3";
+
+package google.cloud.aiplatform.master;
+
+option java_package = "com.google.cloud.aiplatform.master";
+option java_outer_classname = "PredictionServiceProto";
+option java_multiple_files = true;
+option csharp_namespace = "Google.Cloud.AIPlatform.Master";
+option php_namespace = "Google\\Cloud\\AIPlatform\\Master";
+option ruby_package = "Google::Cloud::AIPlatform::Master";
+
+import "google/api/annotations.proto";
+import "google/api/client.proto";
+import "google/api/field_behavior.proto";
+import "google/api/httpbody.proto";
+import "google/api/inclusion.proto";
+import "google/api/policy.proto";
+import "google/api/resource.proto";
+import "google/api/versioning.proto";
+import "google/api/visibility.proto";
+import "google/cloud/aiplatform/common/proto_field_options.proto";
+import "google/cloud/aiplatform/master/cached_content.proto";
+import "google/cloud/aiplatform/master/content.proto";
+import "google/cloud/aiplatform/master/explanation.proto";
+import "google/cloud/aiplatform/master/operation.proto";
+import "google/cloud/aiplatform/master/service_tier.proto";
+import "google/cloud/aiplatform/master/tool.proto";
+import "google/cloud/aiplatform/master/types.proto";
+import "google/cloud/aiplatform/master/usage_metadata.proto";
+import "google/cloud/automl/common/proto_field_options.proto";
+import "google/cloud/speech/v1p1beta1/cloud_speech.proto";
+import "google/longrunning/operations.proto";
+import "google/protobuf/any.proto";
+import "google/protobuf/struct.proto";
+import "google/protobuf/timestamp.proto";
+import "net/proto2/contrib/validator/annotations.proto";
+import "storage/datapol/annotations/proto/semantic_annotations.proto";
+
+service PredictionService {
+  rpc Predict (.google.cloud.aiplatform.master.PredictRequest) returns (.google.cloud.aiplatform.master.PredictResponse) {}
+  rpc RawPredict (.google.cloud.aiplatform.master.RawPredictRequest) returns (.google.api.HttpBody) {}
+  rpc StreamRawPredict (.google.cloud.aiplatform.master.StreamRawPredictRequest) returns (stream .google.api.HttpBody) {}
+  rpc DirectPredict (.google.cloud.aiplatform.master.DirectPredictRequest) returns (.google.cloud.aiplatform.master.DirectPredictResponse) {}
+  rpc DirectRawPredict (.google.cloud.aiplatform.master.DirectRawPredictRequest) returns (.google.cloud.aiplatform.master.DirectRawPredictResponse) {}
+  rpc StreamDirectPredict (stream .google.cloud.aiplatform.master.StreamDirectPredictRequest) returns (stream .google.cloud.aiplatform.master.StreamDirectPredictResponse) {}
+  rpc StreamDirectRawPredict (stream .google.cloud.aiplatform.master.StreamDirectRawPredictRequest) returns (stream .google.cloud.aiplatform.master.StreamDirectRawPredictResponse) {}
+  rpc StreamingPredict (stream .google.cloud.aiplatform.master.StreamingPredictRequest) returns (stream .google.cloud.aiplatform.master.StreamingPredictResponse) {}
+  rpc ServerStreamingPredict (.google.cloud.aiplatform.master.StreamingPredictRequest) returns (stream .google.cloud.aiplatform.master.StreamingPredictResponse) {}
+  rpc StreamingRawPredict (stream .google.cloud.aiplatform.master.StreamingRawPredictRequest) returns (stream .google.cloud.aiplatform.master.StreamingRawPredictResponse) {}
+  rpc PredictLongRunning (.google.cloud.aiplatform.master.PredictLongRunningRequest) returns (.google.longrunning.Operation) {}
+  rpc RawPredictLongRunning (.google.cloud.aiplatform.master.RawPredictLongRunningRequest) returns (.google.longrunning.Operation) {}
+  rpc FetchPredictOperation (.google.cloud.aiplatform.master.FetchPredictOperationRequest) returns (.google.longrunning.Operation) {}
+  rpc Invoke (.google.cloud.aiplatform.master.InvokeRequest) returns (stream .google.api.HttpBody) {}
+  rpc StreamInvoke (stream .google.cloud.aiplatform.master.StreamInvokeRequest) returns (stream .google.cloud.aiplatform.master.StreamInvokeResponse) {}
+  rpc InvokeApi (.google.cloud.aiplatform.master.InvokeApiRequest) returns (stream .google.api.HttpBody) {}
+  rpc GetResponse (.google.cloud.aiplatform.master.GetResponseRequest) returns (.google.api.HttpBody) {}
+  rpc DeleteResponse (.google.cloud.aiplatform.master.DeleteResponseRequest) returns (.google.api.HttpBody) {}
+  rpc Explain (.google.cloud.aiplatform.master.ExplainRequest) returns (.google.cloud.aiplatform.master.ExplainResponse) {}
+  rpc CountTokens (.google.cloud.aiplatform.master.CountTokensRequest) returns (.google.cloud.aiplatform.master.CountTokensResponse) {}
+  rpc TestGrpcPredict (.google.cloud.aiplatform.master.TestGrpcPredictRequest) returns (.google.cloud.aiplatform.master.TestGrpcPredictResponse) {}
+  rpc SpeechStreamingRecognize (stream .google.cloud.aiplatform.master.SpeechStreamingRecognizeRequest) returns (stream .google.cloud.aiplatform.master.SpeechStreamingRecognizeResponse) {}
+  rpc CompleteCode (.google.cloud.aiplatform.master.CompleteCodeRequest) returns (.google.cloud.aiplatform.master.CompleteCodeResponse) {}
+  rpc GenerateContent (.google.cloud.aiplatform.master.GenerateContentRequest) returns (.google.cloud.aiplatform.master.GenerateContentResponse) {}
+  rpc StreamGenerateContent (.google.cloud.aiplatform.master.GenerateContentRequest) returns (stream .google.cloud.aiplatform.master.GenerateContentResponse) {}
+  rpc AsyncGenerateContent (.google.cloud.aiplatform.master.AsyncGenerateContentRequest) returns (.google.longrunning.Operation) {}
+  rpc StreamAsyncGenerateContent (.google.cloud.aiplatform.master.StreamAsyncGenerateContentRequest) returns (stream .google.cloud.aiplatform.master.AsyncGenerateContentResponse) {}
+  rpc ChatCompletions (.google.cloud.aiplatform.master.ChatCompletionsRequest) returns (stream .google.api.HttpBody) {}
+  rpc EmbedContent (.google.cloud.aiplatform.master.EmbedContentRequest) returns (.google.cloud.aiplatform.master.EmbedContentResponse) {}
+}
+
+message PredictRequest {
+  message LabelsEntry {
+    string key = 1;
+    string value = 2;
+  }
+
+  string endpoint = 1;
+  repeated .google.protobuf.Value instances = 2;
+  .google.protobuf.Value parameters = 3;
+  repeated .google.cloud.aiplatform.master.PredictRequest.LabelsEntry labels = 4;
+}
+
+message PredictResponse {
+  repeated .google.protobuf.Value predictions = 1;
+  string deployed_model_id = 2;
+  string model = 3;
+  string model_version_id = 5;
+  string model_display_name = 4;
+  .google.protobuf.Value metadata = 6;
+}
+
+message RawPredictRequest {
+  reserved 3;
+  string endpoint = 1;
+  .google.api.HttpBody http_body = 2;
+}
+
+message StreamRawPredictRequest {
+  reserved 3;
+  string endpoint = 1;
+  .google.api.HttpBody http_body = 2;
+}
+
+message DirectPredictRequest {
+  string endpoint = 1;
+  repeated .google.cloud.aiplatform.master.Tensor inputs = 2;
+  .google.cloud.aiplatform.master.Tensor parameters = 3;
+}
+
+message DirectPredictResponse {
+  repeated .google.cloud.aiplatform.master.Tensor outputs = 1;
+  .google.cloud.aiplatform.master.Tensor parameters = 2;
+}
+
+message DirectRawPredictRequest {
+  string endpoint = 1;
+  string method_name = 2;
+  bytes input = 3;
+  .google.protobuf.Timestamp send_time = 4;
+}
+
+message DirectRawPredictResponse {
+  bytes output = 1;
+  .google.protobuf.Timestamp send_time = 2;
+}
+
+message StreamDirectPredictRequest {
+  string endpoint = 1;
+  repeated .google.cloud.aiplatform.master.Tensor inputs = 2;
+  .google.cloud.aiplatform.master.Tensor parameters = 3;
+  .google.protobuf.Timestamp send_time = 4;
+}
+
+message StreamDirectPredictResponse {
+  repeated .google.cloud.aiplatform.master.Tensor outputs = 1;
+  .google.cloud.aiplatform.master.Tensor parameters = 2;
+  .google.protobuf.Timestamp send_time = 3;
+}
+
+message StreamDirectRawPredictRequest {
+  string endpoint = 1;
+  string method_name = 2;
+  bytes input = 3;
+  .google.protobuf.Timestamp send_time = 4;
+}
+
+message StreamDirectRawPredictResponse {
+  bytes output = 1;
+  .google.protobuf.Timestamp send_time = 2;
+}
+
+message StreamingPredictRequest {
+  string endpoint = 1;
+  repeated .google.cloud.aiplatform.master.Tensor inputs = 2;
+  .google.cloud.aiplatform.master.Tensor parameters = 3;
+  .google.protobuf.Timestamp send_time = 4;
+}
+
+message StreamingPredictResponse {
+  repeated .google.cloud.aiplatform.master.Tensor outputs = 1;
+  .google.cloud.aiplatform.master.Tensor parameters = 2;
+  .google.protobuf.Timestamp send_time = 3;
+}
+
+message StreamingRawPredictRequest {
+  string endpoint = 1;
+  string method_name = 2;
+  bytes input = 3;
+  .google.protobuf.Timestamp send_time = 4;
+}
+
+message StreamingRawPredictResponse {
+  bytes output = 1;
+  .google.protobuf.Timestamp send_time = 2;
+}
+
+message PredictLongRunningRequest {
+  message LabelsEntry {
+    string key = 1;
+    string value = 2;
+  }
+
+  string endpoint = 1;
+  repeated .google.protobuf.Value instances = 2;
+  .google.protobuf.Value parameters = 3;
+  repeated .google.cloud.aiplatform.master.PredictLongRunningRequest.LabelsEntry labels = 4;
+}
+
+message RawPredictLongRunningRequest {
+  string endpoint = 1;
+  .google.api.HttpBody http_body = 2;
+}
+
+message FetchPredictOperationRequest {
+  string endpoint = 1;
+  string operation_name = 2;
+}
+
+message InvokeRequest {
+  string endpoint = 1;
+  string deployed_model_id = 3;
+  .google.api.HttpBody http_body = 2;
+}
+
+message StreamInvokeRequest {
+  string endpoint = 1;
+  .google.api.HttpBody http_body = 2;
+  string deployed_model_id = 3;
+}
+
+message StreamInvokeResponse {
+  .google.api.HttpBody http_body = 1;
+}
+
+message InvokeApiRequest {
+  string endpoint = 1;
+  .google.api.HttpBody http_body = 2;
+}
+
+message ExplainRequest {
+  message ConcurrentExplanationSpecOverrideEntry {
+    string key = 1;
+    .google.cloud.aiplatform.master.ExplanationSpecOverride value = 2;
+  }
+
+  string endpoint = 1;
+  repeated .google.protobuf.Value instances = 2;
+  .google.protobuf.Value parameters = 4;
+  .google.cloud.aiplatform.master.ExplanationSpecOverride explanation_spec_override = 5;
+  repeated .google.cloud.aiplatform.master.ExplainRequest.ConcurrentExplanationSpecOverrideEntry concurrent_explanation_spec_override = 6;
+  string deployed_model_id = 3;
+}
+
+message ExplainResponse {
+  message ConcurrentExplanation {
+    repeated .google.cloud.aiplatform.master.Explanation explanations = 1;
+  }
+
+  message ConcurrentExplanationsEntry {
+    string key = 1;
+    .google.cloud.aiplatform.master.ExplainResponse.ConcurrentExplanation value = 2;
+  }
+
+  repeated .google.cloud.aiplatform.master.Explanation explanations = 1;
+  repeated .google.cloud.aiplatform.master.ExplainResponse.ConcurrentExplanationsEntry concurrent_explanations = 4;
+  string deployed_model_id = 2;
+  repeated .google.protobuf.Value predictions = 3;
+}
+
+message CountTokensRequest {
+  string endpoint = 1;
+  string model = 3;
+  repeated .google.protobuf.Value instances = 2;
+  repeated .google.cloud.aiplatform.master.Content contents = 4;
+  repeated .google.cloud.aiplatform.master.Tool tools = 6;
+  optional .google.cloud.aiplatform.master.Content system_instruction = 5;
+  optional .google.cloud.aiplatform.master.GenerationConfig generation_config = 7;
+}
+
+message CountTokensResponse {
+  int32 total_tokens = 1;
+  int32 total_billable_characters = 2;
+  repeated .google.cloud.aiplatform.master.ModalityTokenCount prompt_tokens_details = 3;
+}
+
+message TestGrpcPredictRequest {
+  string endpoint = 1;
+  .google.protobuf.Any instances = 2;
+}
+
+message TestGrpcPredictResponse {
+  .google.protobuf.Any predictions = 1;
+}
+
+message SpeechStreamingRecognizeRequest {
+  string endpoint = 1;
+  .google.cloud.speech.v1p1beta1.StreamingRecognizeRequest speech_req = 2;
+}
+
+message SpeechStreamingRecognizeResponse {
+  string endpoint = 1;
+  .google.cloud.speech.v1p1beta1.StreamingRecognizeResponse speech_resp = 2;
+}
+
+message GenerateContentRequest {
+  message LabelsEntry {
+    string key = 1;
+    string value = 2;
+  }
+
+  string endpoint = 1;
+  string model = 5;
+  repeated .google.cloud.aiplatform.master.Content contents = 2;
+  .google.cloud.aiplatform.master.PreambleConfig preamble_config = 18;
+  string cached_content = 9;
+  repeated .google.cloud.aiplatform.master.Tool tools = 6;
+  .google.cloud.aiplatform.master.ToolConfig tool_config = 7;
+  repeated .google.cloud.aiplatform.master.GenerateContentRequest.LabelsEntry labels = 10;
+  repeated .google.cloud.aiplatform.master.SafetySetting safety_settings = 3;
+  .google.cloud.aiplatform.master.ModelArmorConfig model_armor_config = 11;
+  .google.cloud.aiplatform.master.GenerationConfig generation_config = 4;
+  string service_account = 12;
+  string session_id = 13;
+  string uniserve_endpoint_override = 14;
+  string global_endpoint_target_location_hint_testing_only = 15;
+  optional .google.cloud.aiplatform.master.Content system_instruction = 8;
+  optional .google.cloud.aiplatform.master.ServiceTier service_tier = 16;
+  optional .google.cloud.aiplatform.master.ContextCacheConfig implicit_cache_config = 17;
+}
+
+message GenerateContentResponse {
+  message PromptFeedback {
+    enum BlockedReason {
+      BLOCKED_REASON_UNSPECIFIED = 0;
+      SAFETY = 1;
+      OTHER = 2;
+      BLOCKLIST = 3;
+      PROHIBITED_CONTENT = 4;
+      MODEL_ARMOR = 5;
+      IMAGE_SAFETY = 6;
+      JAILBREAK = 7;
+    }
+
+    .google.cloud.aiplatform.master.GenerateContentResponse.PromptFeedback.BlockedReason block_reason = 1;
+    repeated .google.cloud.aiplatform.master.SafetyRating safety_ratings = 2;
+    string block_reason_message = 3;
+  }
+
+  message UsageMetadata {
+    reserved 6;
+    message BillablleUsage {
+      int32 text_count = 1;
+      int32 image_count = 2;
+      int32 video_duration_seconds = 3;
+      int32 audio_duration_seconds = 4;
+    }
+
+    enum TrafficType {
+      TRAFFIC_TYPE_UNSPECIFIED = 0;
+      ON_DEMAND = 1;
+      ON_DEMAND_PRIORITY = 3;
+      ON_DEMAND_FLEX = 4;
+      PROVISIONED_THROUGHPUT = 2;
+    }
+
+    int32 prompt_token_count = 1;
+    int32 candidates_token_count = 2;
+    int32 total_token_count = 3;
+    int32 tool_use_prompt_token_count = 13;
+    int32 thoughts_token_count = 14;
+    int32 cached_content_token_count = 5;
+    repeated .google.cloud.aiplatform.master.ModalityTokenCount prompt_tokens_details = 9;
+    repeated .google.cloud.aiplatform.master.ModalityTokenCount cache_tokens_details = 10;
+    repeated .google.cloud.aiplatform.master.ModalityTokenCount candidates_tokens_details = 11;
+    repeated .google.cloud.aiplatform.master.ModalityTokenCount tool_use_prompt_tokens_details = 12;
+    .google.cloud.aiplatform.master.GenerateContentResponse.UsageMetadata.TrafficType traffic_type = 8;
+    .google.cloud.aiplatform.master.GenerateContentResponse.UsageMetadata.BillablleUsage billable_prompt_usage = 4;
+    .google.cloud.aiplatform.master.GenerateContentResponse.UsageMetadata.BillablleUsage billable_cached_content_usage = 7;
+  }
+
+  message InternalDebugInfo {
+    string routed_model_name = 1;
+  }
+
+  message ModelLifecycleStatus {
+    enum ModelLifecycleStage {
+      MODEL_LIFECYCLE_STAGE_UNSPECIFIED = 0;
+      EXPERIMENTAL = 1;
+      PREVIEW = 2;
+      STABLE = 3;
+      LEGACY = 4;
+      RETIRED = 5;
+    }
+
+    .google.cloud.aiplatform.master.GenerateContentResponse.ModelLifecycleStatus.ModelLifecycleStage model_lifecycle_stage = 1;
+    string retirement_date = 2;
+    string recommended_upgrade_model = 3;
+  }
+
+  repeated .google.cloud.aiplatform.master.Candidate candidates = 2;
+  string model_version = 11;
+  .google.protobuf.Timestamp create_time = 12;
+  string response_id = 13;
+  .google.cloud.aiplatform.master.GenerateContentResponse.PromptFeedback prompt_feedback = 3;
+  .google.cloud.aiplatform.master.GenerateContentResponse.UsageMetadata usage_metadata = 4;
+  .google.protobuf.Timestamp send_time = 10;
+  .google.cloud.aiplatform.master.GenerateContentResponse.InternalDebugInfo internal_debug_info = 14;
+  .google.cloud.aiplatform.master.GenerateContentResponse.ModelLifecycleStatus model_lifecycle_status = 15;
+  .google.cloud.aiplatform.master.LogprobsResult logprobs_result = 16;
+}
+
+message CompleteCodeRequest {
+  string model = 1;
+  repeated .google.cloud.aiplatform.master.CompleteCodePrompt prompts = 2;
+  .google.cloud.aiplatform.master.CompletionConfig completion_config = 3;
+}
+
+message CompleteCodeResponse {
+  message Metadata {
+    message TokenMetadata {
+      int32 total_billable_characters = 1;
+      int32 total_tokens = 2;
+    }
+
+    .google.cloud.aiplatform.master.CompleteCodeResponse.Metadata.TokenMetadata output_token_count = 1;
+    .google.cloud.aiplatform.master.CompleteCodeResponse.Metadata.TokenMetadata input_token_count = 2;
+  }
+
+  repeated .google.cloud.aiplatform.master.CompleteCodePrediction candidates = 1;
+  string deployed_model_id = 2;
+  string model = 3;
+  string model_version_id = 4;
+  string model_display_name = 5;
+  .google.cloud.aiplatform.master.CompleteCodeResponse.Metadata metadata = 6;
+}
+
+message AsyncGenerateContentResponse {
+  message SessionInfo {
+    string session_id = 1;
+  }
+
+  message AsyncGenerateContentResult {
+    .google.cloud.aiplatform.master.GenerateContentResponse generate_content_response = 1;
+  }
+
+  enum AsyncGenerationState {
+    ASYNC_GENERATION_STATE_UNSPECIFIED = 0;
+    PENDING = 1;
+    RUNNING = 2;
+    DONE = 3;
+  }
+
+  .google.cloud.aiplatform.master.AsyncGenerateContentResponse.SessionInfo session_info = 1;
+  .google.cloud.aiplatform.master.AsyncGenerateContentResponse.AsyncGenerationState state = 2;
+  repeated .google.cloud.aiplatform.master.AsyncGenerateContentResponse.AsyncGenerateContentResult results = 3;
+}
+
+message ChatCompletionsRequest {
+  message ExtraBody {
+    message ModelSafetySettings {
+      message LlamaGuardSettings {
+      }
+
+      bool enabled = 1;
+      oneof settings {
+        .google.cloud.aiplatform.master.ChatCompletionsRequest.ExtraBody.ModelSafetySettings.LlamaGuardSettings llama_guard_settings = 2;
+      }
+    }
+
+    repeated .google.cloud.aiplatform.master.ChatCompletionsRequest.ExtraBody.ModelSafetySettings model_safety_settings = 1;
+    repeated .google.cloud.aiplatform.master.SafetySetting safety_settings = 3;
+    string thought_tag_marker = 4;
+    string cached_content = 5;
+    .google.cloud.aiplatform.master.GenerationConfig.ThinkingConfig thinking_config = 6;
+    string session_id = 7;
+    repeated .google.cloud.aiplatform.master.Tool tools = 8;
+    .google.cloud.aiplatform.master.GenerationConfig.MediaResolution media_resolution = 9;
+    bool stream_function_call_arguments = 10;
+    .google.cloud.aiplatform.master.ContextCacheConfig implicit_cache_config = 11;
+    oneof retrieval_source {
+      .google.cloud.aiplatform.master.VertexRagStore vertex_rag_store = 2;
+    }
+  }
+
+  message ExtraPart {
+    reserved 1;
+    bytes thought_signature = 3;
+    oneof metadata {
+      .google.cloud.aiplatform.master.VideoMetadata video_metadata = 4;
+    }
+    optional bool thought = 2;
+  }
+
+  message PerChoiceResponseExtraProperties {
+    .google.cloud.aiplatform.master.GroundingMetadata grounding_metadata = 1;
+  }
+
+  message ResponseExtraProperties {
+  }
+
+  message ExtraToolPart {
+    repeated .google.cloud.aiplatform.master.FunctionResponsePart parts = 1;
+  }
+
+  string endpoint = 1;
+  .google.api.HttpBody http_body = 2;
+}
+
+message PredictLongRunningResponse {
+  oneof response {
+    .google.cloud.aiplatform.master.GenerateVideoResponse generate_video_response = 1;
+  }
+}
+
+message PredictLongRunningMetadata {
+}
+
+message FetchPredictOperationMetadata {
+  enum TaskState {
+    TASK_STATE_UNSPECIFIED = 0;
+    STARTED = 1;
+    PENDING = 2;
+  }
+
+  .google.cloud.aiplatform.master.FetchPredictOperationMetadata.TaskState task_state = 1;
+}
+
+message GenerateVideoResponse {
+  message Video {
+    string mime_type = 3;
+    oneof data {
+      string gcs_uri = 1;
+      string bytes_base64_encoded = 2;
+    }
+  }
+
+  repeated string generated_samples = 1;
+  repeated string rai_media_filtered_reasons = 3;
+  repeated .google.cloud.aiplatform.master.GenerateVideoResponse.Video videos = 4;
+  optional int32 rai_media_filtered_count = 2;
+}
+
+message EmbedContentRequest {
+  reserved 3;
+  message EmbedContentConfig {
+    optional string title = 1;
+    optional .google.cloud.aiplatform.master.EmbedContentRequest.EmbeddingTaskType task_type = 2;
+    optional bool auto_truncate = 3;
+    optional int32 output_dimensionality = 4;
+    optional bool document_ocr = 5;
+    optional bool audio_track_extraction = 6;
+  }
+
+  enum EmbeddingTaskType {
+    UNSPECIFIED = 0;
+    NONE = 1;
+    RETRIEVAL_QUERY = 2;
+    RETRIEVAL_DOCUMENT = 3;
+    SEMANTIC_SIMILARITY = 4;
+    CLASSIFICATION = 5;
+    CLUSTERING = 6;
+    QUESTION_ANSWERING = 7;
+    FACT_VERIFICATION = 8;
+    CODE_RETRIEVAL_QUERY = 9;
+  }
+
+  optional string model = 1;
+  optional .google.cloud.aiplatform.master.Content content = 2;
+  optional string title = 4;
+  optional .google.cloud.aiplatform.master.EmbedContentRequest.EmbeddingTaskType task_type = 5;
+  optional int32 output_dimensionality = 6;
+  optional bool auto_truncate = 7;
+  optional .google.cloud.aiplatform.master.EmbedContentRequest.EmbedContentConfig embed_content_config = 8;
+  optional string service_account = 9;
+}
+
+message EmbedContentResponse {
+  reserved 3;
+  message Embedding {
+    repeated float values = 1;
+  }
+
+  .google.cloud.aiplatform.master.EmbedContentResponse.Embedding embedding = 1;
+  .google.cloud.aiplatform.master.UsageMetadata usage_metadata = 2;
+  bool truncated = 4;
+}
+
+message AsyncGenerateContentRequest {
+  string model = 1;
+  .google.cloud.aiplatform.master.Content content = 2;
+  repeated .google.cloud.aiplatform.master.Content contents = 6;
+  repeated .google.cloud.aiplatform.master.Tool tools = 3;
+  string session_id = 4;
+  .google.cloud.aiplatform.master.GenerationConfig generation_config = 5;
+}
+
+message StreamAsyncGenerateContentRequest {
+  string model = 1;
+  oneof source {
+    string operation_name = 4;
+  }
+}
+
+message AsyncGenerateContentOperationMetadata {
+  .google.cloud.aiplatform.master.GenericOperationMetadata generic_metadata = 1;
+  string session_id = 2;
+  repeated .google.cloud.aiplatform.master.GenerateContentResponse.UsageMetadata usage_metadata = 3;
+  string model_name = 4;
+}
+
+message AsyncGenerateContentOperationResponse {
+}
+
+message Response {
+}
+
+message GetResponseRequest {
+  string name = 1;
+}
+
+message DeleteResponseRequest {
+  string name = 1;
+}
+

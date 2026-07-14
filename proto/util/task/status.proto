@@ -1,0 +1,22 @@
+syntax = "proto2";
+
+package util;
+
+option java_package = "com.google.net.util";
+option cc_enable_arenas = true;
+option objc_class_prefix = "UTIL";
+
+import "net/proto2/bridge/proto/message_set.proto";
+import "security/loas/l2/internal/securewrapper/multihop_clients/boundary_proxy.proto";
+import "storage/datapol/annotations/proto/semantic_annotations.proto";
+import "third_party/boundary_proxy/proto_compare/annotation.proto";
+
+message StatusProto {
+  reserved 4;
+  optional int32 code = 1;
+  optional string space = 2;
+  optional string message = 3;
+  optional int32 canonical_code = 6;
+  optional .proto2.bridge.MessageSet message_set = 5;
+}
+

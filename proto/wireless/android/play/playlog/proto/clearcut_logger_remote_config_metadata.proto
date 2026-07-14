@@ -1,0 +1,27 @@
+edition = "2023";
+
+package wireless_android_play_playlog;
+
+option java_package = "com.google.wireless.android.play.playlog.proto";
+option java_multiple_files = true;
+
+import "storage/datapol/annotations/proto/semantic_annotations.proto";
+import "wireless/android/play/playlog/proto/logger_enum.proto";
+
+message ClearcutLoggerRemoteConfigMetadata {
+  message PerDeviceSampling {
+    float sampling_rate = 1;
+    int32 rotation_period_days = 2;
+    int32 trailing_days = 3;
+    int32 staggering_period_days = 4;
+  }
+
+  message PerEventSampling {
+    float sampling_rate = 1;
+  }
+
+  .wireless_android_play_playlog.logger_enum.LoggerId logger_id = 1;
+  .wireless_android_play_playlog.ClearcutLoggerRemoteConfigMetadata.PerDeviceSampling per_device_sampling = 2;
+  .wireless_android_play_playlog.ClearcutLoggerRemoteConfigMetadata.PerEventSampling per_event_sampling = 3;
+}
+

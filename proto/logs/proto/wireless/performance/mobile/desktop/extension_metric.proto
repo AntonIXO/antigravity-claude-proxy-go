@@ -1,0 +1,11 @@
+edition = "2024";
+
+package logs.proto.wireless.performance.mobile.desktop;
+
+option java_outer_classname = "ExtensionMetric";
+
+import "storage/datapol/annotations/proto/semantic_annotations.proto";
+
+message MetricExtension {
+}
+

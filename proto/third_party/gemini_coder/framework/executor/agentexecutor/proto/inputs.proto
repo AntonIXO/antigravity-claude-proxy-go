@@ -1,0 +1,51 @@
+syntax = "proto3";
+
+package gemini_coder.agentexecutor;
+
+option java_package = "com.google.geminicoder.agentexecutor";
+option java_multiple_files = true;
+
+import "third_party/gemini_coder/proto/trajectory.proto";
+import "third_party/jetski/context_module_pb/context_module.proto";
+import "third_party/jetski/cortex_pb/cortex.proto";
+import "third_party/jetski/jetski_cortex_pb/jetski_cortex.proto";
+import "third_party/jetski/language_server_pb/language_server.proto";
+
+message Input {
+  reserved 1;
+  oneof kind {
+    .gemini_coder.agentexecutor.SendUserMessage send_user_message = 10;
+    .exa.language_server_pb.CancelCascadeInvocationRequest cancel_invocation = 5;
+    .exa.language_server_pb.CancelCascadeStepsRequest cancel_steps = 6;
+    .exa.language_server_pb.SendAllQueuedMessagesRequest send_queued_messages = 7;
+    .exa.language_server_pb.DeleteQueuedUserInputStepRequest delete_queued_messages = 8;
+    .exa.language_server_pb.RevertToCascadeStepRequest revert_to_step = 2;
+    .exa.language_server_pb.HandleCascadeUserInteractionRequest user_interaction = 9;
+    .exa.language_server_pb.AcknowledgeCascadeCodeEditRequest acknowledge_code_edit = 11;
+    .exa.language_server_pb.AcknowledgeCodeActionStepRequest acknowledge_code_action_step = 12;
+    .exa.language_server_pb.SkipBrowserSubagentRequest skip_browser_subagent = 13;
+    .exa.language_server_pb.ResolveOutstandingStepsRequest resolve_outstanding_steps = 14;
+    .exa.language_server_pb.SendStepsToBackgroundRequest send_steps_to_background = 15;
+    .exa.language_server_pb.ReplayGroundTruthTrajectoryRequest replay_ground_truth_trajectory = 3;
+    .gemini_coder.agentexecutor.SubtrajectoryUpdate subtrajectory_update = 16;
+    .gemini_coder.agentexecutor.RawSteps raw_steps = 4;
+  }
+}
+
+message SendUserMessage {
+  .exa.language_server_pb.SendUserCascadeMessageRequest request = 1;
+  .exa.context_module_pb.ContextModuleResult active_user_state = 2;
+}
+
+message SubtrajectoryUpdate {
+  string sub_trajectory_id = 1;
+  .exa.jetski_cortex_pb.TrajectoryUpdate trajectory_update = 2;
+  .exa.jetski_cortex_pb.ConversationCostSummary cost_summary = 3;
+}
+
+message RawSteps {
+  repeated .gemini_coder.Step steps = 1;
+  .exa.cortex_pb.CortexStepPlannerResponse planner_response = 2;
+  .exa.cortex_pb.CascadeConfig override_config = 3;
+}
+

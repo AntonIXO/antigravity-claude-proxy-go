@@ -1,0 +1,97 @@
+edition = "2023";
+
+package s2a.proto;
+
+option java_package = "com.google.net.grpc.s2a.handshaker";
+option java_outer_classname = "S2AProto";
+option java_multiple_files = true;
+
+import "security/zatar/s2a/proto/common.proto";
+
+service S2AService {
+  rpc SetUpSession (stream .s2a.proto.SessionReq) returns (stream .s2a.proto.SessionResp) {}
+}
+
+message AuthenticationMechanism {
+  .s2a.proto.Identity identity = 1;
+  oneof mechanism_oneof {
+    string token = 2;
+  }
+}
+
+message ClientSessionStartReq {
+  repeated string application_protocols = 1;
+  .s2a.proto.TLSVersion min_tls_version = 2;
+  .s2a.proto.TLSVersion max_tls_version = 3;
+  repeated .s2a.proto.Ciphersuite tls_ciphersuites = 4;
+  repeated .s2a.proto.Identity target_identities = 5;
+  .s2a.proto.Identity local_identity = 6;
+  string target_name = 7;
+  uint32 record_protocol_version = 8;
+}
+
+message ServerSessionStartReq {
+  repeated string application_protocols = 1;
+  .s2a.proto.TLSVersion min_tls_version = 2;
+  .s2a.proto.TLSVersion max_tls_version = 3;
+  repeated .s2a.proto.Ciphersuite tls_ciphersuites = 4;
+  repeated .s2a.proto.Identity local_identities = 5;
+  bytes in_bytes = 6;
+  uint32 record_protocol_version = 7;
+}
+
+message SessionNextReq {
+  bytes in_bytes = 1;
+}
+
+message ResumptionTicketReq {
+  repeated bytes in_bytes = 1;
+  uint64 connection_id = 2;
+  .s2a.proto.Identity local_identity = 3;
+}
+
+message SessionReq {
+  repeated .s2a.proto.AuthenticationMechanism auth_mechanisms = 5;
+  oneof req_oneof {
+    .s2a.proto.ClientSessionStartReq client_start = 1;
+    .s2a.proto.ServerSessionStartReq server_start = 2;
+    .s2a.proto.SessionNextReq next = 3;
+    .s2a.proto.ResumptionTicketReq resumption_ticket = 4;
+  }
+}
+
+message SessionState {
+  .s2a.proto.TLSVersion tls_version = 1;
+  .s2a.proto.Ciphersuite tls_ciphersuite = 2;
+  uint64 in_sequence = 3;
+  uint64 out_sequence = 4;
+  bytes in_key = 5;
+  bytes out_key = 6;
+  bytes in_fixed_nonce = 7;
+  bytes out_fixed_nonce = 8;
+  uint64 connection_id = 9;
+  bool is_handshake_resumed = 10;
+}
+
+message SessionResult {
+  string application_protocol = 1;
+  .s2a.proto.SessionState state = 2;
+  .s2a.proto.Identity peer_identity = 4;
+  .s2a.proto.Identity local_identity = 5;
+  bytes local_cert_fingerprint = 6;
+  bytes peer_cert_fingerprint = 7;
+}
+
+message SessionStatus {
+  uint32 code = 1;
+  string details = 2;
+}
+
+message SessionResp {
+  .s2a.proto.Identity local_identity = 1;
+  bytes out_frames = 2;
+  uint32 bytes_consumed = 3;
+  .s2a.proto.SessionResult result = 4;
+  .s2a.proto.SessionStatus status = 5;
+}
+

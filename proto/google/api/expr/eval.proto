@@ -1,0 +1,44 @@
+syntax = "proto3";
+
+package google.api.expr;
+
+option java_package = "com.google.api.expr";
+option java_outer_classname = "EvalProto";
+option java_multiple_files = true;
+option go_package = "google.golang.org/genproto/googleapis/api/expr;expr";
+
+import "google/api/expr/value.proto";
+import "google/protobuf/any.proto";
+
+message EvalState {
+  message Result {
+    int64 expr = 1;
+    int64 value = 2;
+  }
+
+  repeated .google.api.expr.ExprValue values = 1;
+  repeated .google.api.expr.EvalState.Result results = 3;
+}
+
+message ExprValue {
+  oneof kind {
+    .google.api.expr.Value value = 1;
+    .google.api.expr.ErrorSet error = 2;
+    .google.api.expr.UnknownSet unknown = 3;
+  }
+}
+
+message ErrorSet {
+  repeated .google.api.expr.Status errors = 1;
+}
+
+message Status {
+  int32 code = 1;
+  string message = 2;
+  repeated .google.protobuf.Any details = 3;
+}
+
+message UnknownSet {
+  repeated int64 exprs = 1;
+}
+

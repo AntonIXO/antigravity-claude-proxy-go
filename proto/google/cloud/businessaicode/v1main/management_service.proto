@@ -1,0 +1,109 @@
+syntax = "proto3";
+
+package google.cloud.businessaicode.v1main;
+
+option java_package = "com.google.cloud.businessaicode.v1main";
+option java_outer_classname = "ManagementServiceProto";
+option java_multiple_files = true;
+
+import "google/api/annotations.proto";
+import "google/api/client.proto";
+import "google/api/field_behavior.proto";
+import "google/api/policy.proto";
+import "google/api/resource.proto";
+import "google/api/versioning.proto";
+import "google/api/visibility.proto";
+import "storage/datapol/annotations/proto/semantic_annotations.proto";
+
+service ManagementService {
+  rpc FetchConfig (.google.cloud.businessaicode.v1main.FetchConfigRequest) returns (.google.cloud.businessaicode.v1main.FetchConfigResponse) {}
+  rpc FetchLicenses (.google.cloud.businessaicode.v1main.FetchLicensesRequest) returns (.google.cloud.businessaicode.v1main.FetchLicensesResponse) {}
+  rpc SelfAssignLicense (.google.cloud.businessaicode.v1main.SelfAssignLicenseRequest) returns (.google.cloud.businessaicode.v1main.SelfAssignLicenseResponse) {}
+}
+
+message FetchConfigRequest {
+  string parent = 1;
+}
+
+message FetchConfigResponse {
+  .google.cloud.businessaicode.v1main.AdminControls admin_controls = 1;
+  repeated string allowed_models = 2;
+}
+
+message AdminControls {
+  message AgentControls {
+    enum FileAccessPolicy {
+      FILE_ACCESS_POLICY_UNSPECIFIED = 0;
+      FILE_ACCESS_POLICY_DENY = 1;
+      FILE_ACCESS_POLICY_ALWAYS_ASK = 2;
+      FILE_ACCESS_POLICY_NOT_ENFORCED = 3;
+    }
+
+    enum TerminalCommandAutoExecutionPolicy {
+      TERMINAL_COMMAND_AUTO_EXECUTION_POLICY_UNSPECIFIED = 0;
+      TERMINAL_COMMAND_AUTO_EXECUTION_POLICY_REQUIRE_REVIEW = 1;
+      TERMINAL_COMMAND_AUTO_EXECUTION_POLICY_PROCEED_IN_SANDBOX = 2;
+      TERMINAL_COMMAND_AUTO_EXECUTION_POLICY_NOT_ENFORCED = 3;
+    }
+
+    bool sandbox_mode_enabled = 1;
+    .google.cloud.businessaicode.v1main.AdminControls.AgentControls.FileAccessPolicy outside_workspace_file_access_policy = 2;
+    .google.cloud.businessaicode.v1main.AdminControls.AgentControls.TerminalCommandAutoExecutionPolicy terminal_command_auto_execution_policy = 3;
+  }
+
+  message McpControls {
+    bool mcp_enabled = 1;
+  }
+
+  message LoggingControls {
+    bool metadata_logging_enabled = 1;
+    bool prompt_and_response_logging_enabled = 2;
+  }
+
+  message FeatureControls {
+    bool remote_control_enabled = 1;
+  }
+
+  message BrowserControls {
+    enum JavascriptExecutionPolicy {
+      JAVASCRIPT_EXECUTION_POLICY_UNSPECIFIED = 0;
+      JAVASCRIPT_EXECUTION_POLICY_DISABLED = 1;
+      JAVASCRIPT_EXECUTION_POLICY_REQUEST_REVIEW = 2;
+      JAVASCRIPT_EXECUTION_POLICY_NOT_ENFORCED = 3;
+    }
+
+    bool browser_enabled = 1;
+    .google.cloud.businessaicode.v1main.AdminControls.BrowserControls.JavascriptExecutionPolicy javascript_execution_policy = 2;
+    repeated string actuation_allowed_urls = 3;
+  }
+
+  .google.cloud.businessaicode.v1main.AdminControls.AgentControls agent_controls = 1;
+  .google.cloud.businessaicode.v1main.AdminControls.McpControls mcp_controls = 2;
+  .google.cloud.businessaicode.v1main.AdminControls.LoggingControls logging_controls = 3;
+  .google.cloud.businessaicode.v1main.AdminControls.FeatureControls feature_controls = 4;
+  .google.cloud.businessaicode.v1main.AdminControls.BrowserControls browser_controls = 5;
+}
+
+message FetchLicensesRequest {
+}
+
+message FetchLicensesResponse {
+  repeated .google.cloud.businessaicode.v1main.License licenses = 1;
+  repeated string unreachable = 2;
+}
+
+message SelfAssignLicenseRequest {
+  string parent = 1;
+}
+
+message SelfAssignLicenseResponse {
+  .google.cloud.businessaicode.v1main.License license = 1;
+}
+
+message License {
+  string user_tier = 1;
+  string tier_display_name = 2;
+  string project_id = 3;
+  string location = 4;
+}
+

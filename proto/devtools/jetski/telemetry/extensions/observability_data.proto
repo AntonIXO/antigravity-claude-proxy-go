@@ -1,0 +1,15 @@
+edition = "2024";
+
+package devtools.jetski.telemetry.extensions;
+
+option java_outer_classname = "ObservabilityDataOuterClass";
+
+import "devtools/jetski/telemetry/extensions/common.proto";
+import "storage/datapol/annotations/proto/semantic_annotations.proto";
+
+message ObservabilityData {
+  string type = 1;
+  repeated .devtools.jetski.telemetry.extensions.ExtraMetadata non_sensitive_data = 2;
+  repeated .devtools.jetski.telemetry.extensions.ExtraMetadata sensitive_data = 3;
+}
+

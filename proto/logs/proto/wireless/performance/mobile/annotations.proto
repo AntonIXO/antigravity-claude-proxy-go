@@ -1,0 +1,15 @@
+syntax = "proto2";
+
+package logs.proto.wireless.performance.mobile;
+
+option java_package = "logs.proto.wireless.performance.mobile";
+option java_multiple_files = true;
+
+import "net/proto2/proto/descriptor.proto";
+import "storage/datapol/annotations/proto/semantic_annotations.proto";
+
+message UploadPermissions {
+  optional bool allowed_for_upload = 1;
+  repeated string field_path = 2;
+}
+

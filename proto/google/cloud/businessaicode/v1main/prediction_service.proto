@@ -1,0 +1,125 @@
+syntax = "proto3";
+
+package google.cloud.businessaicode.v1main;
+
+option java_package = "com.google.cloud.businessaicode.v1main";
+option java_outer_classname = "PredictionServiceProto";
+option java_multiple_files = true;
+
+import "google/api/annotations.proto";
+import "google/api/field_behavior.proto";
+import "google/api/policy.proto";
+import "google/api/resource.proto";
+import "google/api/versioning.proto";
+import "google/api/visibility.proto";
+import "google/cloud/businessaicode/v1main/content.proto";
+import "google/cloud/businessaicode/v1main/entitlement.proto";
+import "google/cloud/businessaicode/v1main/telemetry_service.proto";
+import "google/protobuf/timestamp.proto";
+import "storage/datapol/annotations/proto/semantic_annotations.proto";
+
+service PredictionService {
+  rpc StreamGenerateContent (.google.cloud.businessaicode.v1main.GenerateContentRequest) returns (stream .google.cloud.businessaicode.v1main.GenerateContentResponse) {}
+  rpc GenerateContent (.google.cloud.businessaicode.v1main.GenerateContentRequest) returns (.google.cloud.businessaicode.v1main.GenerateContentResponse) {}
+  rpc SendTelemetry (.google.cloud.businessaicode.v1main.SendTelemetryRequest) returns (.google.cloud.businessaicode.v1main.SendTelemetryResponse) {}
+  rpc QueryConfig (.google.cloud.businessaicode.v1main.QueryConfigRequest) returns (.google.cloud.businessaicode.v1main.QueryConfigResponse) {}
+  rpc FetchQuotaStatus (.google.cloud.businessaicode.v1main.FetchQuotaStatusRequest) returns (.google.cloud.businessaicode.v1main.FetchQuotaStatusResponse) {}
+}
+
+message GenerateContentRequest {
+  message LabelsEntry {
+    string key = 1;
+    string value = 2;
+  }
+
+  string parent = 1;
+  repeated .google.cloud.businessaicode.v1main.Content contents = 2;
+  .google.cloud.businessaicode.v1main.Content system_instruction = 3;
+  repeated .google.cloud.businessaicode.v1main.Tool tools = 4;
+  .google.cloud.businessaicode.v1main.ToolConfig tool_config = 5;
+  repeated .google.cloud.businessaicode.v1main.GenerateContentRequest.LabelsEntry labels = 6;
+  repeated .google.cloud.businessaicode.v1main.SafetySetting safety_settings = 7;
+  .google.cloud.businessaicode.v1main.GenerationConfig generation_config = 8;
+  .google.cloud.businessaicode.v1main.Entitlement entitlement = 9;
+  oneof inference {
+    string model = 1000;
+    .google.cloud.businessaicode.v1main.AiCodeConfig aicode = 1001;
+  }
+}
+
+message GenerateContentResponse {
+  message PromptFeedback {
+    enum BlockReason {
+      BLOCK_REASON_UNSPECIFIED = 0;
+      SAFETY = 1;
+      OTHER = 2;
+      BLOCKLIST = 3;
+      PROHIBITED_CONTENT = 4;
+      IMAGE_SAFETY = 5;
+    }
+
+    .google.cloud.businessaicode.v1main.GenerateContentResponse.PromptFeedback.BlockReason block_reason = 1;
+    repeated .google.cloud.businessaicode.v1main.SafetyRating safety_ratings = 2;
+    string block_reason_message = 3;
+  }
+
+  message UsageMetadata {
+    int32 prompt_token_count = 1;
+    int32 candidates_token_count = 2;
+    int32 total_token_count = 3;
+    int32 thoughts_token_count = 4;
+    int32 cached_content_token_count = 5;
+    repeated .google.cloud.businessaicode.v1main.ModalityTokenCount prompt_tokens_details = 6;
+    repeated .google.cloud.businessaicode.v1main.ModalityTokenCount cache_tokens_details = 7;
+    repeated .google.cloud.businessaicode.v1main.ModalityTokenCount candidates_tokens_details = 8;
+    repeated .google.cloud.businessaicode.v1main.ModalityTokenCount tool_use_prompt_tokens_details = 9;
+  }
+
+  repeated .google.cloud.businessaicode.v1main.Candidate candidates = 1;
+  .google.cloud.businessaicode.v1main.GenerateContentResponse.PromptFeedback prompt_feedback = 2;
+  .google.cloud.businessaicode.v1main.GenerateContentResponse.UsageMetadata usage_metadata = 3;
+  string model_version = 4;
+  string response_id = 5;
+}
+
+message QueryConfigRequest {
+  string parent = 1;
+}
+
+message QueryConfigResponse {
+}
+
+message FetchQuotaStatusRequest {
+  string parent = 1;
+  .google.cloud.businessaicode.v1main.Entitlement entitlement = 2;
+}
+
+message FetchQuotaStatusResponse {
+  repeated .google.cloud.businessaicode.v1main.QuotaSummaryGroup groups = 1;
+  string description = 2;
+  .google.cloud.businessaicode.v1main.OverageInfo overage_info = 3;
+}
+
+message OverageInfo {
+  bool enabled = 1;
+}
+
+message QuotaSummaryGroup {
+  string display_name = 1;
+  string description = 2;
+  repeated .google.cloud.businessaicode.v1main.QuotaSummaryBucket buckets = 3;
+}
+
+message QuotaSummaryBucket {
+  string bucket_id = 1;
+  string display_name = 2;
+  string description = 3;
+  string window = 4;
+  bool disabled = 7;
+  .google.protobuf.Timestamp reset_time = 8;
+  oneof remaining {
+    float remaining_fraction = 5;
+    int64 remaining_amount = 6;
+  }
+}
+

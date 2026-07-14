@@ -1,0 +1,35 @@
+edition = "2024";
+
+package devtools.jetski.telemetry.extensions;
+
+option java_outer_classname = "CommandUsageMetadataOuterClass";
+
+import "storage/datapol/annotations/proto/semantic_annotations.proto";
+import "third_party/jetski/codeium_common_pb/codeium_common.proto";
+import "third_party/jetski/cortex_pb/cortex.proto";
+import "third_party/jetski/prompt_pb/prompt.proto";
+
+message CommandUsageMetadata {
+  string command = 1;
+  string selection = 2;
+  .exa.codeium_common_pb.CommandRequestSource request_source = 3;
+  string prompt_id = 4;
+  string completion_id = 5;
+  string completion = 6;
+  string command_prompt = 7;
+  .exa.codeium_common_pb.Model requested_model_id = 8;
+  .exa.codeium_common_pb.StopReason stop_reason = 9;
+  .exa.codeium_common_pb.Language language = 10;
+  .exa.codeium_common_pb.ProviderSource provider_source = 11;
+  .exa.prompt_pb.UnifiedPromptComponents prompt_components = 12;
+  .exa.codeium_common_pb.SuperCompleteFilterReason super_complete_filter_reason = 13;
+  repeated .exa.codeium_common_pb.PromptStageLatency prompt_stage_latencies = 14;
+  .exa.codeium_common_pb.SupercompleteTriggerCondition supercomplete_trigger_condition = 15;
+  int32 max_ccis_with_subranges = 16;
+  string locale = 17;
+  .exa.cortex_pb.CortexTrajectoryReference cortex_trajectory_reference = 18;
+  string ide_version = 19;
+  string ide_name = 20;
+  string os = 21;
+}
+

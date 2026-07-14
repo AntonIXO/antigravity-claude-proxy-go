@@ -1,0 +1,19 @@
+edition = "2024";
+
+package devtools.jetski.telemetry.extensions;
+
+option java_outer_classname = "CompletionsMetadataOuterClass";
+
+import "storage/datapol/annotations/proto/semantic_annotations.proto";
+import "third_party/jetski/codeium_common_pb/codeium_common.proto";
+
+message CompletionsMetadata {
+  repeated .exa.codeium_common_pb.CompletionWithLatencyInfo completions_with_latency_info = 1;
+  string prompt_id = 2;
+  uint64 prompt_length = 3;
+  .exa.codeium_common_pb.ProviderSource provider_source = 4;
+  string relative_path_or_absolute_path = 5;
+  .exa.codeium_common_pb.Repository repository = 6;
+  string model_tag = 7;
+}
+

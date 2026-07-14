@@ -1,0 +1,43 @@
+edition = "2023";
+
+package s2a.proto;
+
+option java_package = "com.google.net.grpc.s2a.handshaker";
+option java_outer_classname = "CommonProto";
+option java_multiple_files = true;
+
+import "third_party/golang/protobuf/v2/src/google/protobuf/go_features.proto";
+
+message L7lbId {
+  uint64 project_number = 1;
+  fixed64 backend_service_incarnation_id = 2;
+}
+
+message Identity {
+  message AttributesEntry {
+    string key = 1;
+    string value = 2;
+  }
+
+  repeated .s2a.proto.Identity.AttributesEntry attributes = 3;
+  oneof identity_oneof {
+    string spiffe_id = 1;
+    string hostname = 2;
+    string uid = 4;
+    string username = 5;
+    string gcp_id = 6;
+    .s2a.proto.L7lbId l7lb_id = 7;
+  }
+}
+
+enum Ciphersuite {
+  AES_128_GCM_SHA256 = 0;
+  AES_256_GCM_SHA384 = 1;
+  CHACHA20_POLY1305_SHA256 = 2;
+}
+
+enum TLSVersion {
+  TLS1_2 = 0;
+  TLS1_3 = 1;
+}
+

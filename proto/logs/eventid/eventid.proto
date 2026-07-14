@@ -1,0 +1,21 @@
+syntax = "proto2";
+
+option java_package = "com.google.common.logging";
+option cc_enable_arenas = true;
+option objc_class_prefix = "EID";
+
+import "java/com/google/apps/jspb/jspb.proto";
+import "net/proto2/bridge/proto/message_set.proto";
+import "storage/datapol/annotations/proto/semantic_annotations.proto";
+
+message EventIdMessage {
+  required int64 time_usec = 1;
+  required fixed32 server_ip = 2;
+  required fixed32 process_id = 3;
+}
+
+message ClientEventIdMessage {
+  optional .EventIdMessage base = 1;
+  optional int64 client_counter = 2;
+}
+

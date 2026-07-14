@@ -1,0 +1,6 @@
+edition = "2023";
+
+package keytracking;
+
+import "net/proto2/proto/descriptor.proto";
+

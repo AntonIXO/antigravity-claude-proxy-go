@@ -1,0 +1,119 @@
+syntax = "proto3";
+
+package gemini_coder;
+
+option java_package = "com.google.geminicoder";
+option java_multiple_files = true;
+
+import "storage/datapol/annotations/proto/semantic_annotations.proto";
+import "third_party/gemini_coder/proto/trajectory.proto";
+import "third_party/jetski/cortex_pb/cortex.proto";
+import "third_party/jetski/reactive_component_pb/reactive_component.proto";
+
+message ToAgent {
+  oneof kind {
+    .gemini_coder.InitRequest init = 1;
+    .gemini_coder.AddStepsRequest add_steps = 2;
+    .gemini_coder.ExecuteRequest execute = 3;
+    .gemini_coder.CancelExecutionRequest cancel_execution = 4;
+    .gemini_coder.CancelStepsRequest cancel_steps = 5;
+    .gemini_coder.RevertRequest revert = 6;
+    .gemini_coder.ClientResponse client_response = 7;
+  }
+}
+
+message FromAgent {
+  oneof kind {
+    .gemini_coder.InitResponse init = 1;
+    .gemini_coder.AddStepsResponse add_steps = 2;
+    .gemini_coder.ExecuteResponse execute = 3;
+    .gemini_coder.CancelExecutionResponse cancel_execution = 4;
+    .gemini_coder.CancelStepsResponse cancel_steps = 5;
+    .gemini_coder.RevertResponse revert = 6;
+    .gemini_coder.ClientRequest client_request = 7;
+    .gemini_coder.ReactiveStateUpdate reactive_state_update = 8;
+  }
+}
+
+message InitRequest {
+  .gemini_coder.ConversationKey key = 1;
+  bool create_if_missing = 2;
+}
+
+message InitResponse {
+}
+
+message ConversationKey {
+  string conversation_id = 1;
+}
+
+message AddStepsRequest {
+  repeated .gemini_coder.Step steps = 1;
+}
+
+message AddStepsResponse {
+  bool executing = 1;
+}
+
+message ExecuteRequest {
+  .exa.cortex_pb.CascadeConfig cascade_config = 1;
+}
+
+message ExecuteResponse {
+}
+
+message CancelExecutionRequest {
+}
+
+message CancelExecutionResponse {
+}
+
+message CancelStepsRequest {
+  repeated uint32 indices = 1;
+}
+
+message CancelStepsResponse {
+}
+
+message RevertRequest {
+  uint32 index = 1;
+  .exa.cortex_pb.CascadeConfig cascade_config = 2;
+}
+
+message RevertResponse {
+  uint32 index = 1;
+  string error = 2;
+}
+
+message ClientRequest {
+  int32 id = 1;
+  oneof kind {
+    .gemini_coder.UserInteractionRequest user_interaction = 2;
+    .gemini_coder.ExecuteCommandRequest execute_command = 3;
+  }
+}
+
+message ClientResponse {
+  int32 id = 1;
+  oneof kind {
+    .gemini_coder.UserInteractionResponse user_interaction = 2;
+    .gemini_coder.ExecuteCommandResponse execute_command = 3;
+  }
+}
+
+message UserInteractionRequest {
+}
+
+message UserInteractionResponse {
+}
+
+message ExecuteCommandRequest {
+}
+
+message ExecuteCommandResponse {
+}
+
+message ReactiveStateUpdate {
+  .exa.reactive_component_pb.MessageDiff diff = 1;
+}
+

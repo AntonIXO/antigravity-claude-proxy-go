@@ -1,0 +1,830 @@
+syntax = "proto3";
+
+package google.cloud.aiplatform.master;
+
+option java_package = "com.google.cloud.aiplatform.master";
+option java_outer_classname = "ContentProto";
+option java_multiple_files = true;
+option csharp_namespace = "Google.Cloud.AIPlatform.Master";
+option php_namespace = "Google\\Cloud\\AIPlatform\\Master";
+option ruby_package = "Google::Cloud::AIPlatform::Master";
+
+import "google/api/field_behavior.proto";
+import "google/api/inclusion.proto";
+import "google/api/resource.proto";
+import "google/api/versioning.proto";
+import "google/api/visibility.proto";
+import "google/cloud/aiplatform/master/openapi.proto";
+import "google/cloud/aiplatform/master/tool.proto";
+import "google/cloud/aiplatform/master/vertex_rag_data.proto";
+import "google/protobuf/duration.proto";
+import "google/protobuf/struct.proto";
+import "google/type/date.proto";
+import "net/proto2/contrib/validator/annotations.proto";
+import "storage/datapol/annotations/proto/semantic_annotations.proto";
+
+message Content {
+  string role = 1;
+  repeated .google.cloud.aiplatform.master.Part parts = 2;
+}
+
+message Part {
+  message MediaResolution {
+    enum Level {
+      MEDIA_RESOLUTION_UNSPECIFIED = 0;
+      MEDIA_RESOLUTION_LOW = 1;
+      MEDIA_RESOLUTION_MEDIUM = 2;
+      MEDIA_RESOLUTION_HIGH = 3;
+      MEDIA_RESOLUTION_ULTRA_HIGH = 4;
+    }
+
+    oneof value {
+      .google.cloud.aiplatform.master.Part.MediaResolution.Level level = 1;
+      int32 num_tokens = 2;
+    }
+  }
+
+  message InternalSettings {
+    bool exclude_billing = 1;
+  }
+
+  message ToolCall {
+    string id = 1;
+    .google.cloud.aiplatform.master.ToolType tool_type = 2;
+    .google.protobuf.Struct args = 3;
+  }
+
+  message ToolResponse {
+    string id = 1;
+    .google.cloud.aiplatform.master.ToolType tool_type = 2;
+    .google.protobuf.Struct response = 3;
+  }
+
+  bool thought = 10;
+  bytes thought_signature = 11;
+  .google.cloud.aiplatform.master.Part.MediaResolution media_resolution = 12;
+  .google.cloud.aiplatform.master.Part.InternalSettings internal_settings = 7;
+  repeated .google.cloud.aiplatform.master.GroundingChunk source_annotations = 15;
+  .google.cloud.aiplatform.master.AudioTranscription audio_transcription = 16;
+  bool raw_thought = 17;
+  oneof data {
+    string text = 1;
+    .google.cloud.aiplatform.master.Blob inline_data = 2;
+    .google.cloud.aiplatform.master.FileData file_data = 3;
+    .google.cloud.aiplatform.master.FunctionCall function_call = 5;
+    .google.cloud.aiplatform.master.FunctionResponse function_response = 6;
+    .google.cloud.aiplatform.master.ExecutableCode executable_code = 8;
+    .google.cloud.aiplatform.master.CodeExecutionResult code_execution_result = 9;
+    .google.cloud.aiplatform.master.PreprocessedInputs preprocess_inputs = 14;
+    .google.cloud.aiplatform.master.Part.ToolCall tool_call = 18;
+    .google.cloud.aiplatform.master.Part.ToolResponse tool_response = 19;
+  }
+  oneof metadata {
+    .google.cloud.aiplatform.master.VideoMetadata video_metadata = 4;
+    .google.protobuf.Struct custom_metadata = 13;
+  }
+}
+
+message AudioTranscription {
+  message WordInfo {
+    string word = 1;
+    .google.protobuf.Duration start_offset = 2;
+    .google.protobuf.Duration end_offset = 3;
+  }
+
+  string text = 1;
+  string speaker_label = 2;
+  repeated .google.cloud.aiplatform.master.AudioTranscription.WordInfo words = 3;
+}
+
+message AudioTranscriptionConfig {
+  message LanguageAuto {
+  }
+
+  message LanguageHints {
+    repeated string language_codes = 1;
+  }
+
+  repeated string adaptation_phrases = 4;
+  bool word_timestamp = 5;
+  bool diarization = 6;
+  oneof language_config {
+    .google.cloud.aiplatform.master.AudioTranscriptionConfig.LanguageAuto language_auto = 2;
+    .google.cloud.aiplatform.master.AudioTranscriptionConfig.LanguageHints language_hints = 3;
+  }
+}
+
+message PreprocessedInput {
+  string mime_type = 3;
+  oneof preprocessed_data {
+    bytes data = 1;
+    string guri = 2;
+  }
+}
+
+message PreprocessedInputs {
+  repeated .google.cloud.aiplatform.master.PreprocessedInput inputs = 1;
+}
+
+message Blob {
+  string mime_type = 1;
+  bytes data = 2;
+  bool will_continue = 3;
+  string display_name = 4;
+  bool tool_input_only = 5;
+}
+
+message FileData {
+  string mime_type = 1;
+  string file_uri = 2;
+  string display_name = 3;
+  bool tool_input_only = 4;
+}
+
+message VideoMetadata {
+  .google.protobuf.Duration start_offset = 1;
+  .google.protobuf.Duration end_offset = 2;
+  double fps = 3;
+}
+
+message CompleteCodePrompt {
+  string prefix = 1;
+  string suffix = 2;
+}
+
+message PrebuiltVoiceConfig {
+  optional string voice_name = 1;
+}
+
+message CustomVoiceConfig {
+  bytes custom_voice_sample = 1;
+}
+
+message ReplicatedVoiceConfig {
+  string mime_type = 1;
+  bytes voice_sample_audio = 2;
+  bytes consent_audio = 3;
+}
+
+message VoiceConfig {
+  oneof voice_config {
+    .google.cloud.aiplatform.master.PrebuiltVoiceConfig prebuilt_voice_config = 1;
+    .google.cloud.aiplatform.master.CustomVoiceConfig custom_voice_config = 2;
+    .google.cloud.aiplatform.master.ReplicatedVoiceConfig replicated_voice_config = 3;
+    string voice = 4;
+  }
+}
+
+message SpeakerVoiceConfig {
+  string speaker = 1;
+  .google.cloud.aiplatform.master.VoiceConfig voice_config = 2;
+}
+
+message MultiSpeakerVoiceConfig {
+  repeated .google.cloud.aiplatform.master.SpeakerVoiceConfig speaker_voice_configs = 2;
+}
+
+message SpeechConfig {
+  .google.cloud.aiplatform.master.VoiceConfig voice_config = 1;
+  string language_code = 2;
+  .google.cloud.aiplatform.master.MultiSpeakerVoiceConfig multi_speaker_voice_config = 3;
+}
+
+message ProactivityConfig {
+  bool enable_response_rejection = 1;
+  optional bool proactive_audio = 2;
+  optional bool proactive_video = 3;
+}
+
+message ImageConfig {
+  message ImageOutputOptions {
+    optional string mime_type = 1;
+    optional int32 compression_quality = 2;
+  }
+
+  enum PersonGeneration {
+    PERSON_GENERATION_UNSPECIFIED = 0;
+    ALLOW_ALL = 1;
+    ALLOW_ADULT = 2;
+    ALLOW_NONE = 3;
+  }
+
+  enum ProminentPeople {
+    PROMINENT_PEOPLE_UNSPECIFIED = 0;
+    ALLOW_PROMINENT_PEOPLE = 1;
+    BLOCK_PROMINENT_PEOPLE = 2;
+  }
+
+  .google.cloud.aiplatform.master.ImageConfig.ProminentPeople prominent_people = 5;
+  optional .google.cloud.aiplatform.master.ImageConfig.ImageOutputOptions image_output_options = 1;
+  optional string aspect_ratio = 2;
+  optional .google.cloud.aiplatform.master.ImageConfig.PersonGeneration person_generation = 3;
+  optional string image_size = 4;
+}
+
+message RequestLogprobsConfig {
+  optional bool skip_bos = 1;
+  optional bool skip_eos = 2;
+}
+
+message GenerationConfig {
+  reserved 15;
+  reserved 26;
+  message LogitBiasEntry {
+    string key = 1;
+    float value = 2;
+  }
+
+  message RoutingConfig {
+    message AutoRoutingMode {
+      enum ModelRoutingPreference {
+        UNKNOWN = 0;
+        PRIORITIZE_QUALITY = 1;
+        BALANCED = 2;
+        PRIORITIZE_COST = 3;
+      }
+
+      optional .google.cloud.aiplatform.master.GenerationConfig.RoutingConfig.AutoRoutingMode.ModelRoutingPreference model_routing_preference = 1;
+    }
+
+    message ManualRoutingMode {
+      optional string model_name = 1;
+    }
+
+    oneof routing_config {
+      .google.cloud.aiplatform.master.GenerationConfig.RoutingConfig.AutoRoutingMode auto_mode = 1;
+      .google.cloud.aiplatform.master.GenerationConfig.RoutingConfig.ManualRoutingMode manual_mode = 2;
+    }
+  }
+
+  message ContextConfig {
+    bool video_frame_only_during_audio_activity = 1;
+  }
+
+  message ThinkingConfig {
+    reserved 2;
+    enum ThinkingLevel {
+      THINKING_LEVEL_UNSPECIFIED = 0;
+      LOW = 1;
+      MEDIUM = 2;
+      HIGH = 3;
+      MINIMAL = 4;
+    }
+
+    bool include_raw_thoughts = 5;
+    optional bool include_thoughts = 1;
+    optional int32 thinking_budget = 3;
+    optional .google.cloud.aiplatform.master.GenerationConfig.ThinkingConfig.ThinkingLevel thinking_level = 4;
+  }
+
+  message ModelConfig {
+    enum FeatureSelectionPreference {
+      FEATURE_SELECTION_PREFERENCE_UNSPECIFIED = 0;
+      PRIORITIZE_QUALITY = 1;
+      BALANCED = 2;
+      PRIORITIZE_COST = 3;
+    }
+
+    .google.cloud.aiplatform.master.GenerationConfig.ModelConfig.FeatureSelectionPreference feature_selection_preference = 1;
+    optional string model_name_override = 2;
+  }
+
+  enum ResponseStyle {
+    RESPONSE_STYLE_UNSPECIFIED = 0;
+    RESPONSE_STYLE_PRECISE = 1;
+    RESPONSE_STYLE_BALANCED = 2;
+    RESPONSE_STYLE_CREATIVE = 3;
+  }
+
+  enum Modality {
+    MODALITY_UNSPECIFIED = 0;
+    TEXT = 1;
+    IMAGE = 2;
+    AUDIO = 3;
+    VIDEO = 4;
+  }
+
+  enum MediaResolution {
+    MEDIA_RESOLUTION_UNSPECIFIED = 0;
+    MEDIA_RESOLUTION_LOW = 1;
+    MEDIA_RESOLUTION_MEDIUM = 2;
+    MEDIA_RESOLUTION_HIGH = 3;
+  }
+
+  repeated string stop_sequences = 6;
+  repeated .google.cloud.aiplatform.master.GenerationConfig.LogitBiasEntry logit_bias = 10;
+  string response_mime_type = 13;
+  .google.cloud.aiplatform.master.GenerationConfig.ResponseStyle response_style = 14;
+  repeated .google.cloud.aiplatform.master.GenerationConfig.Modality response_modalities = 21;
+  .google.cloud.aiplatform.master.GenerationConfig.ThinkingConfig thinking_config = 25;
+  .google.cloud.aiplatform.master.GenerationConfig.ModelConfig model_config = 27;
+  .google.cloud.aiplatform.master.VideoConfig video_config = 36;
+  repeated .google.cloud.aiplatform.master.ResponseFormat response_format = 35;
+  bool skip_summary_on_response = 38;
+  optional float temperature = 1;
+  optional float top_p = 2;
+  optional float top_k = 3;
+  optional int32 candidate_count = 4;
+  optional int32 max_output_tokens = 5;
+  optional bool response_logprobs = 18;
+  optional int32 logprobs = 7;
+  optional bool request_logprobs = 32;
+  optional int32 request_top_k_logprobs = 33;
+  optional .google.cloud.aiplatform.master.RequestLogprobsConfig request_logprobs_config = 34;
+  optional float presence_penalty = 8;
+  optional float frequency_penalty = 9;
+  optional bool echo = 11;
+  optional int32 seed = 12;
+  optional .google.cloud.aiplatform.master.Schema response_schema = 16;
+  optional .google.protobuf.Value response_json_schema = 28;
+  optional string response_regex_constraint = 31;
+  optional .google.cloud.aiplatform.master.GenerationConfig.RoutingConfig routing_config = 17;
+  optional float min_p = 19;
+  optional bool audio_timestamp = 20;
+  optional .google.cloud.aiplatform.master.GenerationConfig.MediaResolution media_resolution = 22;
+  optional .google.cloud.aiplatform.master.SpeechConfig speech_config = 23;
+  optional .google.cloud.aiplatform.master.GenerationConfig.ContextConfig context_config = 24;
+  optional bool enable_affective_dialog = 29;
+  optional .google.cloud.aiplatform.master.ImageConfig image_config = 30;
+  optional .google.cloud.aiplatform.master.AudioTranscriptionConfig audio_transcription_config = 37;
+}
+
+message ResponseFormat {
+  enum DeliveryMode {
+    DELIVERY_UNSPECIFIED = 0;
+    INLINE = 1;
+    URI = 2;
+  }
+
+  oneof format {
+    .google.cloud.aiplatform.master.TextResponseFormat text = 1;
+    .google.cloud.aiplatform.master.AudioResponseFormat audio = 2;
+    .google.cloud.aiplatform.master.ImageResponseFormat image = 3;
+    .google.cloud.aiplatform.master.VideoResponseFormat video = 4;
+  }
+}
+
+message TextResponseFormat {
+  enum MimeType {
+    MIME_TYPE_UNSPECIFIED = 0;
+    APPLICATION_JSON = 1;
+    TEXT_PLAIN = 2;
+  }
+
+  optional .google.cloud.aiplatform.master.TextResponseFormat.MimeType mime_type = 1;
+  optional .google.protobuf.Value schema = 2;
+}
+
+message AudioResponseFormat {
+  enum MimeType {
+    MIME_TYPE_UNSPECIFIED = 0;
+    AUDIO_MP3 = 1;
+    AUDIO_OGG_OPUS = 2;
+    AUDIO_L16 = 3;
+    AUDIO_WAV = 4;
+    AUDIO_ALAW = 5;
+    AUDIO_MULAW = 6;
+  }
+
+  .google.cloud.aiplatform.master.ResponseFormat.DeliveryMode delivery = 2;
+  optional .google.cloud.aiplatform.master.AudioResponseFormat.MimeType mime_type = 1;
+  optional int32 sample_rate = 3;
+  optional int32 bit_rate = 4;
+}
+
+message ImageResponseFormat {
+  enum MimeType {
+    MIME_TYPE_UNSPECIFIED = 0;
+    IMAGE_JPEG = 1;
+  }
+
+  enum AspectRatio {
+    ASPECT_RATIO_UNSPECIFIED = 0;
+    ASPECT_RATIO_ONE_BY_ONE = 1;
+    ASPECT_RATIO_TWO_BY_THREE = 2;
+    ASPECT_RATIO_THREE_BY_TWO = 3;
+    ASPECT_RATIO_THREE_BY_FOUR = 4;
+    ASPECT_RATIO_FOUR_BY_THREE = 5;
+    ASPECT_RATIO_FOUR_BY_FIVE = 6;
+    ASPECT_RATIO_FIVE_BY_FOUR = 7;
+    ASPECT_RATIO_NINE_BY_SIXTEEN = 8;
+    ASPECT_RATIO_SIXTEEN_BY_NINE = 9;
+    ASPECT_RATIO_TWENTY_ONE_BY_NINE = 10;
+    ASPECT_RATIO_ONE_BY_EIGHT = 11;
+    ASPECT_RATIO_EIGHT_BY_ONE = 12;
+    ASPECT_RATIO_ONE_BY_FOUR = 13;
+    ASPECT_RATIO_FOUR_BY_ONE = 14;
+  }
+
+  enum ImageSize {
+    IMAGE_SIZE_UNSPECIFIED = 0;
+    IMAGE_SIZE_FIVE_TWELVE = 1;
+    IMAGE_SIZE_ONE_K = 2;
+    IMAGE_SIZE_TWO_K = 3;
+    IMAGE_SIZE_FOUR_K = 4;
+  }
+
+  .google.cloud.aiplatform.master.ResponseFormat.DeliveryMode delivery = 2;
+  optional .google.cloud.aiplatform.master.ImageResponseFormat.MimeType mime_type = 1;
+  optional .google.cloud.aiplatform.master.ImageResponseFormat.AspectRatio aspect_ratio = 3;
+  optional .google.cloud.aiplatform.master.ImageResponseFormat.ImageSize image_size = 4;
+}
+
+message VideoResponseFormat {
+  enum AspectRatio {
+    ASPECT_RATIO_UNSPECIFIED = 0;
+    ASPECT_RATIO_SIXTEEN_BY_NINE = 1;
+    ASPECT_RATIO_NINE_BY_SIXTEEN = 2;
+  }
+
+  .google.cloud.aiplatform.master.ResponseFormat.DeliveryMode delivery = 1;
+  string gcs_uri = 2;
+  .google.cloud.aiplatform.master.VideoResponseFormat.AspectRatio aspect_ratio = 3;
+  optional .google.protobuf.Duration duration = 4;
+}
+
+message CompletionConfig {
+  repeated string stop_sequences = 4;
+  optional float temperature = 1;
+  optional int32 candidate_count = 2;
+  optional int32 max_output_tokens = 3;
+  optional bool echo = 5;
+  optional int32 seed = 6;
+  optional float top_p = 7;
+}
+
+message CompleteCodePrediction {
+  .google.cloud.aiplatform.master.CitationMetadata citation_metadata = 1;
+  .google.cloud.aiplatform.master.SafetyAttributes safety_attributes = 2;
+  string content = 3;
+  double score = 4;
+}
+
+message SafetySetting {
+  reserved 3;
+  enum HarmBlockThreshold {
+    HARM_BLOCK_THRESHOLD_UNSPECIFIED = 0;
+    BLOCK_LOW_AND_ABOVE = 1;
+    BLOCK_MEDIUM_AND_ABOVE = 2;
+    BLOCK_ONLY_HIGH = 3;
+    BLOCK_NONE = 4;
+    OFF = 5;
+  }
+
+  enum HarmBlockMethod {
+    HARM_BLOCK_METHOD_UNSPECIFIED = 0;
+    SEVERITY = 1;
+    PROBABILITY = 2;
+  }
+
+  .google.cloud.aiplatform.master.HarmCategory category = 1;
+  .google.cloud.aiplatform.master.SafetySetting.HarmBlockThreshold threshold = 2;
+  .google.cloud.aiplatform.master.SafetySetting.HarmBlockMethod method = 4;
+}
+
+message SafetyRating {
+  reserved 4;
+  enum HarmProbability {
+    HARM_PROBABILITY_UNSPECIFIED = 0;
+    NEGLIGIBLE = 1;
+    LOW = 2;
+    MEDIUM = 3;
+    HIGH = 4;
+  }
+
+  enum HarmSeverity {
+    HARM_SEVERITY_UNSPECIFIED = 0;
+    HARM_SEVERITY_NEGLIGIBLE = 1;
+    HARM_SEVERITY_LOW = 2;
+    HARM_SEVERITY_MEDIUM = 3;
+    HARM_SEVERITY_HIGH = 4;
+  }
+
+  .google.cloud.aiplatform.master.HarmCategory category = 1;
+  .google.cloud.aiplatform.master.SafetyRating.HarmProbability probability = 2;
+  float probability_score = 5;
+  .google.cloud.aiplatform.master.SafetyRating.HarmSeverity severity = 6;
+  float severity_score = 7;
+  bool blocked = 3;
+  .google.cloud.aiplatform.master.SafetySetting.HarmBlockThreshold overwritten_threshold = 8;
+}
+
+message SafetyAttributes {
+  repeated string categories = 1;
+  repeated float scores = 2;
+  bool blocked = 3;
+  repeated int32 errors = 4;
+}
+
+message CitationMetadata {
+  repeated .google.cloud.aiplatform.master.Citation citations = 1;
+}
+
+message Citation {
+  int32 start_index = 1;
+  int32 end_index = 2;
+  string uri = 3;
+  string title = 4;
+  string license = 5;
+  .google.type.Date publication_date = 6;
+}
+
+message ImageContext {
+  message Source {
+    string uri = 1;
+    string title = 2;
+  }
+
+  message Image {
+    string uri = 1;
+    int32 width = 2;
+    int32 height = 3;
+  }
+
+  .google.cloud.aiplatform.master.ImageContext.Source source = 1;
+  .google.cloud.aiplatform.master.ImageContext.Image image = 2;
+  .google.cloud.aiplatform.master.ImageContext.Image thumbnail = 3;
+}
+
+message YoutubeVideoContext {
+  string youtube_external_id = 1;
+}
+
+message Attachment {
+  oneof attachment_type {
+    .google.cloud.aiplatform.master.ImageContext image = 1;
+    .google.cloud.aiplatform.master.YoutubeVideoContext youtube_video = 2;
+  }
+}
+
+message Candidate {
+  reserved 11;
+  enum FinishReason {
+    FINISH_REASON_UNSPECIFIED = 0;
+    STOP = 1;
+    MAX_TOKENS = 2;
+    SAFETY = 3;
+    RECITATION = 4;
+    OTHER = 5;
+    BLOCKLIST = 6;
+    PROHIBITED_CONTENT = 7;
+    SPII = 8;
+    MALFORMED_FUNCTION_CALL = 9;
+    MODEL_ARMOR = 10;
+    IMAGE_SAFETY = 11;
+    IMAGE_PROHIBITED_CONTENT = 12;
+    IMAGE_RECITATION = 13;
+    IMAGE_OTHER = 14;
+    UNEXPECTED_TOOL_CALL = 15;
+    NO_IMAGE = 16;
+  }
+
+  int32 index = 1;
+  .google.cloud.aiplatform.master.Content content = 2;
+  double score = 8;
+  double avg_logprobs = 9;
+  .google.cloud.aiplatform.master.LogprobsResult logprobs_result = 10;
+  .google.cloud.aiplatform.master.Candidate.FinishReason finish_reason = 3;
+  repeated .google.cloud.aiplatform.master.SafetyRating safety_ratings = 4;
+  .google.cloud.aiplatform.master.CitationMetadata citation_metadata = 6;
+  .google.cloud.aiplatform.master.GroundingMetadata grounding_metadata = 7;
+  .google.cloud.aiplatform.master.UrlContextMetadata url_context_metadata = 13;
+  optional string finish_message = 5;
+}
+
+message UrlContextMetadata {
+  repeated .google.cloud.aiplatform.master.UrlMetadata url_metadata = 1;
+}
+
+message UrlMetadata {
+  enum UrlRetrievalStatus {
+    URL_RETRIEVAL_STATUS_UNSPECIFIED = 0;
+    URL_RETRIEVAL_STATUS_SUCCESS = 1;
+    URL_RETRIEVAL_STATUS_ERROR = 2;
+  }
+
+  string retrieved_url = 1;
+  .google.cloud.aiplatform.master.UrlMetadata.UrlRetrievalStatus url_retrieval_status = 2;
+}
+
+message LogprobsResult {
+  message Candidate {
+    optional string token = 1;
+    optional int32 token_id = 3;
+    optional float log_probability = 2;
+  }
+
+  message TopCandidates {
+    repeated .google.cloud.aiplatform.master.LogprobsResult.Candidate candidates = 1;
+  }
+
+  repeated .google.cloud.aiplatform.master.LogprobsResult.TopCandidates top_candidates = 1;
+  repeated .google.cloud.aiplatform.master.LogprobsResult.Candidate chosen_candidates = 2;
+}
+
+message Segment {
+  int32 part_index = 1;
+  int32 start_index = 2;
+  int32 end_index = 3;
+  string text = 4;
+}
+
+message GroundingChunk {
+  message Web {
+    string text = 4;
+    optional string uri = 1;
+    optional string title = 2;
+    optional string domain = 3;
+  }
+
+  message Image {
+    optional string source_uri = 1;
+    optional string image_uri = 2;
+    optional string title = 3;
+    optional string domain = 4;
+  }
+
+  message RetrievedContext {
+    oneof context_details {
+      .google.cloud.aiplatform.master.RagChunk rag_chunk = 4;
+    }
+    optional string uri = 1;
+    optional string title = 2;
+    optional string text = 3;
+    optional int32 page_number = 5;
+    optional string document_name = 6;
+  }
+
+  message Maps {
+    message PlaceAnswerSources {
+      reserved 2;
+      reserved 3;
+      message AuthorAttribution {
+        string display_name = 1;
+        string uri = 2;
+        string photo_uri = 3;
+      }
+
+      message ReviewSnippet {
+        reserved 2;
+        reserved 3;
+        reserved 4;
+        reserved 5;
+        reserved 6;
+        string review_id = 1;
+        string google_maps_uri = 7;
+        string title = 8;
+      }
+
+      repeated .google.cloud.aiplatform.master.GroundingChunk.Maps.PlaceAnswerSources.ReviewSnippet review_snippets = 1;
+    }
+
+    message Route {
+      int32 distance_meters = 1;
+      .google.protobuf.Duration duration = 2;
+      string encoded_polyline = 3;
+    }
+
+    .google.cloud.aiplatform.master.GroundingChunk.Maps.PlaceAnswerSources place_answer_sources = 5;
+    .google.cloud.aiplatform.master.GroundingChunk.Maps.Route route = 6;
+    optional string uri = 1;
+    optional string title = 2;
+    optional string text = 3;
+    optional string place_id = 4;
+  }
+
+  message MapsImagery {
+    optional string title = 1;
+    optional string uri = 2;
+  }
+
+  message ChunkMetadataEntry {
+    string key = 1;
+    string value = 2;
+  }
+
+  string reference_id = 7;
+  repeated .google.cloud.aiplatform.master.GroundingChunk.ChunkMetadataEntry chunk_metadata = 4;
+  oneof chunk_type {
+    .google.cloud.aiplatform.master.GroundingChunk.Web web = 1;
+    .google.cloud.aiplatform.master.GroundingChunk.Image image = 5;
+    .google.cloud.aiplatform.master.GroundingChunk.RetrievedContext retrieved_context = 2;
+    .google.cloud.aiplatform.master.GroundingChunk.Maps maps = 3;
+    .google.cloud.aiplatform.master.GroundingChunk.MapsImagery maps_imagery = 6;
+  }
+}
+
+message GroundingSupport {
+  repeated int32 grounding_chunk_indices = 2;
+  repeated float confidence_scores = 3;
+  repeated int32 rendered_parts = 4;
+  optional .google.cloud.aiplatform.master.Segment segment = 1;
+}
+
+message GroundingAttribution {
+  message Web {
+    string uri = 1;
+    string title = 2;
+  }
+
+  message RetrievedContext {
+    string uri = 1;
+    string title = 2;
+  }
+
+  .google.cloud.aiplatform.master.Segment segment = 1;
+  oneof reference {
+    .google.cloud.aiplatform.master.GroundingAttribution.Web web = 3;
+    .google.cloud.aiplatform.master.GroundingAttribution.RetrievedContext retrieved_context = 4;
+  }
+  optional float confidence_score = 2;
+}
+
+message GroundingMetadata {
+  message SourceFlaggingUri {
+    string source_id = 1;
+    string flag_content_uri = 2;
+  }
+
+  repeated string web_search_queries = 1;
+  repeated string image_search_queries = 11;
+  repeated string retrieval_queries = 3;
+  repeated .google.cloud.aiplatform.master.GroundingAttribution grounding_attributions = 2;
+  repeated .google.cloud.aiplatform.master.GroundingChunk grounding_chunks = 5;
+  repeated .google.cloud.aiplatform.master.GroundingSupport grounding_supports = 6;
+  repeated .google.cloud.aiplatform.master.Attachment attachments = 9;
+  repeated .google.cloud.aiplatform.master.GroundingMetadata.SourceFlaggingUri source_flagging_uris = 10;
+  optional .google.cloud.aiplatform.master.SearchEntryPoint search_entry_point = 4;
+  optional .google.cloud.aiplatform.master.RetrievalMetadata retrieval_metadata = 7;
+  optional string google_maps_widget_context_token = 8;
+}
+
+message SearchEntryPoint {
+  string rendered_content = 1;
+  bytes sdk_blob = 2;
+}
+
+message RetrievalMetadata {
+  reserved 1;
+  float google_search_dynamic_retrieval_score = 2;
+  repeated string vertex_ai_search_attribution_tokens = 3;
+}
+
+message ModelArmorConfig {
+  string prompt_template_name = 1;
+  string response_template_name = 2;
+  bool disable = 3;
+}
+
+message ModalityTokenCount {
+  .google.cloud.aiplatform.master.Modality modality = 1;
+  int32 token_count = 2;
+}
+
+message PreambleConfig {
+  enum SystemInstructionMode {
+    SYSTEM_INSTRUCTION_MODE_UNSPECIFIED = 0;
+    SYSTEM_INSTRUCTION_MODE_APPEND = 1;
+    SYSTEM_INSTRUCTION_MODE_REPLACE = 2;
+  }
+
+  .google.cloud.aiplatform.master.Content system_instruction = 1;
+  .google.cloud.aiplatform.master.PreambleConfig.SystemInstructionMode mode = 2;
+}
+
+message VideoConfig {
+  enum Task {
+    TASK_UNSPECIFIED = 0;
+    TEXT_TO_VIDEO = 1;
+    IMAGE_TO_VIDEO = 2;
+    REFERENCE_TO_VIDEO = 3;
+    EDIT = 4;
+    EXTEND = 5;
+  }
+
+  .google.cloud.aiplatform.master.VideoConfig.Task task = 1;
+}
+
+enum HarmCategory {
+  HARM_CATEGORY_UNSPECIFIED = 0;
+  HARM_CATEGORY_HATE_SPEECH = 1;
+  HARM_CATEGORY_DANGEROUS_CONTENT = 2;
+  HARM_CATEGORY_HARASSMENT = 3;
+  HARM_CATEGORY_SEXUALLY_EXPLICIT = 4;
+  HARM_CATEGORY_CIVIC_INTEGRITY = 5;
+  HARM_CATEGORY_IMAGE_HATE = 6;
+  HARM_CATEGORY_IMAGE_DANGEROUS_CONTENT = 7;
+  HARM_CATEGORY_IMAGE_HARASSMENT = 8;
+  HARM_CATEGORY_IMAGE_SEXUALLY_EXPLICIT = 9;
+  HARM_CATEGORY_JAILBREAK = 10;
+}
+
+enum Modality {
+  MODALITY_UNSPECIFIED = 0;
+  TEXT = 1;
+  IMAGE = 2;
+  VIDEO = 3;
+  AUDIO = 4;
+  DOCUMENT = 5;
+}
+

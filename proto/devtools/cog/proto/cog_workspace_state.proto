@@ -1,0 +1,49 @@
+edition = "2024";
+
+package devtools_cog;
+
+message CogCommit {
+  string commit_id = 1;
+  string commit_hash = 2;
+  string last_published_commit_cloud_hash = 13;
+  int64 change_number = 3;
+  int64 patchset_number = 4;
+  bool contains_conflicts = 5;
+  string theirs_commit_hash = 6;
+  string ours_commit_hash = 7;
+  string last_revision_without_conflicts = 8;
+  string commit_cloud_hash = 9;
+  repeated string commit_cloud_parent_hashes = 10;
+  bool is_root = 11;
+  bool has_pending_changes = 12;
+}
+
+message CogRepoState {
+  reserved 2;
+  reserved 3;
+  reserved 4;
+  reserved 6;
+  reserved 7;
+  reserved 8;
+  reserved 9;
+  reserved 13;
+  reserved 14;
+  reserved 15;
+  string gob_repo_name = 1;
+  string nearest_published_commit = 12;
+  string target_branch = 5;
+  repeated .devtools_cog.CogCommit commits = 10;
+  int64 checked_out_index = 11;
+  bool jj_initialized = 16;
+}
+
+message CogWorkspaceState {
+  reserved 2;
+  message ReposEntry {
+    string key = 1;
+    .devtools_cog.CogRepoState value = 2;
+  }
+
+  repeated .devtools_cog.CogWorkspaceState.ReposEntry repos = 1;
+}
+

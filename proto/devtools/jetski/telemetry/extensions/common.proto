@@ -1,0 +1,14 @@
+edition = "2024";
+
+package devtools.jetski.telemetry.extensions;
+
+option java_outer_classname = "CommonOuterClass";
+
+import "storage/datapol/annotations/proto/semantic_annotations.proto";
+
+message ExtraMetadata {
+  string key = 1;
+  string value = 2;
+  int64 int_value = 3;
+}
+

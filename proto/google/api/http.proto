@@ -1,0 +1,57 @@
+syntax = "proto3";
+
+package google.api;
+
+option java_package = "com.google.api";
+option java_outer_classname = "HttpProto";
+option java_multiple_files = true;
+option go_package = "google.golang.org/genproto/googleapis/api/annotations;annotations";
+option cc_enable_arenas = true;
+option objc_class_prefix = "GAPI";
+
+import "google/api/authz.proto";
+import "google/api/inclusion.proto";
+import "google/api/media.proto";
+import "google/api/visibility.proto";
+
+message Http {
+  repeated .google.api.HttpRule rules = 1;
+  bool fully_decode_reserved_expansion = 2;
+}
+
+message HttpRule {
+  string selector = 1;
+  string body = 7;
+  string response_body = 12;
+  .google.api.MediaUpload media_upload = 9;
+  .google.api.MediaDownload media_download = 10;
+  repeated .google.api.HttpRule additional_bindings = 11;
+  string rest_collection = 13;
+  string rest_method_name = 14;
+  repeated .google.api.AuthorizationRule authorizations = 15;
+  bool allow_half_duplex = 16;
+  bool derived = 17;
+  repeated .google.api.CrossOriginValidation cross_origin_validation = 18;
+  oneof pattern {
+    string get = 2;
+    string put = 3;
+    string post = 4;
+    string delete = 5;
+    string patch = 6;
+    .google.api.CustomHttpPattern custom = 8;
+  }
+}
+
+message CrossOriginValidation {
+  repeated string allowed_origins = 1;
+  repeated string allowed_methods = 2;
+  repeated string allowed_headers = 3;
+  repeated int64 allowed_origin_pen_users = 4;
+  string legacy_path_prefix = 5;
+}
+
+message CustomHttpPattern {
+  string kind = 1;
+  string path = 2;
+}
+

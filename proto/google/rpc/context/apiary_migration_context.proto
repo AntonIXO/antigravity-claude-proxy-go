@@ -1,0 +1,15 @@
+syntax = "proto3";
+
+package google.rpc.context;
+
+option java_package = "com.google.rpc.context";
+option java_outer_classname = "ApiaryMigrationContextProto";
+option java_multiple_files = true;
+option objc_class_prefix = "RPC";
+
+message ApiaryMigrationContext {
+  string apiary_method_name = 1;
+  string original_text_content = 2;
+  string oauth_access_token = 3;
+}
+

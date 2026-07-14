@@ -1,0 +1,22 @@
+edition = "2024";
+
+package devtools.jetski.telemetry.extensions;
+
+option java_outer_classname = "CortexExecutionMetadataOuterClass";
+
+import "storage/datapol/annotations/proto/semantic_annotations.proto";
+import "third_party/jetski/cortex_pb/cortex.proto";
+
+message CortexExecutionMetadata {
+  reserved 1;
+  string execution_id = 2;
+  string cascade_id = 3;
+  string trajectory_id = 4;
+  string experiment_json = 5;
+  string experiment_variants_json = 6;
+  .exa.cortex_pb.CascadeConfig cascade_config = 7;
+  repeated int32 mendel_experiment_ids = 8;
+  .exa.cortex_pb.ExecutorTerminationReason termination_reason = 9;
+  .exa.cortex_pb.ExecutorMetadata executor_metadata = 10;
+}
+

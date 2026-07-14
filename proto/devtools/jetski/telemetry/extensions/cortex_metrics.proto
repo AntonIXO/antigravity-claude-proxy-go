@@ -1,0 +1,59 @@
+edition = "2024";
+
+package devtools.jetski.telemetry.extensions;
+
+option java_outer_classname = "CortexMetricsOuterClass";
+
+import "google/protobuf/timestamp.proto";
+import "storage/datapol/annotations/proto/semantic_annotations.proto";
+
+message CortexMetrics {
+  string ide = 1;
+  string ide_version = 2;
+  string os = 3;
+  string os_name = 4;
+  string execution_id = 5;
+  string cascade_id = 6;
+  string trajectory_type = 7;
+  string trajectory_source = 8;
+  string trajectory_id = 9;
+  int32 start_step_index = 10;
+  int32 end_step_index = 11;
+  int32 start_generator_metadata_index = 12;
+  int32 end_generator_metadata_index = 13;
+  repeated .devtools.jetski.telemetry.extensions.MetricsRecord metrics = 14;
+  .google.protobuf.Timestamp timestamp = 15;
+  string model = 16;
+  repeated int32 mendel_experiment_ids = 17;
+  string response_model = 18;
+  string model_name = 19;
+}
+
+message MetricsRecord {
+  reserved 8;
+  message DetailsEntry {
+    string key = 1;
+    string value = 2;
+  }
+
+  string name = 1;
+  float value = 2;
+  repeated .devtools.jetski.telemetry.extensions.MetricsRecord.DetailsEntry details = 3;
+  .devtools.jetski.telemetry.extensions.MetricsMetadata metadata = 9;
+  string error = 6;
+  string trajectory_id = 7;
+  bool lower_better = 4;
+  bool is_bool = 5;
+}
+
+message MetricsMetadata {
+  reserved 5;
+  int32 version = 1;
+  string description = 2;
+  string better_direction = 3;
+  bool is_bool = 4;
+  bool uses_null_default_value = 8;
+  float null_default_value = 6;
+  string scope = 7;
+}
+

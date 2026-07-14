@@ -1,0 +1,80 @@
+syntax = "proto3";
+
+package google.gca.aicode.v1main;
+
+option java_package = "com.google.gca.aicode.v1main";
+option java_outer_classname = "AicodeContentProto";
+option java_multiple_files = true;
+
+import "google/api/field_behavior.proto";
+import "storage/datapol/annotations/proto/semantic_annotations.proto";
+
+message CodeBlock {
+  string content = 1;
+  string programming_language = 2;
+}
+
+message SourceFile {
+  message FileSegment {
+    string content = 1;
+    bool is_selected = 2;
+  }
+
+  enum InclusionReason {
+    INCLUSION_REASON_UNSPECIFIED = 0;
+    ACTIVE = 1;
+    OPEN = 2;
+    RECENTLY_CLOSED = 3;
+    RECENTLY_EDITED = 4;
+    COLOCATED = 5;
+    RELATED = 6;
+    USER_SELECTED = 7;
+  }
+
+  repeated .google.gca.aicode.v1main.SourceFile.InclusionReason inclusion_reason = 1;
+  string file_uri = 2;
+  repeated .google.gca.aicode.v1main.SourceFile.FileSegment segments = 4;
+  optional string programming_language = 3;
+}
+
+message FileEdit {
+  enum EditType {
+    EDIT_TYPE_UNSPECIFIED = 0;
+    TYPED = 1;
+    PASTED = 2;
+    AI_GENERATED = 3;
+  }
+
+  string file_uri = 1;
+  repeated .google.gca.aicode.v1main.CodeEdit edit = 2;
+  .google.gca.aicode.v1main.FileEdit.EditType edit_type = 3;
+}
+
+message CodeEdit {
+  int32 start_line = 1;
+  int32 end_line = 2;
+  repeated .google.gca.aicode.v1main.DiffLine lines = 3;
+}
+
+message DiffLine {
+  string text = 1;
+  .google.gca.aicode.v1main.DiffChangeType type = 2;
+  .google.gca.aicode.v1main.CharacterDiff character_diff = 3;
+}
+
+message CharacterDiff {
+  repeated .google.gca.aicode.v1main.CharacterDiffChange changes = 1;
+}
+
+message CharacterDiffChange {
+  string text = 1;
+  .google.gca.aicode.v1main.DiffChangeType type = 2;
+}
+
+enum DiffChangeType {
+  DIFF_CHANGE_TYPE_UNSPECIFIED = 0;
+  INSERT = 1;
+  DELETE = 2;
+  UNCHANGED = 3;
+}
+

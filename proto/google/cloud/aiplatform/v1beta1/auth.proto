@@ -1,0 +1,96 @@
+syntax = "proto3";
+
+package google.cloud.aiplatform.v1beta1;
+
+option java_package = "com.google.cloud.aiplatform.v1beta1";
+option java_outer_classname = "AuthProto";
+option java_multiple_files = true;
+option csharp_namespace = "Google.Cloud.AIPlatform.V1Beta1";
+option php_namespace = "Google\\Cloud\\AIPlatform\\V1beta1";
+option ruby_package = "Google::Cloud::AIPlatform::V1beta1";
+
+import "google/api/field_behavior.proto";
+import "google/api/inclusion.proto";
+import "google/api/resource.proto";
+import "google/api/versioning.proto";
+import "google/api/visibility.proto";
+import "net/proto2/contrib/validator/annotations.proto";
+import "storage/datapol/annotations/proto/semantic_annotations.proto";
+
+message AuthConfig {
+  reserved 1;
+  message ApiKeyConfig {
+    string name = 1;
+    string api_key_secret = 2;
+    string api_key_string = 4;
+    .google.cloud.aiplatform.v1beta1.HttpElementLocation http_element_location = 3;
+  }
+
+  message HttpBasicAuthConfig {
+    string credential_secret = 2;
+  }
+
+  message GoogleServiceAccountConfig {
+    string service_account = 1;
+  }
+
+  message OauthConfig {
+    oneof oauth_config {
+      string access_token = 1;
+      string service_account = 2;
+    }
+  }
+
+  message OidcConfig {
+    oneof oidc_config {
+      string id_token = 1;
+      string service_account = 2;
+    }
+  }
+
+  message ClientCertificateConfig {
+    string ssl_certificate = 1;
+    string private_key = 2;
+    string passphrase = 3;
+  }
+
+  .google.cloud.aiplatform.v1beta1.AuthType auth_type = 101;
+  oneof auth_config {
+    .google.cloud.aiplatform.v1beta1.AuthConfig.ApiKeyConfig api_key_config = 2;
+    .google.cloud.aiplatform.v1beta1.AuthConfig.HttpBasicAuthConfig http_basic_auth_config = 3;
+    .google.cloud.aiplatform.v1beta1.AuthConfig.GoogleServiceAccountConfig google_service_account_config = 4;
+    .google.cloud.aiplatform.v1beta1.AuthConfig.OauthConfig oauth_config = 5;
+    .google.cloud.aiplatform.v1beta1.AuthConfig.OidcConfig oidc_config = 7;
+    .google.cloud.aiplatform.v1beta1.AuthConfig.ClientCertificateConfig client_certificate_config = 6;
+  }
+}
+
+enum HttpMethod {
+  HTTP_METHOD_UNSPECIFIED = 0;
+  HTTP_METHOD_DELETE = 1;
+  HTTP_METHOD_GET = 2;
+  HTTP_METHOD_PATCH = 3;
+  HTTP_METHOD_POST = 4;
+  HTTP_METHOD_PUT = 5;
+}
+
+enum HttpElementLocation {
+  HTTP_IN_UNSPECIFIED = 0;
+  HTTP_IN_QUERY = 1;
+  HTTP_IN_HEADER = 2;
+  HTTP_IN_PATH = 3;
+  HTTP_IN_BODY = 4;
+  HTTP_IN_COOKIE = 5;
+}
+
+enum AuthType {
+  AUTH_TYPE_UNSPECIFIED = 0;
+  NO_AUTH = 1;
+  API_KEY_AUTH = 2;
+  HTTP_BASIC_AUTH = 3;
+  GOOGLE_SERVICE_ACCOUNT_AUTH = 4;
+  OAUTH = 6;
+  CLIENT_CERTIFICATE_AUTH = 7;
+  OIDC_AUTH = 8;
+}
+

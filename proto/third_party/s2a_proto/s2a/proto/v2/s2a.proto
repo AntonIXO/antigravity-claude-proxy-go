@@ -1,0 +1,222 @@
+edition = "2023";
+
+package s2a.proto.v2;
+
+option java_package = "com.google.s2a.proto.v2";
+option java_outer_classname = "S2AProto";
+option java_multiple_files = true;
+
+import "third_party/golang/protobuf/v2/src/google/protobuf/go_features.proto";
+import "third_party/s2a_proto/s2a/proto/v2/common.proto";
+import "third_party/s2a_proto/s2a/proto/v2/s2a_context.proto";
+
+service S2AService {
+  rpc SetUpSession (stream .s2a.proto.v2.SessionReq) returns (stream .s2a.proto.v2.SessionResp) {}
+}
+
+message AlpnPolicy {
+  bool enable_alpn_negotiation = 1;
+  repeated .s2a.proto.v2.AlpnProtocol alpn_protocols = 2;
+}
+
+message AuthenticationMechanism {
+  reserved 1;
+  .s2a.proto.v2.Identity identity = 3;
+  oneof mechanism_oneof {
+    string token = 2;
+  }
+}
+
+message Status {
+  uint32 code = 1;
+  string details = 2;
+}
+
+message GetTlsConfigurationReq {
+  .s2a.proto.v2.ConnectionSide connection_side = 1;
+  string sni = 2;
+  bytes client_hello = 3;
+  .s2a.proto.v2.TLSVersion tls_version = 4;
+  bytes random = 5;
+  bytes session_id = 6;
+  bytes cipher_suites = 7;
+  bytes compression_methods = 8;
+  bytes tls_extensions = 9;
+}
+
+message GetTlsConfigurationResp {
+  message ClientTlsConfiguration {
+    reserved 4;
+    reserved 5;
+    repeated string certificate_chain = 1;
+    .s2a.proto.v2.TLSVersion min_tls_version = 2;
+    .s2a.proto.v2.TLSVersion max_tls_version = 3;
+    repeated .s2a.proto.v2.Ciphersuite ciphersuites = 6;
+    .s2a.proto.v2.AlpnPolicy alpn_policy = 7;
+    string sni = 8;
+  }
+
+  message ServerTlsConfiguration {
+    reserved 4;
+    reserved 5;
+    enum RequestClientCertificate {
+      UNSPECIFIED = 0;
+      DONT_REQUEST_CLIENT_CERTIFICATE = 1;
+      REQUEST_CLIENT_CERTIFICATE_BUT_DONT_VERIFY = 2;
+      REQUEST_CLIENT_CERTIFICATE_AND_VERIFY = 3;
+      REQUEST_AND_REQUIRE_CLIENT_CERTIFICATE_BUT_DONT_VERIFY = 4;
+      REQUEST_AND_REQUIRE_CLIENT_CERTIFICATE_AND_VERIFY = 5;
+    }
+
+    repeated string certificate_chain = 1;
+    .s2a.proto.v2.TLSVersion min_tls_version = 2;
+    .s2a.proto.v2.TLSVersion max_tls_version = 3;
+    repeated .s2a.proto.v2.Ciphersuite ciphersuites = 10;
+    bool tls_resumption_enabled = 6;
+    .s2a.proto.v2.GetTlsConfigurationResp.ServerTlsConfiguration.RequestClientCertificate request_client_certificate = 7;
+    uint32 max_overhead_of_ticket_aead = 9;
+    .s2a.proto.v2.AlpnPolicy alpn_policy = 11;
+  }
+
+  oneof tls_configuration {
+    .s2a.proto.v2.GetTlsConfigurationResp.ClientTlsConfiguration client_tls_configuration = 1;
+    .s2a.proto.v2.GetTlsConfigurationResp.ServerTlsConfiguration server_tls_configuration = 2;
+  }
+}
+
+message OffloadPrivateKeyOperationReq {
+  reserved 3;
+  enum PrivateKeyOperation {
+    UNSPECIFIED = 0;
+    SIGN = 1;
+    DECRYPT = 2;
+  }
+
+  .s2a.proto.v2.OffloadPrivateKeyOperationReq.PrivateKeyOperation operation = 1;
+  .s2a.proto.v2.SignatureAlgorithm signature_algorithm = 2;
+  oneof in_bytes {
+    bytes raw_bytes = 4;
+    bytes sha256_digest = 5;
+    bytes sha384_digest = 6;
+    bytes sha512_digest = 7;
+  }
+}
+
+message OffloadPrivateKeyOperationResp {
+  bytes out_bytes = 1;
+}
+
+message OffloadResumptionKeyOperationReq {
+  enum ResumptionKeyOperation {
+    UNSPECIFIED = 0;
+    ENCRYPT = 1;
+    DECRYPT = 2;
+  }
+
+  .s2a.proto.v2.OffloadResumptionKeyOperationReq.ResumptionKeyOperation operation = 1;
+  bytes in_bytes = 2;
+}
+
+message OffloadResumptionKeyOperationResp {
+  bytes out_bytes = 1;
+}
+
+message ValidatePeerCertificateChainReq {
+  message ClientPeer {
+    repeated bytes certificate_chain = 1;
+  }
+
+  message ServerPeer {
+    repeated bytes certificate_chain = 1;
+    string server_hostname = 2;
+    bytes serialized_unrestricted_client_policy = 3;
+    string raw_target_name = 4;
+  }
+
+  enum VerificationMode {
+    UNSPECIFIED = 0;
+    SPIFFE = 1;
+    CONNECT_TO_GOOGLE = 2;
+    INSECURE = 3;
+    VERIFY_HOSTNAME_FOR_SELF_SIGNED = 4;
+    TPC_PARTNER_SPACE = 5;
+    ENROLLZ_CERTIFICATE = 6;
+    CONNECT_FROM_GOOGLE = 7;
+  }
+
+  .s2a.proto.v2.ValidatePeerCertificateChainReq.VerificationMode mode = 1;
+  oneof peer_oneof {
+    .s2a.proto.v2.ValidatePeerCertificateChainReq.ClientPeer client_peer = 2;
+    .s2a.proto.v2.ValidatePeerCertificateChainReq.ServerPeer server_peer = 3;
+  }
+}
+
+message ValidatePeerCertificateChainResp {
+  enum ValidationResult {
+    UNSPECIFIED = 0;
+    SUCCESS = 1;
+    FAILURE = 2;
+  }
+
+  enum ValidationFailureReason {
+    UNKNOWN_ERROR = 0;
+    VALIDATION_FAILURE = 1;
+    VALIDATION_NOT_PERFORMED = 2;
+    CERT_CHAIN_LENGTH_LIMIT_EXCEEDED = 3;
+    UNSUPPORTED_KEY_ALGORITHM = 4;
+    INVALID_RSA_KEY_SIZE = 5;
+    UNSUPPORTED_ELLIPTIC_CURVE_KEY = 6;
+    PKI_TOO_LARGE = 7;
+    VALIDATION_TIMED_OUT = 8;
+    VALIDATION_SEARCH_LIMIT_EXCEEDED = 9;
+    CLIENT_CERT_CHAIN_PARSE_FAILURE = 10;
+    MAX_NAME_CONSTRAINTS_EXCEEDED = 11;
+    CLIENT_CERT_CHAIN_INVALID_EKU = 12;
+    CONFIGURATION_RESOLVER_RESOLUTION_FAILURE = 13;
+  }
+
+  .s2a.proto.v2.ValidatePeerCertificateChainResp.ValidationResult validation_result = 1;
+  string validation_details = 2;
+  .s2a.proto.v2.S2AContext context = 3;
+  .s2a.proto.v2.ValidatePeerCertificateChainResp.ValidationFailureReason validation_failure_reason = 4;
+}
+
+message SessionReq {
+  reserved 1;
+  .s2a.proto.v2.Identity local_identity = 7;
+  repeated .s2a.proto.v2.AuthenticationMechanism authentication_mechanisms = 2;
+  oneof req_oneof {
+    .s2a.proto.v2.GetTlsConfigurationReq get_tls_configuration_req = 3;
+    .s2a.proto.v2.OffloadPrivateKeyOperationReq offload_private_key_operation_req = 4;
+    .s2a.proto.v2.OffloadResumptionKeyOperationReq offload_resumption_key_operation_req = 5;
+    .s2a.proto.v2.ValidatePeerCertificateChainReq validate_peer_certificate_chain_req = 6;
+  }
+}
+
+message SessionResp {
+  .s2a.proto.v2.Status status = 1;
+  oneof resp_oneof {
+    .s2a.proto.v2.GetTlsConfigurationResp get_tls_configuration_resp = 2;
+    .s2a.proto.v2.OffloadPrivateKeyOperationResp offload_private_key_operation_resp = 3;
+    .s2a.proto.v2.OffloadResumptionKeyOperationResp offload_resumption_key_operation_resp = 4;
+    .s2a.proto.v2.ValidatePeerCertificateChainResp validate_peer_certificate_chain_resp = 5;
+  }
+}
+
+enum SignatureAlgorithm {
+  S2A_SSL_SIGN_UNSPECIFIED = 0;
+  S2A_SSL_SIGN_RSA_PKCS1_SHA256 = 1;
+  S2A_SSL_SIGN_RSA_PKCS1_SHA384 = 2;
+  S2A_SSL_SIGN_RSA_PKCS1_SHA512 = 3;
+  S2A_SSL_SIGN_ECDSA_SECP256R1_SHA256 = 4;
+  S2A_SSL_SIGN_ECDSA_SECP384R1_SHA384 = 5;
+  S2A_SSL_SIGN_ECDSA_SECP521R1_SHA512 = 6;
+  S2A_SSL_SIGN_RSA_PSS_RSAE_SHA256 = 7;
+  S2A_SSL_SIGN_RSA_PSS_RSAE_SHA384 = 8;
+  S2A_SSL_SIGN_RSA_PSS_RSAE_SHA512 = 9;
+  S2A_SSL_SIGN_ED25519 = 10;
+  S2A_SSL_SIGN_RSA_PKCS1_SHA1 = 11;
+  S2A_SSL_SIGN_RSA_PKCS1_MD5_SHA1 = 12;
+  S2A_SSL_SIGN_ECDSA_SHA1 = 13;
+}
+

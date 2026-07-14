@@ -1,0 +1,95 @@
+edition = "2023";
+
+option java_package = "com.google.tracing";
+
+import "java/com/google/apps/jspb/jspb.proto";
+import "net/proto2/bridge/proto/message_set.proto";
+import "perftools/tracing/proto/annotation_value.proto";
+import "perftools/tracing/proto/source_location.proto";
+import "storage/datapol/annotations/proto/semantic_annotations.proto";
+import "util/task/status.proto";
+
+message TraceRecord {
+  reserved 3 to 8;
+  reserved 12;
+  reserved 19;
+  reserved 20;
+  reserved 25;
+  reserved 31;
+  reserved 35;
+  reserved 58;
+  message AnnotationsLocation {
+    string filename = 1;
+    bytes position = 2;
+  }
+
+  message ChannelEntry {
+    message AnnotationEntry {
+      reserved 12;
+      string key = 27;
+      .perftools.tracing.SourceLocation source_location = 46;
+      sfixed64 timestamp_ns = 54;
+      int32 thread_id = 37;
+      string string_value = 13;
+      int32 int32_value = 21;
+      int64 int64_value = 22;
+      double double_value = 23;
+      .proto2.bridge.MessageSet message_value = 24;
+      bool boolean_value = 30;
+      .perftools.tracing.AnnotationValue annotation_value = 59;
+    }
+
+    fixed32 channel_id = 10;
+    repeated group annotationentry = 11;
+  }
+
+  enum SpanType {
+    SPAN_UNKNOWN = 0;
+    SPAN_LOCAL = 1;
+    SPAN_CLIENT_HALF = 2;
+    SPAN_SERVER_HALF = 3;
+  }
+
+  enum SpanIdVersion {
+    SPAN_ID_VERSION_SAME_FOR_CLIENT_SERVER = 0;
+    SPAN_ID_VERSION_UNIQUE = 1;
+  }
+
+  fixed64 rpc_id = 1;
+  fixed64 global_id = 2;
+  fixed64 global_id_hi = 44;
+  fixed64 parent_span_id = 14;
+  fixed64 grandparent_span_id = 39;
+  fixed64 process_id = 15;
+  int32 trace_mask = 16 [default = 1];
+  double sampling_probability = 32;
+  double trace_period = 17 [default = 1024];
+  double local_sampling_probability = 42;
+  double query_cost_sampling_probability = 48;
+  double relative_skeletal_sampling_probability = 57;
+  string name = 18;
+  string stubby_name_with_package = 45;
+  sfixed64 local_start_time_ns = 51;
+  sfixed64 local_end_time_ns = 52;
+  sfixed64 local_stop_time_ns = 53;
+  bool is_leaf = 26;
+  int32 child_span_count = 38;
+  bool error = 33;
+  .util.StatusProto status = 41;
+  .TraceRecord.SpanType span_type = 34 [default = SPAN_UNKNOWN];
+  bool tracing_initiator = 36;
+  uint64 initiator_id = 43;
+  string resolved_initiator = 50;
+  .TraceRecord.SpanIdVersion span_id_version = 40 [default = SPAN_ID_VERSION_SAME_FOR_CLIENT_SERVER];
+  .perftools.tracing.SourceLocation span_source_location = 49;
+  .TraceRecord.AnnotationsLocation annotations_location = 47;
+  repeated group channelentry = 9;
+  bool skipped_annotations = 55;
+  bool annotation_buffer_overflow = 56;
+}
+
+message EncryptedAnnotationPlaceholder {
+  int32 num_cipher_bytes = 1;
+  uint64 encrypted_annotation_id = 2;
+}
+

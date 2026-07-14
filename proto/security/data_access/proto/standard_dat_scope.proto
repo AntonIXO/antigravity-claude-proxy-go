@@ -1,0 +1,48 @@
+syntax = "proto2";
+
+package security.data_access;
+
+option java_package = "com.google.security.data_access.proto";
+option cc_enable_arenas = true;
+
+import "google/api/inclusion.proto";
+import "security/credentials/proto/data_access_token_scope.proto";
+import "security/credentials/proto/principal.proto";
+import "storage/datapol/annotations/proto/semantic_annotations.proto";
+import "third_party/boundary_proxy/proto_compare/annotation.proto";
+
+message UserDataScopeProto {
+  reserved 5;
+  optional .security.credentials.PrincipalProto principal_id = 1;
+  optional .security.data_access.ProdUserType prod_user_type = 6;
+  optional bool all_principals_allowed = 2 [default = false];
+  repeated .security.data_access.DataScopeProto data_scope = 3;
+  optional bool all_data_scopes_allowed = 4 [default = false];
+}
+
+message DataScopeProto {
+  optional int64 datatype_scope_code = 1;
+  repeated .security.data_access.DocumentIdProto document_id = 5;
+  optional bool all_document_ids_allowed = 6 [default = false];
+  optional bytes OBSOLETE_7 = 7;
+}
+
+message DocumentIdProto {
+  optional string document_id_string = 1;
+  optional int64 document_id_int = 2;
+}
+
+message StandardDatScopeProto {
+  repeated int32 api_scope_code = 5;
+  repeated .security.data_access.UserDataScopeProto user_data_scope = 1;
+  optional bytes OBSOLETE_2 = 2;
+  optional bytes OBSOLETE_3 = 3;
+  optional bytes OBSOLETE_4 = 4;
+}
+
+enum ProdUserType {
+  USER_TYPE_UNSPECIFIED = 0;
+  USER_TYPE_PERSON = 1;
+  USER_TYPE_NON_PERSON = 2;
+}
+

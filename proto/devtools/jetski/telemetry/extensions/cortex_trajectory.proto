@@ -1,0 +1,29 @@
+edition = "2024";
+
+package devtools.jetski.telemetry.extensions;
+
+option java_outer_classname = "CortexTrajectoryOuterClass";
+
+import "storage/datapol/annotations/proto/semantic_annotations.proto";
+import "third_party/jetski/cortex_pb/cortex.proto";
+
+message CortexTrajectory {
+  string trajectory_id = 1;
+  string cascade_id = 2;
+  .exa.cortex_pb.CortexTrajectoryType trajectory_type = 3;
+  .exa.cortex_pb.CortexTrajectorySource trajectory_source = 4;
+  repeated .exa.cortex_pb.CortexTrajectoryReference parents = 5;
+  .exa.cortex_pb.CortexTrajectoryMetadata trajectory_metadata = 6;
+  string ide_version = 7;
+  string ide_name = 8;
+  string os_name = 9;
+  .devtools.jetski.telemetry.extensions.RedactionInfo redaction_info = 10;
+}
+
+message RedactionInfo {
+  string reason = 1;
+  int32 last_retained_step_index = 2;
+  int32 last_retained_generator_metadata_index = 3;
+  bool is_partially_retained = 4;
+}
+

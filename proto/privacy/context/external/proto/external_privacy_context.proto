@@ -1,0 +1,15 @@
+syntax = "proto2";
+
+package privacy.context.external;
+
+option java_multiple_files = true;
+option objc_class_prefix = "PCEP";
+
+import "privacy/context/external/proto/external_prequest_context.proto";
+import "privacy/context/external/proto/external_sot_mappings.proto";
+
+message ExternalPrivacyContext {
+  optional .privacy.context.external.ExternalPRequestContext prequest = 2;
+  optional .privacy.context.external.ExternalSotMappings sot = 3;
+}
+

@@ -1,0 +1,13 @@
+edition = "2024";
+
+package devtools.jetski.telemetry.extensions;
+
+option java_outer_classname = "ErrorTraceMetadataOuterClass";
+
+import "storage/datapol/annotations/proto/semantic_annotations.proto";
+import "third_party/jetski/codeium_common_pb/codeium_common.proto";
+
+message ErrorTraceMetadata {
+  .exa.codeium_common_pb.ErrorTrace error_trace = 1;
+}
+

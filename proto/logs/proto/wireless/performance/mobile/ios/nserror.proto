@@ -1,0 +1,22 @@
+syntax = "proto2";
+
+package logs.proto.wireless.performance.mobile.ios;
+
+option java_package = "logs.proto.wireless.performance.mobile.ios";
+option java_outer_classname = "NSErrorOuterClass";
+option java_multiple_files = true;
+option objc_class_prefix = "PRM";
+
+import "logs/proto/wireless/performance/mobile/annotations.proto";
+import "storage/datapol/annotations/proto/semantic_annotations.proto";
+
+message NSError {
+  repeated .logs.proto.wireless.performance.mobile.ios.NSErrorNode underlying_errors = 3;
+}
+
+message NSErrorNode {
+  optional string compile_time_literal_error_domain = 1;
+  optional int64 error_code = 2;
+  repeated int64 underlying_error_indices = 3;
+}
+

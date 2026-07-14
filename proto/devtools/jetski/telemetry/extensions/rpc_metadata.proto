@@ -1,0 +1,15 @@
+edition = "2024";
+
+package devtools.jetski.telemetry.extensions;
+
+option java_outer_classname = "RpcMetadataOuterClass";
+
+import "google/rpc/code.proto";
+import "storage/datapol/annotations/proto/semantic_annotations.proto";
+
+message RpcMetadata {
+  string rpc_name = 1;
+  .google.rpc.Code status_code = 2;
+  int64 latency_ms = 3;
+}
+

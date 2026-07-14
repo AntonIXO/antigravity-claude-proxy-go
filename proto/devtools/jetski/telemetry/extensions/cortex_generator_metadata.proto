@@ -1,0 +1,20 @@
+edition = "2024";
+
+package devtools.jetski.telemetry.extensions;
+
+option java_outer_classname = "CortexGeneratorMetadataOuterClass";
+
+import "storage/datapol/annotations/proto/semantic_annotations.proto";
+import "third_party/jetski/cortex_pb/cortex.proto";
+
+message CortexGeneratorMetadata {
+  string trajectory_id = 1;
+  string cascade_id = 2;
+  .exa.cortex_pb.CortexStepGeneratorMetadata generator_metadata = 3;
+  uint32 metadata_index = 4;
+  int32 last_common_index = 5;
+  bool is_full = 6;
+  string execution_id = 11;
+  string plan_model = 12;
+}
+

@@ -1,0 +1,36 @@
+edition = "2024";
+
+package logs.proto.wireless.android.play.playlog;
+
+option java_outer_classname = "ClearcutGoClientTelemetryProto";
+
+import "storage/datapol/annotations/proto/semantic_annotations.proto";
+import "wireless/android/play/playlog/proto/log_source_enum.proto";
+
+message ClearcutGolangClientTelemetry {
+  repeated .logs.proto.wireless.android.play.playlog.ClearcutGolangTelemetryWindow telemetry_windows = 10;
+}
+
+message ClearcutGolangTelemetryWindow {
+  int64 logger_id = 10;
+  int32 sequence_number = 11;
+  .wireless_android_play_playlog.LogSourceEnum.LogSource log_source = 12;
+  int64 window_start_time_ms = 13;
+  int64 window_end_time_ms = 14;
+  int32 num_records_logged = 15;
+  repeated .logs.proto.wireless.android.play.playlog.GolangTelemetryUpload uploads = 16;
+}
+
+message GolangTelemetryUpload {
+  int64 upload_start_time_ms = 10;
+  int32 events_attempted = 11;
+  int32 http_status = 12;
+  int32 events_uploaded = 13;
+  int32 dropped_by_serialization = 14;
+  int32 dropped_by_not_success_not_retryable = 15;
+  int32 dropped_by_read_failure = 16;
+  int32 dropped_by_deserialization = 17;
+  int32 events_removed_from_buffer = 18;
+  int64 upload_end_time_ms = 19;
+}
+

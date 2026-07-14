@@ -1,0 +1,34 @@
+syntax = "proto3";
+
+package google.cloud.aiplatform.v1beta1;
+
+option java_package = "com.google.cloud.aiplatform.v1beta1";
+option java_outer_classname = "OperationProto";
+option java_multiple_files = true;
+option csharp_namespace = "Google.Cloud.AIPlatform.V1Beta1";
+option php_namespace = "Google\\Cloud\\AIPlatform\\V1beta1";
+option ruby_package = "Google::Cloud::AIPlatform::V1beta1";
+
+import "google/api/field_behavior.proto";
+import "google/api/versioning.proto";
+import "google/protobuf/timestamp.proto";
+import "google/rpc/status.proto";
+import "storage/datapol/annotations/proto/semantic_annotations.proto";
+
+message GenericOperationMetadata {
+  enum State {
+    STATE_UNSPECIFIED = 0;
+    RUNNING = 1;
+    CANCELLING = 2;
+    DONE = 3;
+  }
+
+  repeated .google.rpc.Status partial_failures = 1;
+  .google.protobuf.Timestamp create_time = 2;
+  .google.protobuf.Timestamp update_time = 3;
+}
+
+message DeleteOperationMetadata {
+  .google.cloud.aiplatform.v1beta1.GenericOperationMetadata generic_metadata = 1;
+}
+

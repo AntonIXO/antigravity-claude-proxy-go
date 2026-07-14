@@ -1,0 +1,35 @@
+edition = "2024";
+
+package cloud.developer_experience.cloudcode.pkg.modelproxy;
+
+option java_outer_classname = "ExtraFieldsProto";
+
+import "google/cloud/aiplatform/v1beta1/prediction_service.proto";
+
+message ExtraFields {
+  message GenerationConfig {
+    message ChatCompletions {
+      message ResponseFormatDetails {
+        string name = 1;
+        string description = 2;
+        bool strict = 3;
+      }
+
+      .cloud.developer_experience.cloudcode.pkg.modelproxy.ExtraFields.GenerationConfig.ChatCompletions.ResponseFormatDetails response_format_details = 1;
+      .google.cloud.aiplatform.v1beta1.ChatCompletionsRequest.ExtraBody extra_body = 2;
+    }
+
+    .cloud.developer_experience.cloudcode.pkg.modelproxy.ExtraFields.GenerationConfig.ChatCompletions chat_completions = 1000;
+  }
+
+  message Part {
+    message ChatCompletions {
+      string image_detail = 1;
+      string plaintext_tool_response = 2;
+    }
+
+    .cloud.developer_experience.cloudcode.pkg.modelproxy.ExtraFields.Part.ChatCompletions chat_completions = 1000;
+  }
+
+}
+

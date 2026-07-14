@@ -1,0 +1,22 @@
+edition = "2024";
+
+package devtools.jetski.telemetry.proto;
+
+option java_outer_classname = "ReadUrlContent";
+
+import "google/protobuf/timestamp.proto";
+import "storage/datapol/annotations/proto/semantic_annotations.proto";
+
+message ReadUrlContentMetadata {
+  string url = 1;
+  string title = 2;
+  string markdown_content = 3;
+  .google.protobuf.Timestamp timestamp = 4;
+  bool is_cached = 5;
+  int32 latency_ms = 6;
+  int32 total_num_words = 7;
+  bool trawler_fetch = 8;
+  string trawler_cache_error = 9;
+  string trawler_live_error = 10;
+}
+

@@ -1,0 +1,9 @@
+edition = "2024";
+
+package util;
+
+message ErrorSpacePayload {
+  int32 code = 1;
+  string space = 2;
+}
+

@@ -1,0 +1,116 @@
+syntax = "proto3";
+
+package google.cloud.aiplatform.v1beta1;
+
+option java_package = "com.google.cloud.aiplatform.v1beta1";
+option java_outer_classname = "ExplanationMetadataProto";
+option java_multiple_files = true;
+option csharp_namespace = "Google.Cloud.AIPlatform.V1Beta1";
+option php_namespace = "Google\\Cloud\\AIPlatform\\V1beta1";
+option ruby_package = "Google::Cloud::AIPlatform::V1beta1";
+
+import "google/api/field_behavior.proto";
+import "google/api/policy.proto";
+import "google/api/versioning.proto";
+import "google/protobuf/struct.proto";
+
+message ExplanationMetadata {
+  message InputMetadata {
+    message FeatureValueDomain {
+      float min_value = 1;
+      float max_value = 2;
+      float original_mean = 3;
+      float original_stddev = 4;
+    }
+
+    message Visualization {
+      enum Type {
+        TYPE_UNSPECIFIED = 0;
+        PIXELS = 1;
+        OUTLINES = 2;
+      }
+
+      enum Polarity {
+        POLARITY_UNSPECIFIED = 0;
+        POSITIVE = 1;
+        NEGATIVE = 2;
+        BOTH = 3;
+      }
+
+      enum ColorMap {
+        COLOR_MAP_UNSPECIFIED = 0;
+        PINK_GREEN = 1;
+        VIRIDIS = 2;
+        RED = 3;
+        GREEN = 4;
+        RED_GREEN = 6;
+        PINK_WHITE_GREEN = 5;
+      }
+
+      enum OverlayType {
+        OVERLAY_TYPE_UNSPECIFIED = 0;
+        NONE = 1;
+        ORIGINAL = 2;
+        GRAYSCALE = 3;
+        MASK_BLACK = 4;
+      }
+
+      .google.cloud.aiplatform.v1beta1.ExplanationMetadata.InputMetadata.Visualization.Type type = 1;
+      .google.cloud.aiplatform.v1beta1.ExplanationMetadata.InputMetadata.Visualization.Polarity polarity = 2;
+      .google.cloud.aiplatform.v1beta1.ExplanationMetadata.InputMetadata.Visualization.ColorMap color_map = 3;
+      float clip_percent_upperbound = 4;
+      float clip_percent_lowerbound = 5;
+      .google.cloud.aiplatform.v1beta1.ExplanationMetadata.InputMetadata.Visualization.OverlayType overlay_type = 6;
+    }
+
+    enum Encoding {
+      ENCODING_UNSPECIFIED = 0;
+      IDENTITY = 1;
+      BAG_OF_FEATURES = 2;
+      BAG_OF_FEATURES_SPARSE = 3;
+      INDICATOR = 4;
+      COMBINED_EMBEDDING = 5;
+      CONCAT_EMBEDDING = 6;
+    }
+
+    repeated .google.protobuf.Value input_baselines = 1;
+    string input_tensor_name = 2;
+    .google.cloud.aiplatform.v1beta1.ExplanationMetadata.InputMetadata.Encoding encoding = 3;
+    string modality = 4;
+    .google.cloud.aiplatform.v1beta1.ExplanationMetadata.InputMetadata.FeatureValueDomain feature_value_domain = 5;
+    string indices_tensor_name = 6;
+    string dense_shape_tensor_name = 7;
+    repeated string index_feature_mapping = 8;
+    string encoded_tensor_name = 9;
+    repeated .google.protobuf.Value encoded_baselines = 10;
+    .google.cloud.aiplatform.v1beta1.ExplanationMetadata.InputMetadata.Visualization visualization = 11;
+    string group_name = 12;
+  }
+
+  message OutputMetadata {
+    string output_tensor_name = 3;
+    oneof display_name_mapping {
+      .google.protobuf.Value index_display_name_mapping = 1;
+      string display_name_mapping_key = 2;
+    }
+  }
+
+  message EmbeddingMetadata {
+  }
+
+  message InputsEntry {
+    string key = 1;
+    .google.cloud.aiplatform.v1beta1.ExplanationMetadata.InputMetadata value = 2;
+  }
+
+  message OutputsEntry {
+    string key = 1;
+    .google.cloud.aiplatform.v1beta1.ExplanationMetadata.OutputMetadata value = 2;
+  }
+
+  repeated .google.cloud.aiplatform.v1beta1.ExplanationMetadata.InputsEntry inputs = 1;
+  repeated .google.cloud.aiplatform.v1beta1.ExplanationMetadata.OutputsEntry outputs = 2;
+  string feature_attributions_schema_uri = 3;
+  string latent_space_source = 5;
+}
+

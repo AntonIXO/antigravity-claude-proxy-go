@@ -1,0 +1,77 @@
+syntax = "proto2";
+
+package google.longrunning;
+
+option java_package = "com.google.longrunning";
+option java_outer_classname = "OperationsProto";
+option java_multiple_files = true;
+option go_package = "cloud.google.com/go/longrunning/autogen/longrunningpb;longrunningpb";
+option cc_enable_arenas = true;
+option objc_class_prefix = "GLRUN";
+option csharp_namespace = "Google.LongRunning";
+option php_namespace = "Google\\LongRunning";
+
+import "google/api/annotations.proto";
+import "google/api/client.proto";
+import "google/api/field_behavior.proto";
+import "google/protobuf/any.proto";
+import "google/protobuf/duration.proto";
+import "google/protobuf/empty.proto";
+import "google/rpc/status.proto";
+import "net/proto2/proto/descriptor.proto";
+import "third_party/boundary_proxy/proto_compare/annotation.proto";
+
+service Operations {
+  rpc ListOperations (.google.longrunning.ListOperationsRequest) returns (.google.longrunning.ListOperationsResponse) {}
+  rpc GetOperation (.google.longrunning.GetOperationRequest) returns (.google.longrunning.Operation) {}
+  rpc DeleteOperation (.google.longrunning.DeleteOperationRequest) returns (.google.protobuf.Empty) {}
+  rpc CancelOperation (.google.longrunning.CancelOperationRequest) returns (.google.protobuf.Empty) {}
+  rpc WaitOperation (.google.longrunning.WaitOperationRequest) returns (.google.longrunning.Operation) {}
+}
+
+message Operation {
+  optional string name = 1;
+  optional .google.protobuf.Any metadata = 2;
+  optional bool done = 3;
+  oneof result {
+    .google.rpc.Status error = 4;
+    .google.protobuf.Any response = 5;
+  }
+}
+
+message GetOperationRequest {
+  optional string name = 1;
+}
+
+message ListOperationsRequest {
+  optional string name = 4;
+  optional string filter = 1;
+  optional int32 page_size = 2;
+  optional string page_token = 3;
+  optional bool return_partial_success = 5;
+}
+
+message ListOperationsResponse {
+  repeated .google.longrunning.Operation operations = 1;
+  optional string next_page_token = 2;
+  repeated string unreachable = 3;
+}
+
+message CancelOperationRequest {
+  optional string name = 1;
+}
+
+message DeleteOperationRequest {
+  optional string name = 1;
+}
+
+message WaitOperationRequest {
+  optional string name = 1;
+  optional .google.protobuf.Duration timeout = 2;
+}
+
+message OperationInfo {
+  optional string response_type = 1;
+  optional string metadata_type = 2;
+}
+

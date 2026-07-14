@@ -1,0 +1,4 @@
+syntax = "proto2";
+
+package proto2.bridge;
+

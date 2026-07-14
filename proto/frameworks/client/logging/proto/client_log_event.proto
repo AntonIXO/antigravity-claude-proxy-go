@@ -1,0 +1,57 @@
+edition = "2024";
+
+package frameworks.client.logging.proto;
+
+option java_package = "com.google.frameworks.client.logging.proto";
+option java_outer_classname = "ClientLogEventOuterClass";
+option objc_class_prefix = "CLI";
+
+import "frameworks/client/logging/proto/client_event_metadata.proto";
+import "frameworks/client/logging/proto/client_event_trace.proto";
+import "frameworks/client/logging/proto/parameter.proto";
+import "logs/java/logrecord.proto";
+import "logs/proto/wireless/performance/mobile/desktop/extension_metric.proto";
+import "logs/proto/wireless/performance/mobile/extension_metric.proto";
+import "logs/proto/wireless/performance/mobile/ios/extension_metric.proto";
+import "logs/proto/wireless/performance/mobile/ios/nserror.proto";
+import "privacy/pattributes/annotations/proto_field.proto";
+import "storage/datapol/annotations/proto/semantic_annotations.proto";
+
+message ClientLogEvent {
+  reserved 1;
+  reserved 4 to 6;
+  message SafeFormatArgumentValue {
+    oneof argument_value {
+      string string_value = 1;
+      .logs.proto.wireless.performance.mobile.ios.NSError ns_error = 2;
+    }
+  }
+
+  message SafeFormatArguments {
+    repeated int32 index = 1;
+    repeated string value = 2;
+    repeated .frameworks.client.logging.proto.ClientLogEvent.SafeFormatArgumentValue argument_value = 3;
+  }
+
+  enum LoggingType {
+    UNKNOWN = 0;
+    ORIGIN = 1;
+    COUNT = 2;
+  }
+
+  .frameworks.client.logging.proto.ClientLogEvent.LoggingType logging_type = 12;
+  int64 count = 13;
+  .logs.proto.wireless.performance.mobile.MetricExtension metric_extension = 14;
+  .logs.proto.wireless.performance.mobile.ios.MetricExtension ios_metric_extension = 15;
+  .logs.proto.wireless.performance.mobile.desktop.MetricExtension desktop_metric_extension = 18;
+  .frameworks.client.logging.proto.ClientEventMetadata metadata = 2;
+  .LogRecordProto log_record = 3;
+  .frameworks.client.logging.proto.ClientEventTrace trace = 7;
+  bytes custom_data = 8;
+  repeated .frameworks.client.logging.proto.Parameter allowed_parameters = 9;
+  .frameworks.client.logging.proto.ClientLogEvent.SafeFormatArguments safe_format_arguments = 16;
+  string component_id = 10;
+  double sampling_rate = 11;
+  repeated int64 active_cui_ids = 17;
+}
+

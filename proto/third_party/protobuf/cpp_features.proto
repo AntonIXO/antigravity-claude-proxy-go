@@ -1,0 +1,30 @@
+syntax = "proto2";
+
+package pb;
+
+option java_package = "com.google.protobuf";
+option java_outer_classname = "CppFeaturesProto";
+
+import "net/proto2/proto/descriptor.proto";
+
+message CppFeatures {
+  enum StringType {
+    STRING_TYPE_UNKNOWN = 0;
+    VIEW = 1;
+    CORD = 2;
+    STRING = 3;
+    STRING_PIECE = 4;
+  }
+
+  enum RepeatedType {
+    REPEATED_TYPE_UNKNOWN = 0;
+    LEGACY = 1;
+    PROXY = 2;
+  }
+
+  optional bool legacy_closed_enum = 1;
+  optional .pb.CppFeatures.StringType string_type = 2;
+  optional bool enum_name_uses_string_view = 3;
+  optional .pb.CppFeatures.RepeatedType repeated_type = 4;
+}
+

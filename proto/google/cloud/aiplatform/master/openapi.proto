@@ -1,0 +1,71 @@
+syntax = "proto3";
+
+package google.cloud.aiplatform.master;
+
+option java_package = "com.google.cloud.aiplatform.master";
+option java_outer_classname = "OpenApiProto";
+option java_multiple_files = true;
+option csharp_namespace = "Google.Cloud.AIPlatform.Master";
+option php_namespace = "Google\\Cloud\\AIPlatform\\Master";
+option ruby_package = "Google::Cloud::AIPlatform::Master";
+
+import "google/api/field_behavior.proto";
+import "google/api/inclusion.proto";
+import "google/api/visibility.proto";
+import "google/protobuf/struct.proto";
+import "storage/datapol/annotations/proto/semantic_annotations.proto";
+
+message Schema {
+  message PropertiesEntry {
+    string key = 1;
+    .google.cloud.aiplatform.master.Schema value = 2;
+  }
+
+  message DefsEntry {
+    string key = 1;
+    .google.cloud.aiplatform.master.Schema value = 2;
+  }
+
+  .google.cloud.aiplatform.master.Type type = 1;
+  string format = 7;
+  string title = 24;
+  string description = 8;
+  bool nullable = 6;
+  .google.protobuf.Value default = 23;
+  .google.cloud.aiplatform.master.Schema items = 2;
+  repeated .google.cloud.aiplatform.master.Schema prefix_items = 30;
+  int64 min_items = 21;
+  int64 max_items = 22;
+  repeated string enum = 9;
+  repeated .google.cloud.aiplatform.master.Schema.PropertiesEntry properties = 3;
+  repeated string property_ordering = 25;
+  repeated string required = 5;
+  int64 min_properties = 14;
+  int64 max_properties = 15;
+  double minimum = 16;
+  double maximum = 17;
+  int64 min_length = 18;
+  int64 max_length = 19;
+  string pattern = 20;
+  .google.protobuf.Value example = 4;
+  repeated .google.cloud.aiplatform.master.Schema one_of = 10;
+  repeated .google.cloud.aiplatform.master.Schema any_of = 11;
+  repeated .google.cloud.aiplatform.master.Schema all_of = 12;
+  .google.cloud.aiplatform.master.Schema not = 13;
+  .google.protobuf.Value additional_properties = 26;
+  .google.cloud.aiplatform.master.Schema additional_properties_schema = 29;
+  string ref = 27;
+  repeated .google.cloud.aiplatform.master.Schema.DefsEntry defs = 28;
+}
+
+enum Type {
+  TYPE_UNSPECIFIED = 0;
+  STRING = 1;
+  NUMBER = 2;
+  INTEGER = 3;
+  BOOLEAN = 4;
+  ARRAY = 5;
+  OBJECT = 6;
+  NULL = 7;
+}
+

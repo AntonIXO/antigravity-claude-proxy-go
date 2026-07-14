@@ -1,0 +1,10 @@
+edition = "2024";
+
+package pb.file;
+
+import "net/proto2/proto/descriptor.proto";
+
+message CppFileOptions {
+  string namespace = 1;
+}
+

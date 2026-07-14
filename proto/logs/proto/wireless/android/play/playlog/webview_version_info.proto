@@ -1,0 +1,29 @@
+syntax = "proto2";
+
+package wireless_android_play_playlog;
+
+option objc_class_prefix = "CADP";
+
+import "google/api/inclusion.proto";
+import "storage/datapol/annotations/proto/semantic_annotations.proto";
+
+message WebViewVersionInfo {
+  enum PackageName {
+    COM_ANDROID_WEBVIEW = 0;
+    COM_GOOGLE_ANDROID_WEBVIEW = 1;
+    COM_ANDROID_CHROME = 2;
+    COM_CHROME_BETA = 3;
+    COM_CHROME_DEV = 4;
+    COM_CHROME_CANARY = 5;
+    COM_GOOGLE_ANDROID_APPS_CHROME = 6;
+    COM_GOOGLE_ANDROID_WEBVIEW_BETA = 7;
+    COM_GOOGLE_ANDROID_WEBVIEW_DEV = 8;
+    COM_GOOGLE_ANDROID_WEBVIEW_CANARY = 9;
+    COM_GOOGLE_ANDROID_WEBVIEW_DEBUG = 10;
+    OTHER = 11;
+  }
+
+  optional int64 version_code = 1;
+  optional .wireless_android_play_playlog.WebViewVersionInfo.PackageName package_name = 2;
+}
+

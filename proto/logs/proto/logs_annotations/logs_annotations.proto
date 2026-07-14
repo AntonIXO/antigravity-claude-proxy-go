@@ -1,0 +1,25 @@
+syntax = "proto2";
+
+package logs_proto;
+
+option go_package = "/logsannotations";
+option cc_enable_arenas = true;
+option objc_class_prefix = "LOGS";
+
+import "net/proto2/proto/descriptor.proto";
+
+message MessageDetails {
+  message Type {
+    required string source_type = 1;
+    required string log_type = 2;
+  }
+
+  repeated .logs_proto.MessageDetails.Type may_appear_in = 1;
+}
+
+enum TombstoneType {
+  TOMBSTONE_UNSPECIFIED = 0;
+  TOMBSTONE_RETAIN = 1;
+  TOMBSTONE_DROP = 2;
+}
+

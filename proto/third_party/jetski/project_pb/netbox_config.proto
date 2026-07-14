@@ -1,0 +1,73 @@
+syntax = "proto3";
+
+package exa.project_pb;
+
+option java_outer_classname = "NetboxConfigOuterClass";
+option java_multiple_files = true;
+option go_package = "google3/third_party/jetski/project_pb;project_pb";
+
+message NetboxConfig {
+  message AuthEntry {
+    string key = 1;
+    .exa.project_pb.NetboxAuth value = 2;
+  }
+
+  bool verbose = 1;
+  repeated .exa.project_pb.NetboxRule allowed = 2;
+  repeated .exa.project_pb.NetboxRule denied = 3;
+  repeated .exa.project_pb.NetboxConfig.AuthEntry auth = 4;
+  oneof secret_storage {
+    .exa.project_pb.EnvSecretStorage env_storage = 5;
+    .exa.project_pb.InMemorySecretStorage in_memory_storage = 6;
+  }
+}
+
+message EnvSecretStorage {
+}
+
+message InMemorySecretStorage {
+}
+
+message NetboxRule {
+  string host = 1;
+  string method = 2;
+  string path = 3;
+}
+
+message NetboxAuth {
+  repeated .exa.project_pb.NetboxRule rules = 1;
+  oneof auth {
+    .exa.project_pb.HeaderAuthConfig header_auth = 3;
+    .exa.project_pb.OAuth2Config oauth2 = 4;
+    .exa.project_pb.TokenAuthConfig token_auth = 5;
+    .exa.project_pb.BasicAuthConfig basic_auth = 6;
+  }
+}
+
+message HeaderAuthConfig {
+  string header = 1;
+  string value_prefix = 2;
+}
+
+message TokenAuthConfig {
+}
+
+message BasicAuthConfig {
+}
+
+message OAuth2Config {
+  enum Provider {
+    UNSPECIFIED = 0;
+    GOOGLE = 1;
+    GITHUB = 2;
+    CUSTOM = 3;
+  }
+
+  .exa.project_pb.OAuth2Config.Provider provider = 1;
+  string client_id = 2;
+  string client_secret = 3;
+  repeated string scopes = 4;
+  string auth_url = 5;
+  string token_url = 6;
+}
+

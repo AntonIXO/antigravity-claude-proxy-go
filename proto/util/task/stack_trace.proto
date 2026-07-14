@@ -1,0 +1,14 @@
+edition = "2024";
+
+package util;
+
+import "net/proto2/bridge/proto/message_set.proto";
+
+message StackTrace {
+  repeated uint64 addresses = 1;
+}
+
+message StackTraces {
+  repeated .util.StackTrace traces = 1;
+}
+

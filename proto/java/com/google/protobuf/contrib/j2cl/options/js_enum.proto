@@ -1,0 +1,6 @@
+syntax = "proto2";
+
+package protobuf.contrib.j2cl.options;
+
+import "net/proto2/proto/descriptor.proto";
+

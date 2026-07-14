@@ -1,0 +1,13 @@
+edition = "2024";
+
+package devtools.jetski.telemetry.extensions;
+
+option java_outer_classname = "StateInitializationDataOuterClass";
+
+import "storage/datapol/annotations/proto/semantic_annotations.proto";
+import "third_party/jetski/cortex_pb/cortex.proto";
+
+message StateInitializationData {
+  .exa.cortex_pb.StateInitializationData state_initialization_data = 1;
+}
+

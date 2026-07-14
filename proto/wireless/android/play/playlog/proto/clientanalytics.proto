@@ -1,0 +1,936 @@
+syntax = "proto2";
+
+package wireless_android_play_playlog;
+
+option java_package = "com.google.wireless.android.play.playlog.proto.proto1api";
+option java_outer_classname = "ClientAnalytics";
+option cc_enable_arenas = true;
+option objc_class_prefix = "CADP";
+
+import "assistant/api/core_types/device_type.proto";
+import "assistant/api/core_types/surface.proto";
+import "experiments/framework/extensions/heterodyne/proto/experiment_ids.proto";
+import "google/api/inclusion.proto";
+import "google/protobuf/timestamp.proto";
+import "java/com/google/android/gmscore/proto/gmscore_build.proto";
+import "java/com/google/android/gmscore/proto/gmscore_device.proto";
+import "java/com/google/apps/jspb/jspb.proto";
+import "java/com/google/apps/jspb/jspb_disable_randomization.proto";
+import "java/com/google/apps/jspb/jspb_generate_object_format.proto";
+import "logs/proto/logs_annotations/logs_annotations.proto";
+import "logs/proto/wireless/android/play/playlog/accessibility/ios_accessibility_state.proto";
+import "logs/proto/wireless/android/play/playlog/accessibility_state.proto";
+import "logs/proto/wireless/android/play/playlog/webview_version_info.proto";
+import "nest/platform/mesh/platform/proto/platform_information_no_lite_runtime.proto";
+import "net/proto2/bridge/proto/message_set.proto";
+import "search/wga/proto/logged_enums.proto";
+import "storage/datapol/annotations/proto/semantic_annotations.proto";
+import "wireless/android/play/playlog/proto/clearcut_logger_aggregation_metadata.proto";
+import "wireless/android/play/playlog/proto/clearcut_logger_remote_config_metadata.proto";
+import "wireless/android/play/playlog/proto/compliance.proto";
+import "wireless/android/play/playlog/proto/device_restriction_enum.proto";
+import "wireless/android/play/playlog/proto/log_source_enum.proto";
+import "wireless/android/privacy/annotations/proto/collection_basis_annotations.proto";
+
+message LogEventKeyValues {
+  optional string key = 1;
+  optional string value = 2;
+}
+
+message ActiveExperiments {
+  repeated string client_altering_experiment = 1;
+  repeated string other_experiment = 2;
+  repeated int32 gws_experiment = 3;
+  repeated int64 play_experiment = 4;
+  repeated int64 unsupported_play_experiment = 5;
+}
+
+message LogEvent {
+  enum InternalEvent {
+    NONE = 0;
+    WALL_CLOCK_SET = 1;
+    DEVICE_BOOT = 2;
+  }
+
+  optional int64 event_time_ms = 1;
+  optional int64 event_uptime_ms = 17;
+  optional int64 boot_count = 22;
+  optional int64 sequence_position = 21;
+  optional string tag = 2;
+  optional int32 event_code = 11;
+  optional string component_id = 26;
+  optional int64 event_flow_id = 12;
+  optional bool is_user_initiated = 10;
+  repeated .wireless_android_play_playlog.LogEventKeyValues value = 3;
+  optional bytes store = 4;
+  optional .wireless_android_play_playlog.AppUsage1pLogEvent app_usage_1p = 9;
+  optional bytes source_extension = 6;
+  optional string source_extension_js = 8;
+  optional string source_extension_json = 13;
+  optional string source_extension_json_proto3 = 29;
+  optional .wireless_android_play_playlog.ActiveExperiments exp = 7;
+  optional string test_id = 14;
+  optional sint64 timezone_offset_seconds = 15 [default = 180000];
+  optional .experiments.heterodyne.ExperimentIds experiment_ids = 16;
+  optional bytes client_ve = 18;
+  optional string client_ve_js = 24;
+  optional .wireless_android_play_playlog.LogEvent.InternalEvent internal_event = 19;
+  repeated int32 test_code = 20;
+  repeated int32 generic_dimensions = 27;
+  optional .wireless_android_play_playlog.NetworkConnectionInfo network_connection_info = 23;
+  optional bool in_direct_boot_mode = 25;
+  optional string zwieback_cookie_override = 28;
+  optional double module_applied_sampling_rate = 30;
+  optional double client_applied_sampling_rate = 32;
+  optional .wireless_android_play_playlog.ClearcutLoggerRemoteConfigMetadata remote_config_metadata = 35;
+  optional .wireless_android_play_playlog.ComplianceData compliance_data = 33;
+  optional bool use_session_zwieback = 34;
+  optional .wireless_android_play_playlog.AggregationMetadata aggregation_metadata = 36;
+}
+
+message NetworkConnectionInfo {
+  enum NetworkType {
+    NONE = -1;
+    MOBILE = 0;
+    WIFI = 1;
+    MOBILE_MMS = 2;
+    MOBILE_SUPL = 3;
+    MOBILE_DUN = 4;
+    MOBILE_HIPRI = 5;
+    WIMAX = 6;
+    BLUETOOTH = 7;
+    DUMMY = 8;
+    ETHERNET = 9;
+    MOBILE_FOTA = 10;
+    MOBILE_IMS = 11;
+    MOBILE_CBS = 12;
+    WIFI_P2P = 13;
+    MOBILE_IA = 14;
+    MOBILE_EMERGENCY = 15;
+    PROXY = 16;
+    VPN = 17;
+  }
+
+  enum MobileSubtype {
+    UNKNOWN_MOBILE_SUBTYPE = 0;
+    GPRS = 1;
+    EDGE = 2;
+    UMTS = 3;
+    CDMA = 4;
+    EVDO_0 = 5;
+    EVDO_A = 6;
+    RTT = 7;
+    HSDPA = 8;
+    HSUPA = 9;
+    HSPA = 10;
+    IDEN = 11;
+    EVDO_B = 12;
+    LTE = 13;
+    EHRPD = 14;
+    HSPAP = 15;
+    GSM = 16;
+    TD_SCDMA = 17;
+    IWLAN = 18;
+    LTE_CA = 19;
+    NR = 20;
+    COMBINED = 100;
+  }
+
+  optional .wireless_android_play_playlog.NetworkConnectionInfo.NetworkType network_type = 1 [default = NONE];
+  optional .wireless_android_play_playlog.NetworkConnectionInfo.MobileSubtype mobile_subtype = 2 [default = UNKNOWN_MOBILE_SUBTYPE];
+}
+
+message AndroidDeviceType {
+  optional bool is_watch = 1;
+  optional bool is_automotive = 2;
+  optional bool is_chrome_os = 3;
+  optional bool is_android_tv = 4;
+  optional bool is_bstar = 5;
+  optional bool is_android_xr = 6;
+  optional bool is_android_xr_peripheral = 7;
+  optional bool is_desktop = 8;
+}
+
+message AndroidClientInfo {
+  message ExtensionVersion {
+    optional int32 extension = 1;
+    optional int32 version = 2;
+  }
+
+  optional int64 android_id = 1;
+  optional int64 gms_device_id = 39;
+  optional bytes gms_device_id_zwieback = 40;
+  optional string logging_id = 2;
+  optional int64 device_id = 18;
+  optional int32 sdk_version = 3;
+  optional int32 sdk_version_full = 38;
+  repeated .wireless_android_play_playlog.AndroidClientInfo.ExtensionVersion extension_version = 34;
+  optional string model = 4;
+  optional string product = 5;
+  optional string hardware = 8;
+  optional string device = 9;
+  optional string os_build = 6;
+  optional string application_build = 7;
+  optional string mcc_mnc = 10;
+  optional string locale = 11;
+  optional string country = 12;
+  optional string manufacturer = 13;
+  optional string brand = 14;
+  optional string board = 15;
+  optional string radio_version = 16;
+  optional string fingerprint = 17;
+  optional int32 gms_core_version_code = 19;
+  optional .com.google.android.gmscore.proto.GmsCoreBuildVariant gmscore_variant = 32;
+  optional .com.google.android.gmscore.proto.GmsCoreDeviceInfo gmscore_device_info = 37;
+  optional bool is_sidewinder_device = 20;
+  optional bool using_log_source_int = 22;
+  optional .wireless_android_play_playlog.DeviceRestriction.Id device_restriction = 23;
+  optional .wireless_android_play_playlog.AndroidDeviceType android_device_type = 24;
+  optional .wireless_android_play_playlog.AccessibilityState accessibility_state = 25;
+  optional string type = 26;
+  optional string ro_oem_key1 = 27;
+  optional string device_data_version_info = 28;
+  repeated string native_platform = 31;
+  optional int32 sim_carrier_id = 33;
+  optional .wireless_android_play_playlog.WebViewVersionInfo webview_version_info = 35;
+  optional uint64 user_consent_state = 36;
+}
+
+message BrowserInfo {
+  optional string locale = 1;
+  optional string browser = 2;
+  optional string browser_version = 3;
+  optional string flash_version = 4;
+}
+
+message DesktopClientInfo {
+  optional string client_id = 1;
+  optional string logging_id = 2;
+  optional string os = 3;
+  optional string os_major_version = 4;
+  optional string os_full_version = 5;
+  optional string application_build = 6;
+  optional string country = 7;
+  optional int64 application_build_cl = 8;
+  optional int32 clearcut_version = 9;
+  optional string application_identifier = 10;
+  optional string battlestar_windows_id = 11;
+  optional int64 pc_id = 12;
+}
+
+message MacClientInfo {
+  optional string os_major_version = 1;
+  optional string os_full_version = 2;
+  optional string application_build = 3;
+  optional string country = 4;
+  optional int64 application_build_cl = 5;
+  optional int32 clearcut_version = 6;
+  optional string application_bundle_id = 7;
+  optional string client_build_variant = 8;
+}
+
+message IosClientInfo {
+  optional string client_id = 1;
+  optional string logging_id = 2;
+  optional string os_major_version = 3;
+  optional string os_full_version = 4;
+  optional string application_build = 5;
+  optional string application_version = 12;
+  optional string country = 6;
+  optional string model = 7;
+  optional string language_code = 8;
+  optional int64 application_build_cl = 9;
+  optional int32 clearcut_version = 10;
+  optional string application_bundle_id = 11;
+  optional .wireless_android_play_playlog.accessibility.IosAccessibilityState accessibility_state = 13;
+  optional .google.protobuf.Timestamp application_build_timestamp = 14;
+}
+
+message KaiosClientInfo {
+  optional string app_version = 1;
+  optional string core_app_version = 3;
+  optional string device_model = 2;
+  optional string mcc_mnc = 4;
+  optional string locale = 5;
+}
+
+message PancettaClientInfo {
+  enum OsType {
+    OS_TYPE_UNKNOWN = 0;
+    OS_TYPE_MAC = 1;
+    OS_TYPE_WINDOWS = 2;
+    OS_TYPE_ANDROID = 3;
+    OS_TYPE_CROS = 4;
+    OS_TYPE_LINUX = 5;
+    OS_TYPE_OPENBSD = 6;
+  }
+
+  optional string device_id = 1;
+  optional .wireless_android_play_playlog.PancettaClientInfo.OsType os = 2;
+  optional string app_id = 3;
+  optional string app_version = 4;
+  optional string mcc_mnc = 5;
+}
+
+message PlayCeClientInfo {
+  optional string client_id = 1;
+  optional string logging_id = 7;
+  optional string make = 3;
+  optional string model = 4;
+  optional string application_build = 5;
+  optional string platform_version = 6;
+  optional string country = 8;
+}
+
+message VrClientInfo {
+  enum VrClientType {
+    UNKNOWN = 0;
+    ANDROID_CARDBOARD_SDK = 1;
+    IOS_CARDBOARD_SDK = 2;
+    ANDROID_UNITY_SDK = 3;
+    IOS_UNITY_SDK = 4;
+    WINDOWS = 5;
+  }
+
+  optional .wireless_android_play_playlog.VrClientInfo.VrClientType vr_client_type = 1;
+  optional string sdk_version = 2;
+  optional string fingerprint = 3;
+  optional string gvr_version = 4;
+  optional string manufacturer = 5;
+  optional string model = 6;
+  optional string language = 7;
+  optional string country = 8;
+  optional string unity_version = 9;
+  optional string unity_sdk_version = 10;
+}
+
+message JsClientInfo {
+  message FlushInfo {
+    enum TransmissionType {
+      TRANSMISSION_TYPE_UNKNOWN = 0;
+      XHR_POST = 1;
+      IMAGE_GET = 2;
+      SEND_BEACON = 3;
+      FETCH = 4;
+    }
+
+    optional .wireless_android_play_playlog.JsClientInfo.FlushInfo.TransmissionType transmission_type = 1;
+    optional bool is_final = 2;
+    optional int32 retry_count = 3;
+    optional int32 persisted_log_recovered_count = 4;
+    optional int32 persisted_log_expired_count = 5;
+  }
+
+  message UserAgentClientHints {
+    message BrandAndVersion {
+      optional string brand = 1;
+      optional string version = 2;
+    }
+
+    repeated .wireless_android_play_playlog.JsClientInfo.UserAgentClientHints.BrandAndVersion ua_list = 1;
+    optional bool mobile = 2;
+    optional string platform = 3;
+    optional string platform_version = 4;
+    optional string architecture = 5;
+    optional string model = 6;
+    optional string ua_full_version = 7;
+    optional string bitness = 8;
+  }
+
+  enum OsType {
+    OS_UNKNOWN = 0;
+    MAC = 1;
+    WINDOWS = 2;
+    ANDROID = 3;
+    LINUX = 4;
+    CHROME_OS = 5;
+    IPAD = 6;
+    IPHONE = 7;
+    IPOD = 8;
+    CHROMECAST = 9;
+  }
+
+  enum DeviceType {
+    UNKNOWN = 0;
+    MOBILE = 1;
+    TABLET = 2;
+    DESKTOP = 3;
+    GOOGLE_HOME = 4;
+  }
+
+  optional string os = 1;
+  optional string os_version = 2;
+  optional .wireless_android_play_playlog.JsClientInfo.DeviceType device_type = 3;
+  optional string country = 4;
+  optional string locale = 5;
+  optional .wireless_android_play_playlog.JsClientInfo.OsType os_type = 6;
+  optional string build_label = 7;
+  optional string continent = 8;
+  optional .wireless_android_play_playlog.JsClientInfo.UserAgentClientHints client_hints = 9;
+  optional .wireless_android_play_playlog.JsClientInfo.FlushInfo flush_info = 10;
+}
+
+message BirdsongClientInfo {
+  enum ClientType {
+    CLIENT_UNKNOWN = 0;
+    CHIRP = 1;
+    WAYMO = 2;
+    GV_ANDROID = 3;
+    GV_IOS = 4;
+  }
+
+  optional .wireless_android_play_playlog.BirdsongClientInfo.ClientType client_type = 1;
+  optional string build_label = 2;
+  optional string birdsong_build_label = 3;
+}
+
+message SparklightClientInfo {
+  enum MachineClass {
+    MACHINE_CLASS_UNKNOWN = 0;
+    TEAMFOOD = 1;
+  }
+
+  optional .wireless_android_play_playlog.SparklightClientInfo.MachineClass machine_class = 1;
+}
+
+message YetiClientInfo {
+  optional string build_label = 1;
+  optional string deployment_type = 2;
+  optional string environment = 3;
+  optional string location = 4;
+  optional string machine = 5;
+  optional string gamelet_id = 6;
+  optional string machine_shape = 7;
+  optional string metro = 8;
+  optional string vm_purpose = 9;
+  optional string release_stage = 10;
+}
+
+message GoogleHomeClientInfo {
+  reserved 10;
+  enum BackendType {
+    BACKEND_TYPE_UNKNOWN = 0;
+    BACKEND_TYPE_PRODUCTION = 1;
+    BACKEND_TYPE_ENG = 2;
+    BACKEND_TYPE_TEAMFOOD = 3;
+    BACKEND_TYPE_DOGFOOD = 4;
+  }
+
+  optional string device_id = 9;
+  optional string device_model = 1;
+  optional string app_version = 2;
+  optional string acp_version = 16;
+  optional string opal_version = 18;
+  optional string fuchsia_version = 22;
+  optional string virtual_release_channel = 17;
+  optional string manufacturer = 3;
+  optional string product_name = 4;
+  optional string factory_country = 5;
+  optional string build_type = 6;
+  optional string system_build = 7;
+  optional .wireless_android_play_playlog.GoogleHomeClientInfo.BackendType backend_type = 8;
+  optional string locale = 11;
+  optional bool on_device_assistant_enabled = 12;
+  optional .assistant.api.core_types.SurfaceType.Type surface_type = 13;
+  optional .smart_home_mesh.platform.OsType os_type = 14;
+  optional bool opted_in_metrics_logging = 15;
+  optional .assistant.api.core_types.Surface.Type ontological_surface_type = 19;
+  optional string device_product_name = 20;
+  optional .smart_home_mesh.platform.OsType os_type_replicated = 21;
+  optional int32 matter_vid = 23;
+  optional int32 matter_pid = 24;
+}
+
+message BattlestarClientInfo {
+  reserved 3;
+  reserved 7;
+  reserved 9;
+  enum BattlestarClientType {
+    CLIENT_UNKNOWN = 0;
+    EMULATOR = 1;
+    PHENOTYPE = 2;
+    SERVICE = 3;
+    CLIENT = 4;
+    INSTALLER = 5;
+    HYPERVISOR = 6;
+    INSTALLER_PHENOTYPE = 7;
+  }
+
+  enum BattlestarMachineTier {
+    TIER_UNKNOWN = 0;
+    UNSUPPORTED = 1;
+    SILVER = 2;
+    GOLD = 3;
+    DIAMOND = 4;
+  }
+
+  enum CpuManufacturer {
+    MANUFACTURER_UNKNOWN = 0;
+    MANUFACTURER_INTEL = 1;
+    MANUFACTURER_AMD = 2;
+  }
+
+  optional string build_version = 1;
+  optional string build_type = 4;
+  optional string omaha_channel = 5;
+  optional .wireless_android_play_playlog.BattlestarClientInfo.BattlestarClientType battlestar_client_type = 2;
+  optional .wireless_android_play_playlog.BattlestarClientInfo.BattlestarMachineTier battlestar_machine_tier = 6;
+  optional .wireless_android_play_playlog.BattlestarClientInfo.CpuManufacturer cpu_manufacturer = 8;
+  optional int64 system_physical_memory_bytes = 10;
+}
+
+message DriveDesktopClientInfo {
+  enum DriveDesktopClientType {
+    CLIENT_UNKNOWN = 0;
+    PHENOTYPE = 1;
+  }
+
+  optional string build_version = 1;
+  optional .wireless_android_play_playlog.DriveDesktopClientInfo.DriveDesktopClientType drive_desktop_client_type = 2;
+}
+
+message G1DesktopClientInfo {
+  enum G1DesktopClientType {
+    CLIENT_UNKNOWN = 0;
+    PHENOTYPE = 1;
+  }
+
+  optional string build_version = 1;
+  optional .wireless_android_play_playlog.G1DesktopClientInfo.G1DesktopClientType g1_desktop_client_type = 2;
+}
+
+message PortablePhenotypeLibraryClientInfo {
+  oneof client_info {
+    .wireless_android_play_playlog.BattlestarClientInfo battlestar_client_info = 1;
+    .wireless_android_play_playlog.DriveDesktopClientInfo drive_desktop_client_info = 2;
+    .wireless_android_play_playlog.G1DesktopClientInfo g1_desktop_client_info = 3;
+    .wireless_android_play_playlog.NearbyClientInfo nearby_client_info = 4;
+    .wireless_android_play_playlog.WindowsClientInfo windows_client_info = 5;
+    .wireless_android_play_playlog.DesktopServicesClientInfo desktop_services_client_info = 6;
+  }
+}
+
+message NearbyClientInfo {
+  enum UsageType {
+    USAGE_UNKNOWN = 0;
+    PHENOTYPE = 1;
+  }
+
+  optional .wireless_android_play_playlog.NearbyClientInfo.UsageType usage_type = 1;
+}
+
+message NearbyDesktopClientInfo {
+  reserved 3 to 10;
+  message NearbyDesktopDriverInfo {
+    optional string manufacturer = 1;
+    optional string device_name = 2;
+    optional string driver_provider_name = 3;
+    optional string driver_version = 4;
+    optional string driver_date = 5;
+  }
+
+  message NearbyDesktopBluetoothInfo {
+    optional bool is_extended_advertising_supported = 1;
+    optional bool is_peripheral_role_supported = 2;
+    optional bool is_low_energy_supported = 3;
+    optional bool is_advertisement_offload_supported = 4;
+  }
+
+  message WindowsDeviceInfo {
+    optional .wireless_android_play_playlog.NearbyDesktopClientInfo.DeviceType device_type = 1;
+    optional string device_manufacturer = 2;
+    optional string device_model = 3;
+    optional int64 physical_memory = 4;
+    optional int32 processor_count = 5;
+    optional int32 logical_processor_count = 6;
+    optional string os_name = 7;
+    optional string os_version = 8;
+    optional string os_architecture = 9;
+    optional string cpu_manufacturer = 10;
+    optional string cpu_name = 11;
+    repeated .wireless_android_play_playlog.NearbyDesktopClientInfo.NearbyDesktopDriverInfo bluetooth_driver_infos = 12;
+    repeated .wireless_android_play_playlog.NearbyDesktopClientInfo.NearbyDesktopDriverInfo network_driver_infos = 13;
+    optional .wireless_android_play_playlog.NearbyDesktopClientInfo.NearbyDesktopBluetoothInfo bluetooth_info = 15;
+  }
+
+  message MacOSDeviceInfo {
+    optional .wireless_android_play_playlog.NearbyDesktopClientInfo.DeviceType device_type = 1;
+    optional string device_manufacturer = 2;
+    optional string device_model = 3;
+    optional int64 physical_memory = 4;
+    optional int32 processor_count = 5;
+    optional int32 logical_processor_count = 6;
+    optional string os_name = 7;
+    optional string os_version = 8;
+    optional string os_architecture = 9;
+    optional string cpu_manufacturer = 10;
+    optional string cpu_name = 11;
+    optional .wireless_android_play_playlog.NearbyDesktopClientInfo.NearbyDesktopBluetoothInfo bluetooth_info = 12;
+  }
+
+  enum DeviceType {
+    UNKNOWN_DEVICE_TYPE = 0;
+    LAPTOP = 1;
+    TABLET = 2;
+  }
+
+  optional .wireless_android_play_playlog.NearbyDesktopClientInfo.WindowsDeviceInfo windows_device_info = 1;
+  optional .wireless_android_play_playlog.NearbyDesktopClientInfo.MacOSDeviceInfo mac_os_device_info = 2;
+}
+
+message WindowsClientInfo {
+  message DriverInfo {
+    optional string manufacturer = 1;
+    optional string device_name = 2;
+    optional string driver_provider_name = 3;
+    optional string driver_version = 4;
+    optional string driver_date = 5;
+  }
+
+  message BluetoothInfo {
+    optional bool is_extended_advertising_supported = 1;
+    optional bool is_peripheral_role_supported = 2;
+    optional bool is_low_energy_supported = 3;
+    optional bool is_advertisement_offload_supported = 4;
+  }
+
+  enum DeviceType {
+    UNKNOWN_DEVICE_TYPE = 0;
+    PHONE = 1;
+    TABLET = 2;
+    LAPTOP = 3;
+  }
+
+  enum UsageType {
+    UNKNOWN_USAGE_TYPE = 0;
+    USAGE_TYPE_PHENOTYPE = 1;
+  }
+
+  optional .wireless_android_play_playlog.WindowsClientInfo.DeviceType device_type = 1;
+  optional string device_manufacturer = 2;
+  optional string device_model = 3;
+  optional int64 physical_memory = 4;
+  optional int32 processor_count = 5;
+  optional int32 logical_processor_count = 6;
+  optional string os_name = 7;
+  optional string os_version = 8;
+  optional string os_architecture = 9;
+  optional string os_language_code = 10;
+  optional string cpu_manufacturer = 11;
+  optional string cpu_name = 12;
+  repeated .wireless_android_play_playlog.WindowsClientInfo.DriverInfo bluetooth_driver_infos = 13;
+  repeated .wireless_android_play_playlog.WindowsClientInfo.DriverInfo network_driver_infos = 14;
+  optional bool ble_extd_adv_supported = 15;
+  optional .wireless_android_play_playlog.WindowsClientInfo.BluetoothInfo bluetooth_info = 16;
+  optional .wireless_android_play_playlog.WindowsClientInfo.UsageType usage_type = 17;
+}
+
+message DesktopServicesClientInfo {
+  enum DesktopServicesClientType {
+    DESKTOP_SERVICES_CLIENT_TYPE_UNSPECIFIED = 0;
+    DAEMON = 1;
+    INSTALLER = 2;
+    UNINSTALLER = 3;
+    OVERLAY = 4;
+  }
+
+  optional .wireless_android_play_playlog.DesktopServicesClientInfo.DesktopServicesClientType client_type = 1;
+  optional string build_version = 2;
+  optional string build_type = 3;
+  optional string omaha_channel = 4;
+}
+
+message WgaClientInfo {
+  message OsVersion {
+    optional int32 major_version = 1;
+    optional int32 minor_version = 2;
+    optional int32 build_number = 3;
+    optional int32 product_type = 4;
+    optional .wga.WindowsEdition windows_edition = 5;
+  }
+
+  message WebView2Version {
+    optional int32 major_version = 1;
+    optional int32 build_number = 2;
+  }
+
+  optional string build_version = 1;
+  optional .wireless_android_play_playlog.WgaClientInfo.OsVersion os_version = 2;
+  optional .wga.NetworkEnvironment network_environment = 3;
+  optional .wga.CpuArchitecture cpu_architecture = 4;
+  optional .wga.D3DFeatureLevel d3d_feature_level = 5;
+  optional .wireless_android_play_playlog.WgaClientInfo.WebView2Version webview2_version = 6;
+  optional bool has_package_identity = 7;
+}
+
+message ClientInfo {
+  reserved 21;
+  enum ClientType {
+    UNKNOWN = 0;
+    JS = 1;
+    DESKTOP = 2;
+    IOS = 3;
+    IOS_V2 = 10;
+    ANDROID = 4;
+    PLAY_CE = 5;
+    PYTHON = 6;
+    VR = 7;
+    PANCETTA = 8;
+    DRIVE_FS = 9;
+    YETI = 11;
+    MAC = 12;
+    GOOGLE_HOME = 13;
+    BIRDSONG = 14;
+    IOS_FIREBASE = 15;
+    GO = 16;
+    FUCHSIA = 17;
+    SPARKLIGHT = 18;
+    CPLUSPLUS = 19;
+    KAIOS = 20;
+    MUSK = 21;
+    COMPUTE_IMAGE_TOOLS = 22;
+    ANDROID_FIREBASE = 23;
+    LOONIX = 24;
+    C9 = 25;
+    BATTLESTAR = 26;
+    PORTABLE_PHENOTYPE_LIBRARY = 27;
+    WINDOWS = 28;
+    CLOUD_WORKSTATIONS_CONNECTOR = 29;
+    FITBIT_DARKHORSE = 30;
+    FITBIT_PYTHON = 31;
+    NEARBY = 32;
+    CHROMEOS_BUILD_PYTHON = 33;
+    DOVETAIL_LOGWRITER = 34;
+    NEARBY_CPP = 35;
+    CELLO = 36;
+    NESTCAM_PHOTON = 37;
+    DESKTOP_SERVICES = 38;
+    CHROME_ENTERPRISE_COMPANION = 39;
+    APPSHEET_CLIENT = 40;
+    STARGATE = 41;
+    WGA = 42;
+    VERTEX_DEV_EXPRESS = 43;
+    JETSKI = 44;
+    XPK = 45;
+    COLAB_VSCODE = 46;
+    CHROME_DEVTOOLS_MCP_JS = 47;
+    CLUSTER_TOOLKIT = 48;
+    MEDIAPIPE = 49;
+    CHROME_MODERN_WEB_GUIDANCE_JS = 50;
+    CLUSTER_HEALTH_SCANNER = 51;
+  }
+
+  optional .wireless_android_play_playlog.ClientInfo.ClientType client_type = 1;
+  optional string remote_host = 6;
+  optional string remote_host6 = 7;
+  optional .wireless_android_play_playlog.AndroidClientInfo android_client_info = 2;
+  optional .wireless_android_play_playlog.BattlestarClientInfo battlestar_client_info = 22;
+  optional .wireless_android_play_playlog.BirdsongClientInfo birdsong_client_info = 14;
+  optional .wireless_android_play_playlog.DesktopClientInfo desktop_client_info = 3;
+  optional .wireless_android_play_playlog.DesktopServicesClientInfo desktop_services_client_info = 28;
+  optional .wireless_android_play_playlog.DriveDesktopClientInfo drive_desktop_client_info = 24;
+  optional .wireless_android_play_playlog.G1DesktopClientInfo g1_desktop_client_info = 25;
+  optional .wireless_android_play_playlog.GoogleHomeClientInfo google_home_client_info = 16;
+  optional .wireless_android_play_playlog.IosClientInfo ios_client_info = 4;
+  optional .wireless_android_play_playlog.JsClientInfo js_client_info = 11;
+  optional .wireless_android_play_playlog.KaiosClientInfo kaios_client_info = 20;
+  optional .wireless_android_play_playlog.MacClientInfo mac_client_info = 13;
+  optional .wireless_android_play_playlog.NearbyDesktopClientInfo nearby_desktop_client_info = 27;
+  optional .wireless_android_play_playlog.NestcamPhotonClientInfo nestcam_photon_client_info = 34;
+  optional .wireless_android_play_playlog.PancettaClientInfo pancetta_client_info = 10;
+  optional .wireless_android_play_playlog.PlayCeClientInfo play_ce_client_info = 5;
+  optional .wireless_android_play_playlog.PortablePhenotypeLibraryClientInfo portable_phenotype_library_client_info = 23;
+  optional .wireless_android_play_playlog.SparklightClientInfo sparklight_client_info = 18;
+  optional .wireless_android_play_playlog.VrClientInfo vr_client_info = 8;
+  optional .wireless_android_play_playlog.WgaClientInfo wga_client_info = 29;
+  optional .wireless_android_play_playlog.WindowsClientInfo windows_client_info = 26;
+  optional .wireless_android_play_playlog.YetiClientInfo yeti_client_info = 15;
+  optional .wireless_android_play_playlog.BrowserInfo browser_info = 9;
+  optional int64 heterodyne_config_version = 12;
+}
+
+message ExperimentIdList {
+  repeated string id = 1;
+}
+
+message AppUsage1pLogEvent {
+  optional int32 app_type = 1;
+  optional string android_package_name = 2;
+  optional string version = 3;
+}
+
+message BatchedLogRequest {
+  reserved 2;
+  repeated .wireless_android_play_playlog.LogRequest log_request = 1;
+  optional bool enable_per_request_status = 3;
+  optional bool in_direct_boot_mode = 4;
+  optional int64 last_zwieback_reset_wall_time_ms = 5;
+  repeated .wireless_android_play_playlog.ProductIdZwiebackToken product_id_zwieback_tokens = 6;
+  repeated .wireless_android_play_playlog.SessionZwieback session_zwiebacks = 7;
+}
+
+message RetainImports {
+  optional .wireless_android_play_playlog.LogSourceEnum.LogSource log_source = 1;
+}
+
+message LogRequest {
+  reserved 15;
+  enum SchedulerType {
+    UNKNOWN_SCHEDULER = 0;
+    ASAP = 1;
+    DEFAULT_PERIODIC = 2;
+    QOS_FAST_ONEOFF = 3;
+    QOS_DEFAULT_PERIODIC = 4;
+    QOS_UNMETERED_PERIODIC = 5;
+    BACKSTOP_PERIODIC = 6;
+  }
+
+  optional int64 request_time_ms = 4;
+  optional int64 request_uptime_ms = 8;
+  optional .wireless_android_play_playlog.ClientInfo client_info = 1;
+  optional .wireless_android_play_playlog.LogSourceEnum.LogSource log_source = 2 [default = UNKNOWN];
+  optional string log_source_name = 6;
+  optional string zwieback_cookie = 7;
+  repeated .wireless_android_play_playlog.LogEvent log_event = 3;
+  repeated bytes serialized_log_events = 5;
+  optional int64 log_event_dropped_count = 14;
+  optional .wireless_android_play_playlog.QosTierConfiguration.QosTier qos_tier = 9 [default = DEFAULT];
+  optional .wireless_android_play_playlog.LogRequest.SchedulerType scheduler = 10;
+  optional .wireless_android_play_playlog.DeviceStatus device_status = 11;
+  optional .wireless_android_play_playlog.ExternalTimestamp external_timestamp = 12;
+  optional .wireless_android_play_playlog.CollectForDebug collect_for_debug = 13;
+  optional uint32 app_mobilespec_id = 16;
+  optional .wireless_android_play_playlog.ComplianceData compliance_data = 18;
+}
+
+message DeviceStatus {
+  enum AutomaticTime {
+    UNKNOWN = 0;
+    AUTO_TIME_OFF = 1;
+    AUTO_TIME_ON = 2;
+  }
+
+  optional bool is_unmetered = 1;
+  optional bool is_charging = 2;
+  optional .wireless_android_play_playlog.DeviceStatus.AutomaticTime auto_time_status = 3;
+  optional bool is_googler_device = 4;
+}
+
+message ExternalTimestamp {
+  optional int64 time_ms = 1;
+  optional int64 uptime_ms = 2;
+  optional string source = 3;
+}
+
+message CollectForDebug {
+  optional int64 collect_start_ms = 3;
+  optional int64 collect_until_ms = 1;
+  optional bool skip_persistent_log_storage = 2;
+}
+
+message QosTierConfiguration {
+  enum QosTier {
+    DEFAULT = 0;
+    ANY_NETWORK_OK = 0;
+    UNMETERED_ONLY = 1;
+    UNMETERED_OR_DAILY = 2;
+    FAST_IF_RADIO_AWAKE = 3;
+    NEVER = 4;
+  }
+
+  optional string log_source_name = 1;
+  optional .wireless_android_play_playlog.QosTierConfiguration.QosTier qos_tier = 2;
+  optional .wireless_android_play_playlog.LogSourceEnum.LogSource log_source = 3 [default = UNKNOWN];
+}
+
+message ProductIdZwiebackToken {
+  optional int32 product_id = 1;
+  optional string zwieback_token = 2;
+}
+
+message SessionZwieback {
+  optional string log_source_name = 1 [default = "UNKNOWN"];
+  optional string zwieback_token = 2;
+}
+
+message QosTiersOverride {
+  repeated .wireless_android_play_playlog.QosTierConfiguration qos_tier_configuration = 1;
+  optional int64 qos_tier_fingerprint = 2;
+}
+
+message LogSourceBatchingDenylist {
+  repeated string log_source_name = 1;
+}
+
+message LogResponseDetails {
+  enum ResponseAction {
+    RESPONSE_ACTION_UNKNOWN = 0;
+    RETRY_REQUEST_LATER = 1;
+    DELETE_REQUEST = 2;
+  }
+
+  optional int32 log_request_index = 1;
+  optional .wireless_android_play_playlog.LogResponseDetails.ResponseAction response_action = 2;
+}
+
+message LogResponse {
+  optional int64 next_request_wait_millis = 1 [default = -1];
+  optional .wireless_android_play_playlog.ExperimentIdList experiments = 2;
+  optional .wireless_android_play_playlog.QosTiersOverride qos_tier = 3;
+  optional .wireless_android_play_playlog.LogSourceBatchingDenylist log_source_batching_denylist = 4;
+  repeated .wireless_android_play_playlog.LogResponseDetails log_response_details = 5;
+  repeated .wireless_android_play_playlog.ProductIdZwiebackToken product_id_zwieback_tokens = 6;
+  repeated .wireless_android_play_playlog.SessionZwieback session_zwiebacks = 7;
+}
+
+message NestcamPhotonClientInfo {
+  enum DeviceType {
+    DEVICE_TYPE_UNKNOWN = 0;
+    DEVICE_TYPE_QV1 = 1;
+    DEVICE_TYPE_SQ = 2;
+    DEVICE_TYPE_RQ = 3;
+    DEVICE_TYPE_EMULATOR = 4;
+    DEVICE_TYPE_C302 = 5;
+    DEVICE_TYPE_VEN = 6;
+    DEVICE_TYPE_NEW = 9;
+    DEVICE_TYPE_QV2 = 10;
+    DEVICE_TYPE_BQ = 11;
+    DEVICE_TYPE_LIN = 12;
+    DEVICE_TYPE_RHO = 13;
+    DEVICE_TYPE_UST = 14;
+    DEVICE_TYPE_PIC = 15;
+    DEVICE_TYPE_COR = 16;
+    DEVICE_TYPE_NQ = 17;
+    DEVICE_TYPE_KRAMER = 18;
+    DEVICE_TYPE_ORTIGIA = 19;
+    DEVICE_TYPE_C302_WIRED2K_CAMERA = 20;
+    DEVICE_TYPE_C302_BATTERY = 21;
+  }
+
+  enum BuildChannel {
+    BUILD_CHANNEL_UNKNOWN = 0;
+    BUILD_CHANNEL_ENG = 1;
+    BUILD_CHANNEL_BETA = 2;
+    BUILD_CHANNEL_PROD = 3;
+  }
+
+  enum CloudEnvironment {
+    CLOUD_ENVIRONMENT_UNKNOWN = 0;
+    CLOUD_ENVIRONMENT_NONPROD = 1;
+    CLOUD_ENVIRONMENT_PREPROD = 2;
+    CLOUD_ENVIRONMENT_PROD = 3;
+  }
+
+  optional string device_id = 1;
+  optional .wireless_android_play_playlog.NestcamPhotonClientInfo.DeviceType device_type = 2;
+  optional string sku = 4;
+  optional string software_version = 3;
+  optional string software_version_number_string = 8;
+  optional .wireless_android_play_playlog.NestcamPhotonClientInfo.BuildChannel system_release_channel = 6;
+  optional string virtual_release_channel = 7;
+  optional int64 software_version_number = 5;
+  optional .wireless_android_play_playlog.NestcamPhotonClientInfo.CloudEnvironment cloud_environment = 9;
+  optional int32 vendor_id = 10;
+  optional int32 product_id = 11;
+}
+

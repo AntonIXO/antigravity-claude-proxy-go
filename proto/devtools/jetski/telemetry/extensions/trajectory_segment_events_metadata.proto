@@ -1,0 +1,23 @@
+edition = "2024";
+
+package devtools.jetski.telemetry.extensions;
+
+option java_outer_classname = "TrajectorySegmentEventsMetadataOuterClass";
+
+import "storage/datapol/annotations/proto/semantic_annotations.proto";
+import "third_party/jetski/codeium_common_pb/codeium_common.proto";
+import "third_party/jetski/cortex_pb/cortex.proto";
+
+message TrajectorySegmentEventsMetadata {
+  string trajectory_id = 1;
+  string execution_id = 2;
+  string event_type = 3;
+  repeated .exa.codeium_common_pb.MetricsRecord records = 4;
+  .exa.cortex_pb.CortexTrajectoryType trajectory_type = 5;
+  .exa.cortex_pb.CortexTrajectorySource trajectory_source = 6;
+  .exa.codeium_common_pb.Model model = 7;
+  string response_model = 8;
+  repeated int32 mendel_experiment_ids = 9;
+  string model_name = 10;
+}
+

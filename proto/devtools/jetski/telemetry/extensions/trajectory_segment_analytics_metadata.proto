@@ -1,0 +1,15 @@
+edition = "2024";
+
+package devtools.jetski.telemetry.extensions;
+
+option java_outer_classname = "TrajectorySegmentAnalyticsMetadataOuterClass";
+
+import "storage/datapol/annotations/proto/semantic_annotations.proto";
+import "third_party/gemini_coder/proto/trajectory.proto";
+
+message TrajectorySegmentAnalyticsMetadata {
+  .gemini_coder.Trajectory trajectory_segment = 1;
+  uint32 start_step_index = 2;
+  uint32 start_generator_metadata_index = 3;
+}
+

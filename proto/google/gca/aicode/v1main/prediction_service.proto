@@ -1,0 +1,724 @@
+syntax = "proto3";
+
+package google.gca.aicode.v1main;
+
+option java_package = "com.google.gca.aicode.v1main";
+option java_outer_classname = "PredictionServiceProto";
+option java_multiple_files = true;
+
+import "google/api/annotations.proto";
+import "google/api/field_behavior.proto";
+import "google/api/versioning.proto";
+import "google/gca/aicode/v1main/aicode_content.proto";
+import "google/protobuf/duration.proto";
+import "google/protobuf/struct.proto";
+import "google/protobuf/timestamp.proto";
+import "google/type/interval.proto";
+import "net/proto2/contrib/validator/annotations.proto";
+import "storage/datapol/annotations/proto/semantic_annotations.proto";
+
+service PredictionService {
+  rpc StreamGenerateContent (.google.gca.aicode.v1main.GenerateContentRequest) returns (stream .google.gca.aicode.v1main.GenerateContentResponse) {}
+  rpc GenerateContent (.google.gca.aicode.v1main.GenerateContentRequest) returns (.google.gca.aicode.v1main.GenerateContentResponse) {}
+  rpc BidiGenerateContent (stream .google.gca.aicode.v1main.BidiGenerateContentClientMessage) returns (stream .google.gca.aicode.v1main.BidiGenerateContentServerMessage) {}
+  rpc FetchQuotaStatus (.google.gca.aicode.v1main.FetchQuotaStatusRequest) returns (.google.gca.aicode.v1main.FetchQuotaStatusResponse) {}
+}
+
+message GenerateContentRequest {
+  message LabelsEntry {
+    string key = 1;
+    string value = 2;
+  }
+
+  repeated .google.gca.aicode.v1main.Content contents = 2;
+  repeated .google.gca.aicode.v1main.Tool tools = 4;
+  .google.gca.aicode.v1main.ToolConfig tool_config = 5;
+  repeated .google.gca.aicode.v1main.GenerateContentRequest.LabelsEntry labels = 6;
+  repeated .google.gca.aicode.v1main.SafetySetting safety_settings = 7;
+  .google.gca.aicode.v1main.GenerationConfig generation_config = 8;
+  string session_id = 9;
+  oneof inference {
+    string model = 1;
+    .google.gca.aicode.v1main.AiCodeConfig aicode = 1001;
+  }
+  optional .google.gca.aicode.v1main.Content system_instruction = 3;
+}
+
+message GenerateContentResponse {
+  message PromptFeedback {
+    enum BlockReason {
+      BLOCKED_REASON_UNSPECIFIED = 0;
+      SAFETY = 1;
+      OTHER = 2;
+      BLOCKLIST = 3;
+      PROHIBITED_CONTENT = 4;
+      IMAGE_SAFETY = 5;
+    }
+
+    .google.gca.aicode.v1main.GenerateContentResponse.PromptFeedback.BlockReason block_reason = 1;
+    repeated .google.gca.aicode.v1main.SafetyRating safety_ratings = 2;
+    string block_reason_message = 3;
+  }
+
+  message UsageMetadata {
+    int32 prompt_token_count = 1;
+    int32 candidates_token_count = 2;
+    int32 total_token_count = 3;
+    int32 thoughts_token_count = 4;
+    int32 cached_content_token_count = 5;
+    repeated .google.gca.aicode.v1main.ModalityTokenCount prompt_tokens_details = 6;
+    repeated .google.gca.aicode.v1main.ModalityTokenCount cache_tokens_details = 7;
+    repeated .google.gca.aicode.v1main.ModalityTokenCount candidates_tokens_details = 8;
+    repeated .google.gca.aicode.v1main.ModalityTokenCount tool_use_prompt_tokens_details = 9;
+  }
+
+  repeated .google.gca.aicode.v1main.Candidate candidates = 1;
+  .google.gca.aicode.v1main.GenerateContentResponse.PromptFeedback prompt_feedback = 2;
+  .google.gca.aicode.v1main.GenerateContentResponse.UsageMetadata usage_metadata = 3;
+  string model_version = 4;
+  string response_id = 5;
+}
+
+message BidiGenerateContentClientMessage {
+  string message_id = 5;
+  oneof message_type {
+    .google.gca.aicode.v1main.BidiGenerateContentSetup setup = 1;
+    .google.gca.aicode.v1main.BidiGenerateContentClientContent client_content = 2;
+    .google.gca.aicode.v1main.BidiGenerateContentRealtimeInput realtime_input = 3;
+    .google.gca.aicode.v1main.BidiGenerateContentToolResponse tool_response = 4;
+    .google.gca.aicode.v1main.BidiGenerateContentContextUpdate context_update = 6;
+  }
+}
+
+message BidiGenerateContentServerMessage {
+  oneof message_type {
+    .google.gca.aicode.v1main.BidiGenerateContentSetupComplete setup_complete = 1;
+    .google.gca.aicode.v1main.BidiGenerateContentServerContent server_content = 2;
+    .google.gca.aicode.v1main.BidiGenerateContentToolCall tool_call = 3;
+    .google.gca.aicode.v1main.BidiGenerateContentToolCallCancellation tool_call_cancellation = 4;
+    .google.gca.aicode.v1main.GoAway go_away = 5;
+    .google.gca.aicode.v1main.SessionResumptionUpdate session_resumption_update = 6;
+  }
+}
+
+message FetchQuotaStatusRequest {
+}
+
+message FetchQuotaStatusResponse {
+  message BucketInfo {
+    float remaining_fraction = 1;
+    .google.protobuf.Timestamp reset_time = 2;
+    .google.gca.aicode.v1main.FetchQuotaStatusResponse.QuotaType quota_type = 3;
+    .google.gca.aicode.v1main.Model model = 4;
+  }
+
+  enum QuotaType {
+    QUOTA_TYPE_UNSPECIFIED = 0;
+    REQUESTS = 1;
+  }
+
+  repeated .google.gca.aicode.v1main.FetchQuotaStatusResponse.BucketInfo buckets = 1;
+}
+
+message Model {
+  string model_id = 1;
+  string display_name = 2;
+  string description = 3;
+}
+
+message AiCodeConfig {
+  message AdditionalContent {
+    repeated .google.gca.aicode.v1main.FileEdit file_edits = 1;
+  }
+
+  string experience = 1;
+  repeated .google.gca.aicode.v1main.SourceFile files = 3;
+  optional .google.gca.aicode.v1main.AiCodeConfig.AdditionalContent additional_content = 4;
+}
+
+message Content {
+  repeated .google.gca.aicode.v1main.Part parts = 1;
+  string role = 2;
+}
+
+message Part {
+  bool thought = 9;
+  bytes thought_signature = 10;
+  oneof data {
+    string text = 1;
+    .google.gca.aicode.v1main.Blob inline_data = 2;
+    .google.gca.aicode.v1main.FileData file_data = 3;
+    .google.gca.aicode.v1main.FunctionCall function_call = 4;
+    .google.gca.aicode.v1main.FunctionResponse function_response = 5;
+    .google.gca.aicode.v1main.ExecutableCode executable_code = 6;
+    .google.gca.aicode.v1main.CodeExecutionResult code_execution_result = 7;
+  }
+  oneof metadata {
+    .google.gca.aicode.v1main.VideoMetadata video_metadata = 8;
+  }
+}
+
+message Blob {
+  string mime_type = 1;
+  bytes data = 2;
+}
+
+message FileData {
+  string mime_type = 1;
+  string file_uri = 2;
+}
+
+message FunctionCall {
+  string name = 1;
+  .google.protobuf.Struct args = 2;
+  string id = 3;
+}
+
+message FunctionResponse {
+  string name = 1;
+  .google.protobuf.Struct response = 2;
+  string id = 3;
+  repeated .google.gca.aicode.v1main.FunctionResponsePart parts = 4;
+}
+
+message FunctionResponsePart {
+  oneof data {
+    .google.gca.aicode.v1main.FunctionResponseBlob inline_data = 1;
+  }
+}
+
+message FunctionResponseBlob {
+  string mime_type = 1;
+  bytes data = 2;
+}
+
+message Tool {
+  message GoogleSearch {
+    .google.type.Interval time_range_filter = 2;
+  }
+
+  repeated .google.gca.aicode.v1main.FunctionDeclaration function_declarations = 1;
+  .google.gca.aicode.v1main.Tool.GoogleSearch google_search = 7;
+}
+
+message FunctionDeclaration {
+  string name = 1;
+  string description = 2;
+  .google.gca.aicode.v1main.Schema parameters = 3;
+  optional .google.protobuf.Value parameters_json_schema = 6;
+  optional .google.gca.aicode.v1main.Schema response = 4;
+  optional .google.protobuf.Value response_json_schema = 7;
+}
+
+message Schema {
+  message PropertiesEntry {
+    string key = 1;
+    .google.gca.aicode.v1main.Schema value = 2;
+  }
+
+  .google.gca.aicode.v1main.Type type = 1;
+  string format = 2;
+  string description = 3;
+  bool nullable = 4;
+  repeated string enum = 5;
+  .google.gca.aicode.v1main.Schema items = 6;
+  repeated .google.gca.aicode.v1main.Schema.PropertiesEntry properties = 7;
+  repeated string required = 8;
+  string title = 15;
+  .google.protobuf.Value default = 16;
+  int64 min_items = 17;
+  int64 max_items = 18;
+  int64 min_properties = 19;
+  int64 max_properties = 20;
+  repeated string property_ordering = 21;
+  repeated .google.gca.aicode.v1main.Schema any_of = 22;
+  optional double minimum = 9;
+  optional double maximum = 10;
+  optional int64 min_length = 11;
+  optional int64 max_length = 12;
+  optional string pattern = 13;
+  optional .google.protobuf.Value example = 14;
+}
+
+message ToolConfig {
+  .google.gca.aicode.v1main.FunctionCallingConfig function_calling_config = 1;
+}
+
+message FunctionCallingConfig {
+  enum Mode {
+    MODE_UNSPECIFIED = 0;
+    AUTO = 1;
+    ANY = 2;
+    NONE = 3;
+  }
+
+  .google.gca.aicode.v1main.FunctionCallingConfig.Mode mode = 1;
+  repeated string allowed_function_names = 2;
+}
+
+message SafetySetting {
+  enum HarmBlockMethod {
+    HARM_BLOCK_METHOD_UNSPECIFIED = 0;
+    SEVERITY = 1;
+    PROBABILITY = 2;
+  }
+
+  .google.gca.aicode.v1main.HarmCategory category = 1;
+  .google.gca.aicode.v1main.HarmBlockThreshold threshold = 2;
+  .google.gca.aicode.v1main.SafetySetting.HarmBlockMethod method = 3;
+}
+
+message GenerationConfig {
+  message ThinkingConfig {
+    enum ThinkingLevel {
+      THINKING_LEVEL_UNSPECIFIED = 0;
+      LOW = 1;
+      MEDIUM = 2;
+      HIGH = 3;
+      MINIMAL = 4;
+    }
+
+    optional bool include_thoughts = 1;
+    optional int32 thinking_budget = 2;
+    optional .google.gca.aicode.v1main.GenerationConfig.ThinkingConfig.ThinkingLevel thinking_level = 3;
+  }
+
+  enum Modality {
+    MODALITY_UNSPECIFIED = 0;
+    TEXT = 1;
+    IMAGE = 2;
+    AUDIO = 3;
+  }
+
+  enum MediaResolution {
+    MEDIA_RESOLUTION_UNSPECIFIED = 0;
+    MEDIA_RESOLUTION_LOW = 1;
+    MEDIA_RESOLUTION_MEDIUM = 2;
+    MEDIA_RESOLUTION_HIGH = 3;
+  }
+
+  repeated string stop_sequences = 2;
+  .google.gca.aicode.v1main.GenerationConfig.ThinkingConfig thinking_config = 14;
+  repeated .google.gca.aicode.v1main.GenerationConfig.Modality response_modalities = 17;
+  optional int32 candidate_count = 1;
+  optional int32 max_output_tokens = 4;
+  optional float temperature = 5;
+  optional float top_p = 6;
+  optional float top_k = 7;
+  optional int32 seed = 8;
+  optional string response_mime_type = 9;
+  optional .google.gca.aicode.v1main.Schema response_schema = 10;
+  optional .google.protobuf.Value response_json_schema = 11;
+  optional float presence_penalty = 12;
+  optional float frequency_penalty = 13;
+  optional bool response_logprobs = 15;
+  optional int32 logprobs = 16;
+  optional .google.gca.aicode.v1main.GenerationConfig.MediaResolution media_resolution = 18;
+}
+
+message Candidate {
+  int32 index = 1;
+  .google.gca.aicode.v1main.Content content = 2;
+  .google.gca.aicode.v1main.FinishReason finish_reason = 3;
+  repeated .google.gca.aicode.v1main.SafetyRating safety_ratings = 4;
+  .google.gca.aicode.v1main.CitationMetadata citation_metadata = 5;
+  .google.gca.aicode.v1main.GroundingMetadata grounding_metadata = 7;
+  .google.gca.aicode.v1main.AiCodeOutput aicode_output = 1001;
+  double avg_logprobs = 8;
+  .google.gca.aicode.v1main.UrlContextMetadata url_context_metadata = 10;
+  optional string finish_message = 6;
+}
+
+message AiCodeOutput {
+  message DerivedContent {
+    oneof content {
+      .google.gca.aicode.v1main.OutputSourceFile file = 3;
+      .google.gca.aicode.v1main.CodeBlock code_block = 4;
+      .google.gca.aicode.v1main.TextBlock text_block = 5;
+      .google.gca.aicode.v1main.PredictionMetadata prediction_metadata = 6;
+    }
+    optional int32 start_index = 1;
+    optional int32 end_index = 2;
+  }
+
+  repeated .google.gca.aicode.v1main.AiCodeOutput.DerivedContent contents = 1;
+}
+
+message OutputSourceFile {
+  string file_uri = 1;
+  string content = 2;
+}
+
+message TextBlock {
+  string content = 1;
+}
+
+message PredictionMetadata {
+  double score = 1;
+  double classifier_score = 2;
+}
+
+message SafetyRating {
+  .google.gca.aicode.v1main.HarmCategory category = 1;
+  .google.gca.aicode.v1main.HarmProbability probability = 2;
+  bool blocked = 3;
+}
+
+message CitationMetadata {
+  repeated .google.gca.aicode.v1main.Citation citations = 1;
+}
+
+message Citation {
+  int32 start_index = 1;
+  int32 end_index = 2;
+  string uri = 3;
+  string license = 4;
+}
+
+message ExecutableCode {
+  enum Language {
+    LANGUAGE_UNSPECIFIED = 0;
+    PYTHON = 1;
+  }
+
+  .google.gca.aicode.v1main.ExecutableCode.Language language = 1;
+  string code = 2;
+}
+
+message CodeExecutionResult {
+  enum Outcome {
+    OUTCOME_UNSPECIFIED = 0;
+    OUTCOME_OK = 1;
+    OUTCOME_FAILED = 2;
+    OUTCOME_DEADLINE_EXCEEDED = 3;
+  }
+
+  .google.gca.aicode.v1main.CodeExecutionResult.Outcome outcome = 1;
+  string output = 2;
+}
+
+message VideoMetadata {
+  .google.protobuf.Duration start_offset = 1;
+  .google.protobuf.Duration end_offset = 2;
+  double fps = 3;
+}
+
+message GroundingMetadata {
+  message SearchEntryPoint {
+    string rendered_content = 1;
+    bytes sdk_blob = 2;
+  }
+
+  message GroundingChunk {
+    message Web {
+      optional string uri = 1;
+      optional string title = 2;
+    }
+
+    oneof chunk_type {
+      .google.gca.aicode.v1main.GroundingMetadata.GroundingChunk.Web web = 1;
+    }
+  }
+
+  message GroundingSupport {
+    repeated int32 grounding_chunk_indices = 2;
+    repeated float confidence_scores = 3;
+    optional .google.gca.aicode.v1main.GroundingMetadata.Segment segment = 1;
+  }
+
+  message Segment {
+    int32 part_index = 1;
+    int32 start_index = 2;
+    int32 end_index = 3;
+    string text = 4;
+  }
+
+  repeated string web_search_queries = 1;
+  repeated .google.gca.aicode.v1main.GroundingMetadata.GroundingChunk grounding_chunks = 3;
+  repeated .google.gca.aicode.v1main.GroundingMetadata.GroundingSupport grounding_supports = 4;
+  optional .google.gca.aicode.v1main.GroundingMetadata.SearchEntryPoint search_entry_point = 2;
+  optional .google.gca.aicode.v1main.RetrievalMetadata retrieval_metadata = 5;
+}
+
+message ModalityTokenCount {
+  .google.gca.aicode.v1main.Modality modality = 1;
+  int32 token_count = 2;
+}
+
+message RetrievalMetadata {
+  float google_search_dynamic_retrieval_score = 1;
+}
+
+message BidiGenerateContentSetup {
+  string model = 1;
+  .google.gca.aicode.v1main.GenerationConfig generation_config = 2;
+  .google.gca.aicode.v1main.Content system_instruction = 3;
+  repeated .google.gca.aicode.v1main.Tool tools = 4;
+  .google.gca.aicode.v1main.RealtimeInputConfig realtime_input_config = 5;
+  .google.gca.aicode.v1main.SessionResumptionConfig session_resumption = 6;
+  .google.gca.aicode.v1main.ContextWindowCompressionConfig context_window_compression = 7;
+  .google.gca.aicode.v1main.AudioTranscriptionConfig input_audio_transcription = 8;
+  .google.gca.aicode.v1main.AudioTranscriptionConfig output_audio_transcription = 9;
+  .google.gca.aicode.v1main.ProactivityConfig proactivity = 10;
+  .google.gca.aicode.v1main.HistoryConfig history_config = 11;
+  repeated .google.gca.aicode.v1main.AsrContext asr_context = 12;
+}
+
+message BidiGenerateContentClientContent {
+  repeated .google.gca.aicode.v1main.Content turns = 1;
+  bool turn_complete = 2;
+}
+
+message BidiGenerateContentRealtimeInput {
+  message ActivityStart {
+  }
+
+  message ActivityEnd {
+  }
+
+  .google.gca.aicode.v1main.Blob audio = 1;
+  .google.gca.aicode.v1main.Blob video = 3;
+  .google.gca.aicode.v1main.BidiGenerateContentRealtimeInput.ActivityStart activity_start = 5;
+  .google.gca.aicode.v1main.BidiGenerateContentRealtimeInput.ActivityEnd activity_end = 6;
+  optional bool audio_stream_end = 2;
+  optional string text = 4;
+}
+
+message RealtimeInputConfig {
+  message AutomaticActivityDetection {
+    enum StartSensitivity {
+      START_SENSITIVITY_UNSPECIFIED = 0;
+      START_SENSITIVITY_HIGH = 1;
+      START_SENSITIVITY_LOW = 2;
+    }
+
+    enum EndSensitivity {
+      END_SENSITIVITY_UNSPECIFIED = 0;
+      END_SENSITIVITY_HIGH = 1;
+      END_SENSITIVITY_LOW = 2;
+    }
+
+    optional bool disabled = 1;
+    optional .google.gca.aicode.v1main.RealtimeInputConfig.AutomaticActivityDetection.StartSensitivity start_of_speech_sensitivity = 2;
+    optional int32 prefix_padding_ms = 3;
+    optional .google.gca.aicode.v1main.RealtimeInputConfig.AutomaticActivityDetection.EndSensitivity end_of_speech_sensitivity = 4;
+    optional int32 silence_duration_ms = 5;
+  }
+
+  enum TurnCoverage {
+    TURN_COVERAGE_UNSPECIFIED = 0;
+    TURN_INCLUDES_ONLY_ACTIVITY = 1;
+    TURN_INCLUDES_ALL_INPUT = 2;
+    TURN_INCLUDES_AUDIO_ACTIVITY_AND_ALL_VIDEO = 3;
+  }
+
+  .google.gca.aicode.v1main.RealtimeInputConfig.AutomaticActivityDetection automatic_activity_detection = 6;
+  optional .google.gca.aicode.v1main.ActivityHandling activity_handling = 7;
+  optional .google.gca.aicode.v1main.RealtimeInputConfig.TurnCoverage turn_coverage = 4;
+}
+
+message SessionResumptionConfig {
+  optional string handle = 1;
+}
+
+message HistoryConfig {
+  bool initial_history_in_client_content = 1;
+}
+
+message ContextWindowCompressionConfig {
+  message SlidingWindow {
+    optional int64 target_tokens = 1;
+  }
+
+  oneof compression_mechanism {
+    .google.gca.aicode.v1main.ContextWindowCompressionConfig.SlidingWindow sliding_window = 2;
+  }
+  optional int64 trigger_tokens = 1;
+}
+
+message AudioTranscriptionConfig {
+  message LanguageAuto {
+  }
+
+  message LanguageHints {
+    repeated string language_codes = 1;
+  }
+
+  oneof language_config {
+    .google.gca.aicode.v1main.AudioTranscriptionConfig.LanguageAuto language_auto = 2;
+    .google.gca.aicode.v1main.AudioTranscriptionConfig.LanguageHints language_hints = 3;
+  }
+}
+
+message ProactivityConfig {
+  optional bool proactive_audio = 1;
+}
+
+message BidiGenerateContentTranscription {
+  string text = 1;
+  bool finished = 2;
+  int64 duration_ms = 3;
+  string language_code = 4;
+  .google.gca.aicode.v1main.HardTokens hard_tokens = 5;
+}
+
+message HardTokens {
+  repeated int32 tokens = 1;
+}
+
+message UrlContextMetadata {
+  repeated .google.gca.aicode.v1main.UrlMetadata url_metadata = 1;
+}
+
+message UrlMetadata {
+  enum UrlRetrievalStatus {
+    URL_RETRIEVAL_STATUS_UNSPECIFIED = 0;
+    URL_RETRIEVAL_STATUS_SUCCESS = 1;
+    URL_RETRIEVAL_STATUS_ERROR = 2;
+  }
+
+  string retrieved_url = 1;
+  .google.gca.aicode.v1main.UrlMetadata.UrlRetrievalStatus url_retrieval_status = 2;
+}
+
+message BidiGenerateContentToolCallCancellation {
+  repeated string ids = 1;
+}
+
+message GoAway {
+  .google.protobuf.Duration time_left = 1;
+}
+
+message SessionResumptionUpdate {
+  string new_handle = 1;
+  bool resumable = 2;
+}
+
+message BidiGenerateContentToolResponse {
+  repeated .google.gca.aicode.v1main.FunctionResponse function_responses = 1;
+}
+
+message BidiGenerateContentSetupComplete {
+}
+
+message BidiGenerateContentServerContent {
+  bool generation_complete = 2;
+  bool turn_complete = 3;
+  bool interrupted = 4;
+  .google.gca.aicode.v1main.GroundingMetadata grounding_metadata = 5;
+  .google.gca.aicode.v1main.BidiGenerateContentTranscription input_transcription = 6;
+  .google.gca.aicode.v1main.BidiGenerateContentTranscription undecided_input_transcription = 11;
+  .google.gca.aicode.v1main.BidiGenerateContentTranscription output_transcription = 7;
+  .google.gca.aicode.v1main.UrlContextMetadata url_context_metadata = 8;
+  bool waiting_for_input = 10;
+  optional .google.gca.aicode.v1main.Content model_turn = 1;
+}
+
+message BidiGenerateContentToolCall {
+  repeated .google.gca.aicode.v1main.FunctionCall function_calls = 1;
+}
+
+message BidiGenerateContentContextUpdate {
+  repeated .google.gca.aicode.v1main.AsrContext asr_context = 5;
+}
+
+message AsrContext {
+  message HotwordContext {
+    .google.protobuf.Duration preamble_duration = 1;
+    string trigger_phrase = 2;
+  }
+
+  enum Target {
+    TARGET_UNSPECIFIED = 0;
+    TARGET_TRANSCRIPTION_PREFIX = 1;
+    TARGET_NAM = 2;
+    TARGET_PREDICTED_LANGUAGE = 3;
+    TARGET_HOTWORD = 4;
+    TARGET_CUSTOM = 5;
+    TARGET_CONDITION_LABEL = 6;
+  }
+
+  enum Mode {
+    MODE_UNSPECIFIED = 0;
+    MODE_APPEND = 1;
+    MODE_REPLACE = 2;
+    MODE_APPEND_INTERLEAVED_STREAMING = 3;
+  }
+
+  .google.gca.aicode.v1main.AsrContext.Target target = 1;
+  .google.gca.aicode.v1main.AsrContext.Mode mode = 2;
+  .google.gca.aicode.v1main.Content content = 3;
+  .google.gca.aicode.v1main.AsrContext.HotwordContext hotword_context = 4;
+  string custom_target = 5;
+}
+
+enum Type {
+  TYPE_UNSPECIFIED = 0;
+  STRING = 1;
+  NUMBER = 2;
+  INTEGER = 3;
+  BOOLEAN = 4;
+  ARRAY = 5;
+  OBJECT = 6;
+  NULL = 7;
+}
+
+enum HarmCategory {
+  HARM_CATEGORY_UNSPECIFIED = 0;
+  HARM_CATEGORY_HARASSMENT = 7;
+  HARM_CATEGORY_HATE_SPEECH = 8;
+  HARM_CATEGORY_SEXUALLY_EXPLICIT = 9;
+  HARM_CATEGORY_DANGEROUS_CONTENT = 10;
+}
+
+enum HarmProbability {
+  HARM_PROBABILITY_UNSPECIFIED = 0;
+  NEGLIGIBLE = 1;
+  LOW = 2;
+  MEDIUM = 3;
+  HIGH = 4;
+}
+
+enum HarmBlockThreshold {
+  HARM_BLOCK_THRESHOLD_UNSPECIFIED = 0;
+  BLOCK_LOW_AND_ABOVE = 1;
+  BLOCK_MEDIUM_AND_ABOVE = 2;
+  BLOCK_ONLY_HIGH = 3;
+  BLOCK_NONE = 4;
+  OFF = 5;
+}
+
+enum FinishReason {
+  FINISH_REASON_UNSPECIFIED = 0;
+  STOP = 1;
+  MAX_TOKENS = 2;
+  SAFETY = 3;
+  RECITATION = 4;
+  OTHER = 5;
+  BLOCKLIST = 6;
+  PROHIBITED_CONTENT = 7;
+  SPII = 8;
+  MALFORMED_FUNCTION_CALL = 9;
+  IMAGE_SAFETY = 10;
+  IMAGE_PROHIBITED_CONTENT = 11;
+  IMAGE_RECITATION = 12;
+  IMAGE_OTHER = 13;
+  UNEXPECTED_TOOL_CALL = 14;
+  NO_IMAGE = 15;
+}
+
+enum Modality {
+  MODALITY_UNSPECIFIED = 0;
+  TEXT = 1;
+  IMAGE = 2;
+  VIDEO = 3;
+  AUDIO = 4;
+  DOCUMENT = 5;
+}
+
+enum ActivityHandling {
+  ACTIVITY_HANDLING_UNSPECIFIED = 0;
+  START_OF_ACTIVITY_INTERRUPTS = 1;
+  NO_INTERRUPTION = 2;
+}
+

@@ -1,0 +1,132 @@
+syntax = "proto3";
+
+package google.cloud.aiplatform.master;
+
+option java_package = "com.google.cloud.aiplatform.master";
+option java_outer_classname = "IoProto";
+option java_multiple_files = true;
+option csharp_namespace = "Google.Cloud.AIPlatform.Master";
+option php_namespace = "Google\\Cloud\\AIPlatform\\Master";
+option ruby_package = "Google::Cloud::AIPlatform::Master";
+
+import "google/api/field_behavior.proto";
+import "google/api/policy.proto";
+import "google/api/resource.proto";
+import "google/api/versioning.proto";
+import "google/cloud/aiplatform/master/api_auth.proto";
+import "google/protobuf/timestamp.proto";
+import "storage/datapol/annotations/proto/semantic_annotations.proto";
+
+message AvroSource {
+  .google.cloud.aiplatform.master.GcsSource gcs_source = 1;
+}
+
+message CsvSource {
+  .google.cloud.aiplatform.master.GcsSource gcs_source = 1;
+}
+
+message GcsSource {
+  repeated string uris = 1;
+}
+
+message GcsDestination {
+  string output_uri_prefix = 1;
+}
+
+message BigQuerySource {
+  string input_uri = 1;
+}
+
+message BigQueryDestination {
+  string output_uri = 1;
+}
+
+message VertexMultimodalDatasetSource {
+  string dataset_name = 1;
+}
+
+message VertexMultimodalDatasetDestination {
+  .google.cloud.aiplatform.master.BigQueryDestination bigquery_destination = 1;
+  string display_name = 2;
+}
+
+message CsvDestination {
+  .google.cloud.aiplatform.master.GcsDestination gcs_destination = 1;
+}
+
+message TFRecordDestination {
+  .google.cloud.aiplatform.master.GcsDestination gcs_destination = 1;
+}
+
+message ContainerRegistryDestination {
+  string output_uri = 1;
+}
+
+message GoogleDriveSource {
+  message ResourceId {
+    enum ResourceType {
+      RESOURCE_TYPE_UNSPECIFIED = 0;
+      RESOURCE_TYPE_FILE = 1;
+      RESOURCE_TYPE_FOLDER = 2;
+    }
+
+    .google.cloud.aiplatform.master.GoogleDriveSource.ResourceId.ResourceType resource_type = 1;
+    string resource_id = 2;
+  }
+
+  repeated .google.cloud.aiplatform.master.GoogleDriveSource.ResourceId resource_ids = 1;
+}
+
+message DirectUploadSource {
+}
+
+message SlackSource {
+  message SlackChannels {
+    reserved 2;
+    message SlackChannel {
+      string channel_id = 1;
+      .google.protobuf.Timestamp start_time = 2;
+      .google.protobuf.Timestamp end_time = 3;
+    }
+
+    repeated .google.cloud.aiplatform.master.SlackSource.SlackChannels.SlackChannel channels = 1;
+    .google.cloud.aiplatform.master.ApiAuth.ApiKeyConfig api_key_config = 3;
+  }
+
+  repeated .google.cloud.aiplatform.master.SlackSource.SlackChannels channels = 1;
+}
+
+message JiraSource {
+  message JiraQueries {
+    reserved 1;
+    reserved 2;
+    repeated string projects = 3;
+    repeated string custom_queries = 4;
+    string email = 5;
+    string server_uri = 6;
+    .google.cloud.aiplatform.master.ApiAuth.ApiKeyConfig api_key_config = 7;
+  }
+
+  repeated .google.cloud.aiplatform.master.JiraSource.JiraQueries jira_queries = 1;
+}
+
+message SharePointSources {
+  message SharePointSource {
+    string client_id = 1;
+    .google.cloud.aiplatform.master.ApiAuth.ApiKeyConfig client_secret = 2;
+    string tenant_id = 3;
+    string sharepoint_site_name = 4;
+    string file_id = 9;
+    oneof folder_source {
+      string sharepoint_folder_path = 5;
+      string sharepoint_folder_id = 6;
+    }
+    oneof drive_source {
+      string drive_name = 7;
+      string drive_id = 8;
+    }
+  }
+
+  repeated .google.cloud.aiplatform.master.SharePointSources.SharePointSource share_point_sources = 1;
+}
+

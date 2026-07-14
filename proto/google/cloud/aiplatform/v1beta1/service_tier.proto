@@ -1,0 +1,20 @@
+syntax = "proto3";
+
+package google.cloud.aiplatform.v1beta1;
+
+option java_package = "com.google.cloud.aiplatform.v1beta1";
+option java_outer_classname = "ServiceTierProto";
+option java_multiple_files = true;
+option csharp_namespace = "Google.Cloud.AIPlatform.V1Beta1";
+option php_namespace = "Google\\Cloud\\AIPlatform\\V1beta1";
+option ruby_package = "Google::Cloud::AIPlatform::V1beta1";
+
+import "google/api/inclusion.proto";
+
+enum ServiceTier {
+  SERVICE_TIER_UNSPECIFIED = 0;
+  SERVICE_TIER_STANDARD = 1;
+  SERVICE_TIER_FLEX = 2;
+  SERVICE_TIER_PRIORITY = 3;
+}
+

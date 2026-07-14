@@ -1,0 +1,27 @@
+syntax = "proto2";
+
+package wireless_android_play_playlog;
+
+option java_package = "com.google.common.logging";
+option java_outer_classname = "AccessibilityStateProto";
+option objc_class_prefix = "CADP";
+
+import "google/api/inclusion.proto";
+import "storage/datapol/annotations/proto/semantic_annotations.proto";
+
+message AccessibilityState {
+  enum OnOff {
+    UNKNOWN = 0;
+    ON = 1;
+    OFF = 2;
+  }
+
+  optional .wireless_android_play_playlog.AccessibilityState.OnOff talkback_enabled = 1;
+  optional .wireless_android_play_playlog.AccessibilityState.OnOff brailleback_enabled = 2;
+  optional .wireless_android_play_playlog.AccessibilityState.OnOff switchaccess_enabled = 3;
+  optional .wireless_android_play_playlog.AccessibilityState.OnOff justspeak_enabled = 4;
+  optional .wireless_android_play_playlog.AccessibilityState.OnOff large_text_enabled = 5;
+  optional .wireless_android_play_playlog.AccessibilityState.OnOff magnification_enabled = 6;
+  optional .wireless_android_play_playlog.AccessibilityState.OnOff high_contrast_text_enabled = 7;
+}
+

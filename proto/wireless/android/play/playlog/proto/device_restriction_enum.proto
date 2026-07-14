@@ -1,0 +1,20 @@
+syntax = "proto2";
+
+package wireless_android_play_playlog;
+
+option java_package = "com.google.wireless.android.play.playlog.proto";
+option java_outer_classname = "DeviceRestrictionProto";
+option objc_class_prefix = "CADP";
+
+import "google/api/inclusion.proto";
+import "logs/proto/logs_annotations/logs_annotations.proto";
+
+message DeviceRestriction {
+  enum Id {
+    NO_RESTRICTION = 0;
+    SIDEWINDER_DEVICE = 1;
+    LATCHSKY_DEVICE = 2;
+  }
+
+}
+

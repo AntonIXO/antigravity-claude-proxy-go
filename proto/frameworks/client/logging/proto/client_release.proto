@@ -1,0 +1,21 @@
+edition = "2024";
+
+package frameworks.client.logging.proto;
+
+option java_package = "com.google.frameworks.client.logging.proto";
+option java_outer_classname = "ClientReleaseOuterClass";
+option objc_class_prefix = "CLI";
+
+import "storage/datapol/annotations/proto/semantic_annotations.proto";
+
+message ClientRelease {
+  enum ClientReleaseType {
+    RELEASE_TYPE_UNSPECIFIED = 0;
+    DEV = 1;
+    DOGFOOD = 2;
+    PROD = 3;
+  }
+
+  .frameworks.client.logging.proto.ClientRelease.ClientReleaseType release = 6;
+}
+

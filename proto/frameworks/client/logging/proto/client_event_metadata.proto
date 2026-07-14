@@ -1,0 +1,19 @@
+edition = "2024";
+
+package frameworks.client.logging.proto;
+
+option java_package = "com.google.frameworks.client.logging.proto";
+option java_outer_classname = "ClientEventMetadataOuterClass";
+option objc_class_prefix = "CLI";
+
+import "frameworks/client/logging/proto/client_info.proto";
+import "frameworks/client/logging/proto/client_release.proto";
+import "storage/datapol/annotations/proto/semantic_annotations.proto";
+
+message ClientEventMetadata {
+  reserved 1;
+  reserved 3 to 5;
+  .frameworks.client.logging.proto.ClientInfo client_info = 2;
+  .frameworks.client.logging.proto.ClientRelease release_type = 6;
+}
+

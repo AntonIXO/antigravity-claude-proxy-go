@@ -1,0 +1,8 @@
+syntax = "proto2";
+
+package go_annotation;
+
+option cc_enable_arenas = true;
+
+import "net/proto2/proto/descriptor.proto";
+

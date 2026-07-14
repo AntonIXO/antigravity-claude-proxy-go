@@ -1,0 +1,21 @@
+syntax = "proto2";
+
+package experiments.proto;
+
+option objc_class_prefix = "EPP";
+
+import "java/com/google/apps/jspb/jspb_generate_object_format.proto";
+import "storage/datapol/annotations/proto/semantic_annotations.proto";
+
+message Int32ListParam {
+  repeated int32 element = 1;
+}
+
+message Int64ListParam {
+  repeated int64 element = 1;
+}
+
+message StringListParam {
+  repeated string element = 1;
+}
+

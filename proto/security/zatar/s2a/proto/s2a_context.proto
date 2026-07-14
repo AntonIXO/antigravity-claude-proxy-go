@@ -1,0 +1,19 @@
+edition = "2024";
+
+package s2a.proto;
+
+option java_package = "com.google.net.grpc.s2a.handshaker";
+
+import "security/zatar/s2a/proto/common.proto";
+
+message S2AContext {
+  string application_protocol = 1;
+  .s2a.proto.TLSVersion tls_version = 2;
+  .s2a.proto.Ciphersuite ciphersuite = 3;
+  .s2a.proto.Identity peer_identity = 4;
+  .s2a.proto.Identity local_identity = 5;
+  bytes peer_cert_fingerprint = 6;
+  bytes local_cert_fingerprint = 7;
+  bool is_handshake_resumed = 8;
+}
+

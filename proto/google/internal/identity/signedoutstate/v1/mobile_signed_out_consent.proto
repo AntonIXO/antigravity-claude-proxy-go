@@ -1,0 +1,66 @@
+syntax = "proto3";
+
+package google.internal.identity.signedoutstate.v1;
+
+option java_package = "com.google.identity.signedoutstate.v1";
+option java_outer_classname = "MobileSignedOutStateProto";
+option java_multiple_files = true;
+option objc_class_prefix = "SOS";
+
+import "google/protobuf/timestamp.proto";
+import "storage/datapol/annotations/proto/semantic_annotations.proto";
+
+message DebugOverrides {
+  enum DebugRegion {
+    DEBUG_REGION_UNSPECIFIED = 0;
+    DEBUG_REGION_DE = 1;
+    DEBUG_REGION_US = 2;
+    DEBUG_REGION_NG = 3;
+  }
+
+  optional .google.internal.identity.signedoutstate.v1.DebugOverrides.DebugRegion debug_region = 1;
+}
+
+message MobileSignedOutConsent {
+  enum ConsentChoice {
+    CONSENT_CHOICE_UNSPECIFIED = 0;
+    CONSENT_CHOICE_ESSENTIAL_ONLY = 1;
+    CONSENT_CHOICE_ACCEPT_NON_ESSENTIAL = 2;
+  }
+
+  enum Treatment {
+    TREATMENT_UNSPECIFIED = 0;
+    TREATMENT_ESSENTIAL_ONLY = 1;
+    TREATMENT_NON_ESSENTIAL_PERMITTED = 2;
+  }
+
+  enum Ui {
+    UI_UNSPECIFIED = 0;
+    UI_CONSENT_BUMP = 1;
+    UI_CONSENT_REBUMP = 2;
+  }
+
+  enum EssentialUseConsentState {
+    ESSENTIAL_USE_CONSENT_STATE_UNSPECIFIED = 0;
+    ESSENTIAL_USE_CONSENT_STATE_REGION_OUT_OF_SCOPE = 1;
+    ESSENTIAL_USE_CONSENT_STATE_APPLICATION_OUT_OF_SCOPE = 4;
+    ESSENTIAL_USE_CONSENT_STATE_UNRESTRICTED = 2;
+    ESSENTIAL_USE_CONSENT_STATE_ESSENTIAL_ONLY = 3;
+  }
+
+  enum EpdEligibility {
+    EPD_ELIGIBILITY_UNSPECIFIED = 0;
+    EPD_ELIGIBILITY_ELIGIBLE = 1;
+    EPD_ELIGIBILITY_NOT_ELIGIBLE_REGION_OUT_OF_SCOPE = 2;
+    EPD_ELIGIBILITY_NOT_ELIGIBLE_APPLICATION_OUT_OF_SCOPE = 3;
+  }
+
+  .google.internal.identity.signedoutstate.v1.MobileSignedOutConsent.ConsentChoice consent_choice = 1;
+  .google.protobuf.Timestamp day_of_creation = 2;
+  .google.internal.identity.signedoutstate.v1.MobileSignedOutConsent.Treatment essential_only_mode_treatment = 3;
+  .google.internal.identity.signedoutstate.v1.MobileSignedOutConsent.Ui ui_to_display = 4;
+  .google.internal.identity.signedoutstate.v1.MobileSignedOutConsent.EssentialUseConsentState essential_use_consent_state = 6;
+  .google.internal.identity.signedoutstate.v1.MobileSignedOutConsent.EpdEligibility epd_eligibility = 7;
+  optional .google.internal.identity.signedoutstate.v1.DebugOverrides debug_overrides = 5;
+}
+

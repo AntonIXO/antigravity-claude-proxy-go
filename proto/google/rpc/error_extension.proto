@@ -1,0 +1,13 @@
+syntax = "proto2";
+
+package google.rpc;
+
+option java_package = "com.google.rpc";
+option java_outer_classname = "ErrorExtensionProto";
+option java_multiple_files = true;
+option go_package = "google.golang.org/genproto/googleapis/rpc/errextension;errextension";
+option objc_class_prefix = "RPC";
+
+import "google/rpc/status.proto";
+import "net/proto2/bridge/proto/message_set.proto";
+

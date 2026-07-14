@@ -1,0 +1,71 @@
+syntax = "proto3";
+
+package google.cloud.aiplatform.v1beta1;
+
+option java_package = "com.google.cloud.aiplatform.v1beta1";
+option java_outer_classname = "AaiLiveMessagesProto";
+option java_multiple_files = true;
+option csharp_namespace = "Google.Cloud.AIPlatform.V1Beta1";
+option php_namespace = "Google\\Cloud\\AIPlatform\\V1beta1";
+option ruby_package = "Google::Cloud::AIPlatform::V1beta1";
+
+import "google/api/field_behavior.proto";
+import "google/api/inclusion.proto";
+import "google/api/versioning.proto";
+import "google/api/visibility.proto";
+import "google/cloud/aiplatform/v1beta1/content.proto";
+import "google/protobuf/any.proto";
+import "google/protobuf/duration.proto";
+import "storage/datapol/annotations/proto/semantic_annotations.proto";
+
+message RecipeConfigOverrides {
+  message StaticModelConfigOverride {
+    bool overwrite_static_model_config = 2;
+    optional .google.protobuf.Any static_model_config_override = 1;
+  }
+
+  bool overwrite_static_recipe_config = 1;
+  bool overwrite_recipe_config = 2;
+  repeated .google.cloud.aiplatform.v1beta1.RecipeConfigOverrides.StaticModelConfigOverride static_model_config_overrides = 3;
+  optional .google.protobuf.Any static_recipe_config_override = 18;
+  optional .google.protobuf.Any recipe_config_override = 19;
+}
+
+message BidiGenerateContentHistoryProcessed {
+}
+
+message TransparentHistoryUpdate {
+  .google.cloud.aiplatform.v1beta1.Content content = 1;
+}
+
+message PreprocessedHistoryUpdate {
+  bool clear = 1;
+  repeated .google.cloud.aiplatform.v1beta1.Content contents = 2;
+  int64 last_consumed_client_message_index = 3;
+}
+
+message PlaybackStatusReporting {
+  bool enabled = 1;
+}
+
+message PlaybackStatus {
+  .google.protobuf.Duration playback_progress = 1;
+  bool playback_complete = 2;
+  int64 generation_id = 3;
+}
+
+message TimeContext {
+  string time_zone = 1;
+}
+
+message RequestContext {
+  .google.cloud.aiplatform.v1beta1.TimeContext time_context = 5;
+  repeated string session_tags = 7;
+}
+
+message ToolCallStats {
+  int32 tool_call_count = 3;
+  bool server_executed = 4;
+  optional string function_name = 2;
+}
+

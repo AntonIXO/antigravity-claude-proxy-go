@@ -1,0 +1,96 @@
+syntax = "proto2";
+
+option java_package = "com.google.common.logging";
+option objc_class_prefix = "LJLR";
+
+import "google/api/inclusion.proto";
+import "java/com/google/apps/jspb/jspb.proto";
+import "logs/eventid/eventid.proto";
+import "net/proto2/bridge/proto/message_set.proto";
+import "net/proto2/go/annotation/go_annotation.proto";
+import "storage/datapol/annotations/proto/semantic_annotations.proto";
+
+message ThrowableBlockProto {
+  message StackTraceElement {
+    required string DeclaringClass = 5;
+    required string MethodName = 6;
+    optional string FileName = 7;
+    required int32 LineNumber = 8;
+    optional string ClassLoaderName = 9;
+    optional string ModuleName = 10;
+    optional string ModuleVersion = 11;
+  }
+
+  required string OriginalClass = 1;
+  optional string Message = 2;
+  optional int64 MessageHash = 3;
+  optional bool HadMessage = 12;
+  repeated group stacktraceelement = 4;
+}
+
+message ThrowableProto {
+  message ThrowableNode {
+    optional .ThrowableBlockProto ThrowableInfo = 1;
+    optional int32 Cause = 2;
+    repeated int32 Suppressed = 3;
+  }
+
+  message ThrowableGraph {
+    repeated .ThrowableProto.ThrowableNode Nodes = 1;
+  }
+
+  enum LANGUAGE {
+    JAVA = 1;
+    CPP = 2;
+    PYTHON = 3;
+    JS = 4;
+    GO = 5;
+    DART = 6;
+    OBJC = 7;
+  }
+
+  required .ThrowableBlockProto Outermost = 1;
+  repeated .ThrowableBlockProto Causes = 2;
+  optional .ThrowableProto.LANGUAGE Language = 3 [default = JAVA];
+  oneof kind {
+    .ThrowableProto.ThrowableGraph Graph = 4;
+  }
+}
+
+message CodeModuleProto {
+  optional int64 BaseAddress = 1;
+  optional int64 Size = 2;
+  optional string CodeFile = 3;
+  optional string CodeIdentifier = 4;
+  optional string DebugFile = 5;
+  optional string DebugIdentifier = 6;
+  optional string Version = 7;
+  optional int64 shrink_down_delta = 8;
+  optional bool is_unloaded = 9;
+}
+
+message IosFrame {
+  optional string file_name = 1;
+  optional string function_name = 2;
+  optional int64 line_number = 3;
+  optional string binary_name = 4;
+}
+
+message LogRecordProto {
+  required .EventIdMessage EventId = 1;
+  required string ThreadName = 2;
+  required int32 Level = 3;
+  optional string SourceClassName = 4;
+  optional string SourceMethodName = 5;
+  optional int32 line_number = 13;
+  optional string file_name = 14;
+  optional string MessageFormat = 12;
+  optional string Message = 6;
+  optional int64 MessageHash = 9;
+  repeated string Parameter = 7;
+  optional .ThrowableProto Thrown = 8;
+  repeated string IosCallStackSymbols = 10;
+  repeated .CodeModuleProto IosCodeModules = 11;
+  repeated .IosFrame deobfuscated_ios_frames = 15;
+}
+

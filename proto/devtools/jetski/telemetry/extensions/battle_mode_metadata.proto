@@ -1,0 +1,15 @@
+edition = "2024";
+
+package devtools.jetski.telemetry.extensions;
+
+option java_outer_classname = "BattleModeMetadataOuterClass";
+
+import "storage/datapol/annotations/proto/semantic_annotations.proto";
+import "third_party/jetski/cortex_pb/cortex.proto";
+
+message BattleModeMetadata {
+  string parent_trajectory_id = 1;
+  string parent_cascade_id = 2;
+  .exa.cortex_pb.BattleModeInfo battle_mode_info = 3;
+}
+

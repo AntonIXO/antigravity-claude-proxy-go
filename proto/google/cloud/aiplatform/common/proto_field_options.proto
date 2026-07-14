@@ -1,0 +1,34 @@
+syntax = "proto2";
+
+package google.cloud.aiplatform.common;
+
+option java_package = "com.google.cloud.aiplatform.common";
+option java_outer_classname = "ProtoFieldOptionsProto";
+option java_multiple_files = true;
+
+import "net/proto2/proto/descriptor.proto";
+
+message FieldAnnotations {
+  message VpcScOption {
+    repeated string supported_value = 1;
+  }
+
+  message AxtOption {
+    repeated string supported_value = 1;
+  }
+
+  enum EncryptionSpecType {
+    ENCRYPTION_SPEC_TYPE_UNSPECIFIED = 0;
+    ENCRYPTION_SPEC = 1;
+    PRIMARY_ENCRYPTION_RESOURCE = 2;
+    SECONDARY_ENCRYPTION_RESOURCE = 3;
+  }
+
+  enum GenAiArtifactType {
+    GEN_AI_ARTIFACT_TYPE_UNSPECIFIED = 0;
+    GEN_AI_ARTIFACT_TYPE_TUNING_PIPELINE_TEMPLATE_URI = 1;
+    GEN_AI_ARTIFACT_TYPE_MODEL_NAME = 2;
+  }
+
+}
+

@@ -1,0 +1,10 @@
+edition = "2024";
+
+package thread.fiber;
+
+enum FiberType {
+  FIBER_TYPE_UNKNOWN = 0;
+  FIBER_TYPE_NORMAL = 1;
+  FIBER_TYPE_DYNAMIC = 2;
+}
+

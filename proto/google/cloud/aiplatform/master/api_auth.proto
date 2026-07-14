@@ -1,0 +1,28 @@
+syntax = "proto3";
+
+package google.cloud.aiplatform.master;
+
+option java_package = "com.google.cloud.aiplatform.master";
+option java_outer_classname = "ApiAuthProto";
+option java_multiple_files = true;
+option csharp_namespace = "Google.Cloud.AIPlatform.Master";
+option php_namespace = "Google\\Cloud\\AIPlatform\\Master";
+option ruby_package = "Google::Cloud::AIPlatform::Master";
+
+import "google/api/field_behavior.proto";
+import "google/api/inclusion.proto";
+import "google/api/resource.proto";
+import "net/proto2/contrib/validator/annotations.proto";
+import "storage/datapol/annotations/proto/semantic_annotations.proto";
+
+message ApiAuth {
+  message ApiKeyConfig {
+    string api_key_secret_version = 1;
+    string api_key_string = 2;
+  }
+
+  oneof auth_config {
+    .google.cloud.aiplatform.master.ApiAuth.ApiKeyConfig api_key_config = 1;
+  }
+}
+

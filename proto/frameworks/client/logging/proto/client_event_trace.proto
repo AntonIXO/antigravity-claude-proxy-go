@@ -1,0 +1,14 @@
+edition = "2024";
+
+package frameworks.client.logging.proto;
+
+option java_package = "com.google.frameworks.client.logging.proto";
+option java_outer_classname = "ClientEventTraceOuterClass";
+option objc_class_prefix = "CLI";
+
+import "storage/datapol/annotations/proto/semantic_annotations.proto";
+
+message ClientEventTrace {
+  repeated string span_name = 1;
+}
+

@@ -1,0 +1,32 @@
+edition = "2024";
+
+package perftools.tracing;
+
+option java_package = "com.google.tracing";
+option java_outer_classname = "SpanLink";
+
+import "net/proto2/bridge/proto/message_set.proto";
+
+message ChildSpanLink {
+  fixed64 child_trace_id = 1;
+  fixed64 child_span_id = 2;
+  string name = 3;
+  fixed64 child_trace_id_hi = 4;
+  .perftools.tracing.TraceSystem child_trace_system = 5 [default = DAPPER];
+}
+
+message ParentSpanLink {
+  reserved "parent_owner";
+  reserved 6;
+  fixed64 parent_trace_id = 1;
+  fixed64 parent_span_id = 2;
+  string name = 3;
+  fixed64 parent_trace_id_hi = 4;
+  .perftools.tracing.TraceSystem parent_trace_system = 5 [default = DAPPER];
+}
+
+enum TraceSystem {
+  DAPPER = 1;
+  CLOUD_TRACE = 3;
+}
+

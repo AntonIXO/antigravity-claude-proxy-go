@@ -1,0 +1,21 @@
+syntax = "proto3";
+
+package google.cloud.aiplatform.v1beta1;
+
+option java_package = "com.google.cloud.aiplatform.v1beta1";
+option java_outer_classname = "EncryptionSpecProto";
+option java_multiple_files = true;
+option csharp_namespace = "Google.Cloud.AIPlatform.V1Beta1";
+option php_namespace = "Google\\Cloud\\AIPlatform\\V1beta1";
+option ruby_package = "Google::Cloud::AIPlatform::V1beta1";
+
+import "cloud/security/kms/boq/keytracking/proto/key_tracking_annotations.proto";
+import "google/api/field_behavior.proto";
+import "google/api/policy.proto";
+import "google/api/versioning.proto";
+import "storage/datapol/annotations/proto/semantic_annotations.proto";
+
+message EncryptionSpec {
+  string kms_key_name = 1;
+}
+

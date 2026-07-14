@@ -1,0 +1,16 @@
+syntax = "proto3";
+
+package google.rpc.context;
+
+option java_package = "com.google.rpc.context";
+option java_outer_classname = "AbuseContextProto";
+option java_multiple_files = true;
+option objc_class_prefix = "RPC";
+
+import "google/api/visibility.proto";
+import "google/protobuf/any.proto";
+
+message AbuseContext {
+  .google.protobuf.Any abuse_data = 1;
+}
+

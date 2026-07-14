@@ -1,0 +1,115 @@
+syntax = "proto3";
+
+package google.cloud.businessaicode.v1main;
+
+option java_package = "com.google.cloud.businessaicode.v1main";
+option java_outer_classname = "TelemetryServiceProto";
+option java_multiple_files = true;
+option go_package = "cloud.google.com/go/businessaicode/apiv1main/businessaicodepb;businessaicodepb";
+
+import "google/api/annotations.proto";
+import "google/api/field_behavior.proto";
+import "google/api/policy.proto";
+import "google/api/resource.proto";
+import "google/api/versioning.proto";
+import "google/api/visibility.proto";
+import "google/protobuf/duration.proto";
+import "google/protobuf/timestamp.proto";
+import "storage/datapol/annotations/proto/semantic_annotations.proto";
+
+service TelemetryService {
+  rpc SendTelemetry (.google.cloud.businessaicode.v1main.SendTelemetryRequest) returns (.google.cloud.businessaicode.v1main.SendTelemetryResponse) {}
+}
+
+message SendTelemetryRequest {
+  string parent = 1;
+  repeated .google.cloud.businessaicode.v1main.FeedbackEvent feedback_events = 2;
+}
+
+message SendTelemetryResponse {
+}
+
+message FeedbackEvent {
+  .google.protobuf.Timestamp event_time = 1;
+  string inference_request_id = 2;
+  string prompt_id = 3;
+  string trajectory_id = 4;
+  oneof event {
+    .google.cloud.businessaicode.v1main.InferenceResolved inference_resolved = 5;
+    .google.cloud.businessaicode.v1main.InferenceInteraction inference_interaction = 6;
+  }
+}
+
+message InferenceResolved {
+  .google.cloud.businessaicode.v1main.Resolution resolution = 1;
+  string inference_model_version = 2;
+  .google.cloud.businessaicode.v1main.InitiationMethod initiation_method = 3;
+  string programming_language = 4;
+  optional .google.protobuf.Duration ttft_latency = 5;
+  optional .google.protobuf.Duration ttlt_latency = 6;
+}
+
+message Resolution {
+  enum Status {
+    STATUS_UNSPECIFIED = 0;
+    SUCCESS = 1;
+    ERROR = 2;
+    CANCELLED = 3;
+  }
+
+  .google.cloud.businessaicode.v1main.Resolution.Status status = 1;
+  bool streaming = 4;
+  int32 candidate_count = 5;
+  .google.cloud.businessaicode.v1main.InteractionType interaction_type = 7;
+  int32 tool_calls_count = 8;
+  int32 interactive_tool_calls_count = 9;
+  oneof error {
+    int32 http_error_code = 2;
+    .google.cloud.businessaicode.v1main.ClientErrorTag client_error_tag = 3;
+  }
+  optional int32 winning_candidate_index = 6;
+}
+
+message InferenceInteraction {
+  .google.cloud.businessaicode.v1main.Interaction interaction = 1;
+  string inference_model_version = 2;
+  .google.cloud.businessaicode.v1main.InitiationMethod initiation_method = 3;
+  string programming_language = 4;
+}
+
+message Interaction {
+  .google.cloud.businessaicode.v1main.Outcome outcome = 1;
+  .google.cloud.businessaicode.v1main.InteractionType type = 2;
+  optional .google.protobuf.Duration interaction_latency = 3;
+  optional int32 winning_candidate_index = 4;
+  optional int32 tool_call_index = 5;
+}
+
+enum ClientErrorTag {
+  CLIENT_ERROR_TAG_UNSPECIFIED = 0;
+  TIMEOUT = 1;
+  PARSE_ERROR = 2;
+}
+
+enum InteractionType {
+  INTERACTION_TYPE_UNSPECIFIED = 0;
+  NONE = 1;
+  PROPOSAL_ACCEPTANCE = 2;
+  PERMISSION_GRANT = 3;
+  TEXT_CLARIFICATION = 4;
+  INTERACTION_TYPE_OTHER = 5;
+}
+
+enum InitiationMethod {
+  INITIATION_METHOD_UNSPECIFIED = 0;
+  AGENT_CHAT = 1;
+  AGENT_LOOP = 2;
+}
+
+enum Outcome {
+  OUTCOME_UNSPECIFIED = 0;
+  ACCEPTED = 1;
+  REJECTED = 2;
+  MODIFIED = 3;
+}
+

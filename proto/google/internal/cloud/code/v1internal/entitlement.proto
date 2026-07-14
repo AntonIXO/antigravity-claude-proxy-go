@@ -1,0 +1,15 @@
+syntax = "proto3";
+
+package google.internal.cloud.code.v1internal;
+
+option java_package = "com.google.internal.cloud.code.v1internal";
+option java_outer_classname = "EntitlementProto";
+option java_multiple_files = true;
+
+import "google/api/field_behavior.proto";
+import "storage/datapol/annotations/proto/semantic_annotations.proto";
+
+message Entitlement {
+  string user_tier = 1;
+}
+

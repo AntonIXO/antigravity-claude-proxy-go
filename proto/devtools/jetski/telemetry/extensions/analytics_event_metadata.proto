@@ -1,0 +1,22 @@
+edition = "2024";
+
+package devtools.jetski.telemetry.extensions;
+
+option java_outer_classname = "AnalyticsEventMetadataOuterClass";
+
+import "devtools/jetski/telemetry/extensions/common.proto";
+import "storage/datapol/annotations/proto/semantic_annotations.proto";
+import "third_party/jetski/codeium_common_pb/codeium_common.proto";
+
+message Experiment {
+  string key = 1;
+  bool enabled = 2;
+}
+
+message AnalyticsEventMetadata {
+  string event_type = 1;
+  repeated .devtools.jetski.telemetry.extensions.ExtraMetadata extra = 2;
+  repeated .devtools.jetski.telemetry.extensions.Experiment experiments = 3;
+  .exa.codeium_common_pb.RuntimeEnvironment runtime_environment = 4;
+}
+

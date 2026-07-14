@@ -1,0 +1,27 @@
+edition = "2023";
+
+package s2a.proto.v2;
+
+option java_package = "com.google.s2a.proto.v2";
+option java_outer_classname = "S2AContextProto";
+option java_multiple_files = true;
+
+import "third_party/s2a_proto/s2a/proto/v2/common.proto";
+
+message S2AContext {
+  reserved 5;
+  message AttributesEntry {
+    string key = 1;
+    string value = 2;
+  }
+
+  string leaf_cert_spiffe_id = 1;
+  repeated string leaf_cert_uris = 2;
+  repeated string leaf_cert_dnsnames = 3;
+  repeated string peer_certificate_chain_fingerprints = 4;
+  .s2a.proto.v2.Identity local_identity = 9;
+  bytes local_leaf_cert_fingerprint = 6;
+  bytes peer_leaf_certificate_der = 7;
+  repeated .s2a.proto.v2.S2AContext.AttributesEntry attributes = 8;
+}
+

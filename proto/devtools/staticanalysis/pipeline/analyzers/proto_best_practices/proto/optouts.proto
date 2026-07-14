@@ -1,0 +1,75 @@
+syntax = "proto2";
+
+package proto_best_practices;
+
+option java_outer_classname = "OptoutsProtoExt";
+option java_multiple_files = true;
+
+import "logs/proto/logs_annotations/logs_annotations.proto";
+import "net/proto2/proto/descriptor.proto";
+
+message Category {
+  enum Subcategory {
+    UNSPECIFIED = 0;
+    BOOL_FIELD = 1;
+    CHANGE_TO_UNSIGNED_INT = 2;
+    CHANGE_TO_SIGNED_INT = 3;
+    CHANGED_FIELD_TYPE = 4;
+    INVALID_MESSAGE_CHANGE = 5;
+    TYPE_CHANGE = 6;
+    BOOL_TO_ENUM = 7;
+    DEFAULT_VALUE_CHANGE = 8;
+    DELETE_FIELD_RESERVED = 9;
+    DELETE_NON_DEPRECATED_FIELD = 10;
+    ENUM_DEFAULT_VALUE_ZERO = 11;
+    ENUM_DEFAULT_VALUE_NAME = 12;
+    ENUM_DEFAULT_VALUE_NAME_CONFLICT = 13;
+    ENUM_VALUE_ADDED = 14;
+    ENUM_VALUE_CHANGED = 15;
+    ENUM_VALUE_NAMES = 16;
+    FIELD_PRESENCE = 17;
+    GENERATED_CODE_STYLE = 18;
+    LARGE_ENUM = 19;
+    MESSAGE_SET_MISMATCH = 20;
+    PACKED_FIELD = 21;
+    RENAME_FIELD = 22;
+    TAG_CHANGE = 23;
+    TIME_UNIT = 24;
+    TOO_MANY_FIELDS = 25;
+    DELETE_REQUIRED_FIELD = 26;
+    KEYWORD_CONFLICT = 27;
+    GLOBAL_PACKAGE = 28;
+    ONEOF_FIELD_CHANGE = 29;
+    KEEP_PROTO_FILES_SMALL = 30;
+    LONG_FIELD_JSPB_ANNOTATED = 31;
+    ENUM_VALUE_DELETE = 32;
+    REPEATED_FIELD_TRANSITION_PACKED = 33;
+    REPEATED_FIELD_TRANSITION_MESSAGE = 34;
+    REQUIRED_TO_OPTIONAL = 35;
+    DELETE_ENUM_VALUE = 36;
+    MISSING_GLUE_MERGE_ANNOTATION = 37;
+    RENAME_SERVICE_PACKAGE = 38;
+    LARGE_ONEOF = 39;
+    REQUIRE_INNERTUBE_CAPABILITY_NEGOTIATION = 40;
+    JSPB_MESSAGE_ID_CHANGE = 41;
+    REQUIRE_DROIDGUARD_CLIENT_RESPONSE_ANNOTATION = 42;
+    SERVICE_DEADLINE = 43;
+    IMPORT_PUBLIC = 44;
+    ONEOF_AVOID = 45;
+    INT32_AVOID = 46;
+    UNSIGNED_INTEGER = 47;
+    JAVA_FEATURES = 48;
+    GOOGLESQL_AVOID_DEFAULTS = 49;
+    NESTED_EXPORT = 50;
+    EXPORT_ALL = 51;
+    GOOGLE_API_HTTP = 52;
+    PROTO_PACKAGE_STYLE = 53;
+    ENFORCE_NAMING_STYLE = 54;
+  }
+
+}
+
+message FindingOptouts {
+  repeated .proto_best_practices.Category.Subcategory categories = 1;
+}
+
