@@ -219,4 +219,3 @@ evidence but are not the current-agy transport.
 - [ ] Hermes answers end-to-end through `custom:antigravity-proxy`.
 - [ ] New systemd unit runs on 8091; Node port 8090 remains untouched.
 - [ ] README documents current baseline evidence and the deferred sidecar gap.
-

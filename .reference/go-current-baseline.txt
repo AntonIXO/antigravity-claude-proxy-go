@@ -1,0 +1,25 @@
+Go proxy Phase 2 Cloud Code gate
+================================
+
+Captured: 2026-07-14 23:35 Europe/Moscow
+Toolchain: public go1.27rc2 linux/amd64
+Operation: POST /v1internal:fetchAvailableModels
+Result: HTTP 200, 68,722 response bytes
+Capture: .reference/go-current-capture.pcap
+SHA-256: 27e5dcb9975bf0cf8cd740b586e1d94b660f5cd4ecc03c0ca9e3f96d9df4b753
+
+Observed ClientHello:
+
+  SNI:  daily-cloudcode-pa.googleapis.com
+  ALPN: absent
+  JA4:  t13d131100_f57a46bbacb6_f50d94e863eb
+
+Current agy baseline:
+
+  SNI:  daily-cloudcode-pa.googleapis.com
+  ALPN: absent
+  JA4:  t13d131100_f57a46bbacb6_f50d94e863eb
+
+The full JA4, cipher list, signature algorithms, SNI, and ALPN state match the
+current agy capture. The Go transport uses only an empty tls.Config and leaves
+ForceAttemptHTTP2 at its zero value.
