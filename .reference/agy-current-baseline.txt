@@ -1,0 +1,44 @@
+Current agy Cloud Code baseline
+===============================
+
+Captured: 2026-07-14 23:27 Europe/Moscow
+Binary: /root/.local/bin/agy (agy 1.1.2)
+Build: go1.27-20260710-RC00 cl/945845058 +03845e30f7 X:fieldtrack,boringcrypto,simd
+Capture: .reference/agy-current-capture.pcap
+SHA-256: 2d041c7f794c5ec018543c2f5b953ecaa2bf5855c69670b522b696e68c0f6ca9
+
+Invocation:
+
+  /root/.local/bin/agy \
+    --log-file=/tmp/agy-current-run.log \
+    --print='Reply with exactly CURRENT_BASELINE_OK' \
+    --print-timeout=45s
+
+Observed response:
+
+  CURRENT_BASELINE_OK
+
+Capture filter:
+
+  host daily-cloudcode-pa.googleapis.com and tcp port 443
+
+Every captured Cloud Code ClientHello:
+
+  SNI:  daily-cloudcode-pa.googleapis.com
+  ALPN: absent
+  JA4:  t13d131100_f57a46bbacb6_f50d94e863eb
+
+The agy run log identified these application URLs:
+
+  https://daily-cloudcode-pa.googleapis.com/v1internal:loadCodeAssist
+  https://daily-cloudcode-pa.googleapis.com/v1internal:fetchAvailableModels
+  https://daily-cloudcode-pa.googleapis.com/v1internal:streamGenerateContent?alt=sse
+
+Conclusion:
+
+The current agy binary uses HTTPS REST/SSE for Cloud Code content generation.
+The older t13d1312h2 capture is a www.googleapis.com net/http connection, not a
+Cloud Code gRPC connection. A grpc-go channel advertises ALPN h2 and its TLS
+credentials filter HTTP/2-forbidden CBC cipher suites, so it cannot reproduce
+this current Cloud Code ClientHello while retaining an empty tls.Config.
+
