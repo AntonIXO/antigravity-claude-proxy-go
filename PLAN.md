@@ -192,8 +192,13 @@ evidence but are not the current-agy transport.
 - Leave the Node service and port 8090 untouched.
 - Point Hermes `custom:antigravity-proxy` at
   `http://127.0.0.1:8091/anthropic` only after all earlier gates pass.
+- Run Claude Code against the same `/anthropic` base URL with its Sonnet and
+  Opus model environment variables explicitly forced to model IDs returned by
+  the Go proxy. Keep the test environment isolated from the user's normal
+  Claude configuration.
 - **Gate:** `hermes chat -q "..." --provider custom:antigravity-proxy -m
-  gemini-3.5-flash-low` returns a real answer through the Go proxy.
+  gemini-3.5-flash-low` returns a real answer through the Go proxy, and Claude
+  Code returns real answers through each forced model mapping.
 
 ## Behavioral-mimicry scope
 
@@ -229,5 +234,7 @@ evidence but are not the current-agy transport.
 - [ ] Streaming emits valid Anthropic SSE events.
 - [ ] Forced 429 handling rotates/cools down without crashing.
 - [ ] Hermes answers end-to-end through `custom:antigravity-proxy`.
+- [ ] Claude Code answers end-to-end with Sonnet and Opus forced to the Go
+      proxy's advertised model IDs.
 - [ ] New systemd unit runs on 8091; Node port 8090 remains untouched.
 - [ ] README documents current baseline evidence and the deferred sidecar gap.
