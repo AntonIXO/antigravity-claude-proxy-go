@@ -140,7 +140,11 @@ func (m Manager) Get(ctx context.Context) (Credentials, error) {
 			return Credentials{}, err
 		}
 	}
-	file, err := os.OpenFile(path, os.O_RDWR, 0)
+	flags := os.O_RDONLY
+	if m.WriteBack || os.Getenv("AGY_TOKEN_WRITEBACK") == "1" {
+		flags = os.O_RDWR
+	}
+	file, err := os.OpenFile(path, flags, 0)
 	if err != nil {
 		return Credentials{}, fmt.Errorf("open agy token: %w", err)
 	}

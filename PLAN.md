@@ -224,17 +224,17 @@ evidence but are not the current-agy transport.
 
 ## Acceptance
 
-- [ ] Go Cloud Code JA4 equals current agy exactly:
+- [x] Go Cloud Code JA4 equals current agy exactly:
       `t13d131100_f57a46bbacb6_f50d94e863eb`, packet-verified.
-- [ ] Cloud Code SNI is correct and ALPN is absent, matching current agy.
-- [ ] Traffic uses the HTTPS REST/SSE paths observed for both Gemini and Claude,
+- [x] Cloud Code SNI is correct and ALPN is absent, matching current agy.
+- [x] Traffic uses the HTTPS REST/SSE paths observed for both Gemini and Claude,
       including `streamGenerateContent?alt=sse`.
-- [ ] `x-goog-api-client` begins with `gl-go/` and identity headers match agy.
-- [ ] `/v1/messages` and `/anthropic/v1/messages` return valid Anthropic JSON.
-- [ ] Streaming emits valid Anthropic SSE events.
-- [ ] Forced 429 handling rotates/cools down without crashing.
-- [ ] Hermes answers end-to-end through `custom:antigravity-proxy`.
-- [ ] Claude Code answers end-to-end with Sonnet and Opus forced to the Go
+- [x] `x-goog-api-client` begins with `gl-go/` and identity headers match agy.
+- [x] `/v1/messages` and `/anthropic/v1/messages` return valid Anthropic JSON.
+- [x] Streaming emits valid Anthropic SSE events.
+- [x] Forced 429 handling rotates/cools down without crashing.
+- [x] Hermes answers end-to-end through `custom:antigravity-proxy`.
+- [x] Claude Code answers end-to-end with Sonnet and Opus forced to the Go
       proxy's advertised model IDs.
-- [ ] New systemd unit runs on 8091; Node port 8090 remains untouched.
-- [ ] README documents current baseline evidence and the deferred sidecar gap.
+- [x] New systemd unit runs on 8091; Node port 8090 remains untouched.
+- [x] README documents current baseline evidence and the deferred sidecar gap.
