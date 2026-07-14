@@ -1,175 +1,222 @@
-# PLAN — Go/gRPC Antigravity Proxy (fingerprint-identical to `agy`)
+# PLAN — Current-`agy` Go REST/SSE Antigravity Proxy
 
 ## Mission
 
-Reimplement the Node.js `antigravity-claude-proxy` as a **Go** binary that talks to
-Google Cloud Code (`cloudcode-pa.googleapis.com`) over **native gRPC**, so its
-network fingerprint is **indistinguishable from the official `agy` CLI** (also Go).
-The proxy exposes a local **Anthropic Messages API** (`/v1/messages`) that Hermes
-Agent consumes as a custom provider. Goal: eliminate the two ToS-ban detection
-vectors identified by packet capture — **REST-vs-gRPC** and **Node-vs-Go TLS**.
+Reimplement the Node.js `antigravity-claude-proxy` as a **Go** binary whose
+Cloud Code traffic matches the currently installed official `agy` CLI. The
+proxy exposes a local Anthropic Messages API (`/v1/messages`) for Hermes Agent
+and calls Google Cloud Code over the same HTTPS REST/SSE transport as agy.
 
-## Why this eliminates the ban risk (evidence from tcpdump + Wireshark)
+The initial roadmap assumed agy used gRPC. A fresh packet capture and an agy
+application log taken on 2026-07-14 disproved that assumption. Current agy 1.1.2
+calls endpoints such as:
 
-| Vector | Node proxy (current) | `agy` (real) | Go proxy (this plan) |
-|--------|----------------------|--------------|----------------------|
-| Protocol | REST `v1internal:generateContent` (HTTP/1.1 JSON) | gRPC `CloudCode/GenerateContent` (HTTP/2 protobuf) | **gRPC, identical** |
-| TLS JA4 | `t13d5212h1` (OpenSSL, 52 ciphers, h1) | `t13d1312h2` (Go crypto/tls, 13 ciphers, h2) | **`t13d1312h2`, identical** |
-| `x-goog-api-client` | `gl-node/...` | `gl-go/1.26.4 ...` | **`gl-go/...`, identical** |
-| HTTP/2 SETTINGS | undici defaults | grpc-go defaults | **grpc-go defaults, identical** |
+- `https://daily-cloudcode-pa.googleapis.com/v1internal:loadCodeAssist`
+- `https://daily-cloudcode-pa.googleapis.com/v1internal:fetchAvailableModels`
+- `https://daily-cloudcode-pa.googleapis.com/v1internal:streamGenerateContent?alt=sse`
 
-**Critical insight (from deep research):** if you build with the *same Go
-version* (1.26.4 — already installed) using *standard `crypto/tls`* via `grpc-go`,
-and you **do not override** `CipherSuites`, `CurvePreferences`, or `NextProtos`,
-the JA3/JA4 hash matches `agy` **automatically**. Do NOT use `utls` — it would
-*break* the match. The whole strategy is "be a normal Go gRPC client, like agy is."
+Network fidelity therefore means native Go `net/http`, HTTP/1.1 JSON/SSE, and
+the current Cloud Code ClientHello—not grpc-go.
 
-## Ground truth already captured for you (in `.reference/`)
+## Packet-verified ground truth
 
-- `grpc-methods.txt` — 22 real `CloudCode/*` gRPC method names from the `agy` binary.
-- `proto-messages.txt` — 249 real `v1internal.*` protobuf message type names.
-- `agy-capture.pcap` — real `agy` TLS ClientHello (JA4 `t13d1312h2`). Your target.
-- `proxy-capture.pcap` — old Node proxy ClientHello (JA4 `t13d5212h1`). What to avoid.
+| Vector | Old Node proxy | Current agy 1.1.2 | Go proxy target |
+|---|---|---|---|
+| Application protocol | REST/SSE | REST/SSE | **REST/SSE** |
+| Cloud Code ALPN | `http/1.1`/OpenSSL behavior | absent | **absent** |
+| Cloud Code JA4 | `t13d5212h1...` | `t13d131100_f57a46bbacb6_f50d94e863eb` | **exact match** |
+| TLS implementation | Node/OpenSSL | internal Go 1.27 RC/BoringCrypto | **public Go 1.27 RC `crypto/tls`** |
+| Content endpoint | `v1internal:generateContent` | `v1internal:streamGenerateContent?alt=sse` | **same** |
+| API identity | historically Node-flavored | `gl-go/...`, Antigravity headers | **same** |
 
-Verify your build against these with `tshark -r <cap> -Y 'tls.handshake.type==1' -T fields -e tls.handshake.ja4`.
+The older `.reference/agy-capture.pcap` value
+`t13d1312h2_f57a46bbacb6_f50d94e863eb` is a `www.googleapis.com` `net/http`
+connection with ALPN `h2,http/1.1`; it is not a Cloud Code connection and is no
+longer the gate.
 
-## Reference implementations to read (do NOT reinvent)
+The authoritative baseline is:
 
-- **`/root/antigravity-claude-proxy/`** — the Node proxy. Port its *business logic*
-  verbatim: Anthropic↔Google format conversion (`src/format/`), account manager,
-  multi-account rotation, rate-limit backoff, thinking-signature handling,
-  schema sanitizer (incl. the `enum: [true]→["true"]` fix already applied),
-  the `/anthropic` prefix alias, and the agy-token reader (`src/auth/agy-token.js`).
-- **`/root/hermes-claude-auth/`** — Python reference for how a *Claude Code
-  identity* proxy masks itself (billing header, system-prompt relocation, Stainless
-  spoof). Not directly reused, but the *philosophy* of "match the real client
-  byte-for-byte" is the same. Read `anthropic_billing_bypass.py` for the pattern.
+- `.reference/agy-current-capture.pcap`
+- `.reference/agy-current-baseline.txt`
+- SHA-256 `2d041c7f794c5ec018543c2f5b953ecaa2bf5855c69670b522b696e68c0f6ca9`
+- Cloud Code JA4 `t13d131100_f57a46bbacb6_f50d94e863eb`
 
-## The proto problem (do this FIRST — everything depends on it)
+Verify captures with:
 
-The `v1internal.CloudCode` service is an internal Google API with **no public
-.proto**. You must recover the FileDescriptorSet embedded in the `agy` Go binary.
+```sh
+tshark -r <cap.pcap> \
+  -Y 'tls.handshake.type==1 && tls.handshake.extensions_server_name contains "cloudcode"' \
+  -T fields -e tls.handshake.extensions_server_name \
+  -e tls.handshake.extensions_alpn_str -e tls.handshake.ja4
+```
 
-1. Install tools: `go install github.com/arkadiyt/protodump/cmd/protodump@latest`
-   and `pacman -S protobuf` (for `protoc` + `protoc-gen-go` + `protoc-gen-go-grpc`).
-2. `protodump -output ./proto /root/.local/bin/agy` — dumps embedded
-   `FileDescriptorProto`s as `.proto` files.
-3. Locate `google/internal/cloud/code/v1internal/*.proto`. Confirm it defines
-   `CloudCode` with `GenerateContent`/`GenerateChat`/`StreamGenerateContent` and
-   the request/response messages (cross-check names against `.reference/*.txt`).
-4. `protoc --go_out=gen --go-grpc_out=gen <the .proto files>`.
-5. If `protodump` misses fields, fall back to `strings`/manual descriptor parsing,
-   but descriptors are almost always complete. **If the descriptor is genuinely
-   unrecoverable, STOP and report** — do not fabricate a schema.
+## TLS rule
+
+Do not customize TLS internals. Use an empty `tls.Config{}` with Go's standard
+HTTP transport. Do not set `CipherSuites`, `CurvePreferences`, `NextProtos`,
+minimum/maximum TLS versions, or a custom ClientHello. Do not use `utls`.
+
+Current agy was built with an internal
+`go1.27-20260710-RC00 ... X:fieldtrack,boringcrypto,simd` toolchain. Public Go
+1.27rc2 has the same signature-algorithm extension hash in the captured
+ClientHello. Use the closest public Go 1.27 release candidate and packet-verify
+the complete JA4. Toolchain selection is part of the fingerprint gate.
+
+For Cloud Code, use a dedicated `http.Transport` with only
+`TLSClientConfig: &tls.Config{}`. Leave `ForceAttemptHTTP2` at its zero value;
+that matches agy's observed lack of ALPN. Do not reuse a transport that enables
+automatic HTTP/2.
+
+## Reference implementations
+
+- `/root/antigravity-claude-proxy/src/` is the business-logic source. Port its
+  format conversion, schema sanitizer, thinking signatures, request envelope,
+  SSE parsing, account rotation, and backoff faithfully.
+- `/root/hermes-claude-auth/anthropic_billing_bypass.py` is the masking
+  philosophy reference.
+- `/root/.local/bin/agy` and the current capture/log are the network ground truth.
+- Recovered schemas under `proto/` and generated types under `gen/` remain
+  useful for validating JSON field names and enums. Do not invent schema.
 
 ## Architecture
 
-```
+```text
 Hermes Agent ──HTTP──▶ Go proxy (:8091, Anthropic Messages API)
-                          │  convert Anthropic → Cloud Code protobuf
+                          │  Anthropic → agy-compatible JSON envelope
                           ▼
-                       grpc-go client ──h2/protobuf──▶ cloudcode-pa.googleapis.com
-                          │  (crypto/tls default = agy JA4; gl-go x-goog-api-client)
+                     Go net/http client ──HTTP/1.1 JSON/SSE──▶ Cloud Code
+                          │  empty tls.Config; current-agy headers and JA4
                           ▼
-                       convert Cloud Code protobuf → Anthropic response (SSE for streaming)
+                     SSE/JSON → Anthropic response/events
 ```
 
-Keep the Node proxy running on :8090 as a fallback during development; the Go
-proxy takes a **new port :8091** so both can coexist for A/B fingerprint testing.
+The Node proxy remains running and untouched on port 8090. The Go proxy uses
+port 8091 until the user explicitly switches Hermes.
 
-## Phased build (commit after each phase; each phase must compile + be tested)
+## Phased build
 
-### Phase 0 — Scaffolding & proto recovery
-- `go mod init antigravity-go-proxy`, Go 1.26.4, `google.golang.org/grpc@latest`.
-- Recover proto (above). Commit generated Go stubs under `gen/`.
-- **Gate:** generated `NewCloudCodeClient` compiles.
+Commit after each phase. Every phase must compile and pass its gate before the
+next begins.
 
-### Phase 1 — Auth (port from `src/auth/agy-token.js`)
-- Read `~/.gemini/antigravity-cli/antigravity-oauth-token` (JSON: access_token,
-  refresh_token, expiry, auth_method).
-- Refresh via `https://oauth2.googleapis.com/token` with the shared client_id/secret
-  (in the Node `src/constants.js` `OAUTH_CONFIG`). **File-lock** the token file to
-  avoid clobbering a concurrently-running `agy` (Google rotates refresh_token on
-  every refresh). Optional write-back gated by `AGY_TOKEN_WRITEBACK=1`.
-- **Gate:** prints a fresh access_token + resolves account email.
+### Phase 0 — Scaffolding and exact schema recovery — COMPLETE
 
-### Phase 2 — gRPC client with agy fingerprint
-- Dial `cloudcode-pa.googleapis.com:443` with
-  `grpc.NewClient(target, grpc.WithTransportCredentials(credentials.NewTLS(&tls.Config{})))`.
-  **Empty `tls.Config{}`** — do NOT set CipherSuites/CurvePreferences/NextProtos.
-- Attach per-call metadata exactly like agy: `x-goog-api-client: gl-go/1.26.4 ...`,
-  `user-agent: antigravity/<ver> linux/amd64`, `x-client-name: antigravity`,
-  `x-client-version`, plus the numeric client-metadata (ideType=9 ANTIGRAVITY,
-  platform, pluginType=GEMINI). Pull exact header values from Node `src/constants.js`
-  (`ANTIGRAVITY_HEADERS`, `CLIENT_METADATA`) and verify against the binary via
-  `strings /root/.local/bin/agy | grep -iE 'antigravity/|x-goog-api|client-metadata'`.
-- Endpoint fallback order (daily → prod) as in the Node proxy.
-- **Gate (fingerprint):** capture your client's ClientHello with tcpdump and confirm
-  `tls.handshake.ja4 == t13d1312h2...` matching `.reference/agy-capture.pcap`. This
-  is the single most important acceptance test. If it doesn't match, the whole
-  point is lost — debug before proceeding.
+- Initialize the Go module and install protobuf recovery/generation tools.
+- Recover descriptors from agy without fabricating missing fields.
+- Generate compileable Go schema/service types under `gen/`.
+- **Gate:** recovered `NewCloudCodeClient` and `NewPredictionServiceClient`
+  compile.
+- Commit: `27c9332`.
 
-### Phase 3 — Format conversion (port from Node `src/format/`)
-- Anthropic request → Cloud Code protobuf request (system-instruction relocation,
-  `cache_control` stripping, tool/function-declaration mapping, the enum/const→string
-  sanitizer fix, thinking config).
-- Cloud Code response → Anthropic response (content blocks, thinking blocks +
-  signatures, usage, stop_reason).
-- **Gate:** unit tests converting a captured request/response round-trip.
+The recovered schema also established that `PredictionService`, not
+`CloudCode`, owns `GenerateContent`. Generated gRPC stubs are retained as schema
+evidence but are not the current-agy transport.
+
+### Phase 1 — Auth — COMPLETE
+
+- Read wrapped and flat agy token files.
+- File-lock refresh, handle a rotated refresh token, and gate optional atomic
+  write-back behind `AGY_TOKEN_WRITEBACK=1`.
+- Resolve the account email using Google userinfo.
+- **Gate:** a real expired token refresh succeeds and resolves the email.
+- Commit: `48b95d8`.
+
+### Baseline correction — COMPLETE
+
+- Capture a clean current-agy one-shot request to Cloud Code.
+- Preserve the pcap and provenance under `.reference/`.
+- Confirm from agy's own log that generation uses REST/SSE.
+- Commit: `52ec2b8`.
+
+### Phase 2 — Native Go REST/SSE client with current-agy fingerprint
+
+- Select public Go 1.27rc2 (or a closer available public 1.27 build) because Go
+  1.26.4 lacks the three signature algorithms present in current agy's
+  ClientHello.
+- Call daily Cloud Code first, then production fallback, with standard
+  `net/http` and a dedicated `http.Transport{TLSClientConfig: &tls.Config{}}`.
+- Leave ALPN/HTTP2 controls untouched at zero values.
+- Send agy identity headers: `Authorization`, `User-Agent`, `X-Client-Name`,
+  `X-Client-Version`, and `x-goog-api-client: gl-go/1.26.4 auth/0.5
+  google-api-go-client/0.5`.
+- Implement unary JSON and streaming SSE request primitives for
+  `loadCodeAssist`, `onboardUser`, `fetchAvailableModels`, `generateContent`,
+  and `streamGenerateContent`.
+- **Gate:** a real Cloud Code call succeeds, and a tcpdump of the Go client has
+  SNI `daily-cloudcode-pa.googleapis.com`, no ALPN, and exact JA4
+  `t13d131100_f57a46bbacb6_f50d94e863eb`.
+
+### Phase 3 — Format conversion
+
+- Port Anthropic request → agy JSON request-envelope conversion.
+- Preserve system-instruction relocation, `cache_control` stripping,
+  tool/function mapping, enum/const-to-string schema sanitization, thinking
+  configuration, and thought signatures.
+- Port Cloud Code JSON/SSE responses → Anthropic content/thinking/tool blocks,
+  usage, and stop reason.
+- **Gate:** captured request/response fixtures pass deterministic conversion and
+  streaming round-trip tests.
 
 ### Phase 4 — Anthropic HTTP server
-- `POST /v1/messages` (non-stream + SSE stream), `GET /v1/models`, `GET /health`.
-- Mirror the `/anthropic` prefix alias (so Hermes' `base_url=.../anthropic`
-  auto-detects `anthropic_messages` mode — same trick as the Node proxy).
-- `x-api-key` auth for local access (reuse `agy-proxy-key-2026` or new).
-- **Gate:** `curl /v1/messages` returns a valid Anthropic response through real gRPC.
 
-### Phase 5 — Robustness (port from Node `message-handler.js`)
-- Multi-account rotation, 429/quota backoff tiers, capacity-exhaustion retry,
-  endpoint failover, permanent-auth-failure + ToS-ban detection (403 patterns).
-- **Gate:** survives a forced 429 without crashing; rotates/rate-limits correctly.
+- Serve `POST /v1/messages`, `GET /v1/models`, and `GET /health`.
+- Support non-streaming JSON and Anthropic SSE streaming.
+- Mirror every route under `/anthropic` for Hermes provider detection.
+- Require local `x-api-key` authentication.
+- **Gate:** both `/v1/messages` and `/anthropic/v1/messages` return valid real
+  Anthropic responses through the Go REST/SSE client.
 
-### Phase 6 — Systemd + Hermes wiring
-- `--no-webui`-equivalent is default (this build has no WebUI — pure API, ~small RAM).
-- Write `antigravity-go-proxy.service` (PORT=8091). Do NOT auto-replace the running
-  :8090 unit — leave both; the user flips Hermes over after verifying.
-- Update Hermes `custom_providers` entry (or document the exact edit) to point
-  `base_url` at `http://127.0.0.1:8091/anthropic`.
-- **Gate:** `hermes chat -q "..." --provider custom:antigravity-proxy -m gemini-3.5-flash-low`
-  returns a real answer through the Go proxy.
+### Phase 5 — Robustness
 
-## Behavioral-mimicry stance (from deep research — scope decision)
+- Port Node account loading without modifying the live Node `accounts.json`.
+- Port selection strategy, per-model limits, 429/quota backoff tiers,
+  capacity-exhaustion retry, endpoint failover, permanent auth failure, and
+  ToS/verification 403 detection.
+- **Gate:** deterministic forced-429 tests prove cooldown and rotation, followed
+  by a successful real request.
 
-Full behavioral parity (telemetry to `/api/event_logging/batch`, `cclog` uploads,
-`onboardUser`/`loadCodeAssist` provisioning, language-server sidecar) is a
-*secondary* signal. For THIS build:
-- **DO** call `LoadCodeAssist`/`OnboardUser` on first run if required for project
-  provisioning (the Node proxy already does — port it; a missing project → 403).
-- **DO** send `RecordClientEvent`/minimal telemetry heartbeats if trivial to port.
-- **DEFER** the language-server WebSocket sidecar (high effort, low marginal signal)
-  — leave a clearly-commented `TODO(behavioral)` stub. Document this gap in README.
+### Phase 6 — Systemd and Hermes
 
-## Hard rules for the executor (Claude Code)
+- Add a new `antigravity-go-proxy.service` on port 8091.
+- Leave the Node service and port 8090 untouched.
+- Point Hermes `custom:antigravity-proxy` at
+  `http://127.0.0.1:8091/anthropic` only after all earlier gates pass.
+- **Gate:** `hermes chat -q "..." --provider custom:antigravity-proxy -m
+  gemini-3.5-flash-low` returns a real answer through the Go proxy.
 
-1. **Never override TLS knobs.** Empty `tls.Config{}`. No `utls`. No custom cipher
-   lists. The Go default IS the disguise.
-2. **Never fabricate the proto.** Recover it from the binary. If unrecoverable, stop
-   and report — a wrong schema fails silently and looks like a ban.
-3. **Verify fingerprint with real packet capture** at Phase 2 before building further.
-4. **Port logic, don't redesign it.** The Node proxy's format/backoff/rotation logic
-   is battle-tested — translate it faithfully to Go.
-5. **New port 8091, new systemd unit.** Do not disturb the running :8090 Node proxy
-   or its accounts.json until the user switches over.
-6. **Commit per phase** with a clear message; keep each phase compiling.
-7. **Read before writing:** `/root/antigravity-claude-proxy/src/` and `.reference/`
-   are ground truth. Cross-check every constant against the `agy` binary.
+## Behavioral-mimicry scope
 
-## Acceptance (definition of done)
+- **Do** use `loadCodeAssist` and `onboardUser` when project provisioning needs
+  them.
+- **Do** use the exact REST paths and SSE query observed in current agy.
+- **Do** preserve current-agy client metadata and request-envelope structure.
+- **Do** add minimal `RecordClientEvent` behavior if it is straightforward after
+  the primary path is accepted.
+- **Defer** the language-server sidecar and document the gap in README as
+  `TODO(behavioral)`.
 
-- [ ] `tls.handshake.ja4` of the Go proxy == `agy` (`t13d1312h2...`) — packet-verified.
-- [ ] Traffic is gRPC/HTTP2/protobuf to `cloudcode-pa.googleapis.com` (not REST).
-- [ ] `x-goog-api-client` starts `gl-go/`.
-- [ ] `curl /v1/messages` and `/anthropic/v1/messages` return valid Anthropic JSON.
-- [ ] Hermes `custom:antigravity-proxy` answers through the Go proxy end-to-end.
-- [ ] systemd unit on :8091; Node :8090 untouched.
-- [ ] README documents the deferred behavioral-sidecar gap.
+## Hard rules
+
+1. Never override TLS knobs; use an empty `tls.Config{}`.
+2. The current Cloud Code capture, not the older `www.googleapis.com` frame, is
+   the packet gate.
+3. Never claim Phase 2 passed without a real tcpdump/tshark exact JA4 match.
+4. Never fabricate protobuf/JSON schema.
+5. Port Node business logic rather than redesigning it.
+6. Use port 8091 and do not disturb the Node service or its accounts file.
+7. Commit each completed phase with its real gate output.
+
+## Acceptance
+
+- [ ] Go Cloud Code JA4 equals current agy exactly:
+      `t13d131100_f57a46bbacb6_f50d94e863eb`, packet-verified.
+- [ ] Cloud Code SNI is correct and ALPN is absent, matching current agy.
+- [ ] Traffic uses the observed HTTPS REST/SSE paths, including
+      `streamGenerateContent?alt=sse`.
+- [ ] `x-goog-api-client` begins with `gl-go/` and identity headers match agy.
+- [ ] `/v1/messages` and `/anthropic/v1/messages` return valid Anthropic JSON.
+- [ ] Streaming emits valid Anthropic SSE events.
+- [ ] Forced 429 handling rotates/cools down without crashing.
+- [ ] Hermes answers end-to-end through `custom:antigravity-proxy`.
+- [ ] New systemd unit runs on 8091; Node port 8090 remains untouched.
+- [ ] README documents current baseline evidence and the deferred sidecar gap.
+
