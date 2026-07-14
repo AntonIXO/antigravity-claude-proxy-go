@@ -1,0 +1,70 @@
+{
+  "model": "claude-sonnet-4-6-thinking",
+  "system": [
+    {
+      "type": "text",
+      "text": "You are a fixture assistant.",
+      "cache_control": {"type": "ephemeral"}
+    }
+  ],
+  "messages": [
+    {
+      "role": "user",
+      "content": [
+        {
+          "type": "text",
+          "text": "Inspect the fixture.",
+          "cache_control": {"type": "ephemeral"}
+        },
+        {
+          "type": "image",
+          "source": {"type": "base64", "media_type": "image/png", "data": "aW1hZ2U="},
+          "cache_control": {"type": "ephemeral"}
+        }
+      ]
+    },
+    {
+      "role": "assistant",
+      "content": [
+        {"type": "tool_use", "id": "tool-1", "name": "file.read!", "input": {"path": "/tmp/a"}},
+        {"type": "text", "text": "I will inspect it."}
+      ]
+    },
+    {
+      "role": "user",
+      "content": [
+        {
+          "type": "tool_result",
+          "tool_use_id": "tool-1",
+          "content": [
+            {"type": "text", "text": "ok"},
+            {"type": "image", "source": {"type": "base64", "media_type": "image/png", "data": "cmVzdWx0"}}
+          ],
+          "cache_control": {"type": "ephemeral"}
+        }
+      ]
+    }
+  ],
+  "max_tokens": 1000,
+  "temperature": 0,
+  "top_p": 0.9,
+  "top_k": 0,
+  "stop_sequences": ["STOP"],
+  "thinking": {"type": "enabled", "budget_tokens": 1000},
+  "tools": [
+    {
+      "name": "file.read!",
+      "description": "Read one file",
+      "input_schema": {
+        "type": "object",
+        "title": "Ignored by Google cleaner",
+        "properties": {
+          "path": {"type": "string"},
+          "literal": {"type": "boolean", "const": true},
+          "count": {"type": "integer", "enum": [1, 2]}
+        },
+        "required": ["path", "missing"]
+      }
+    }
+  ]
+}

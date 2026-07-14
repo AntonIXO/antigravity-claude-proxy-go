@@ -1,0 +1,4 @@
+data: {"response":{"candidates":[{"content":{"parts":[{"thought":true,"text":"I should ","thoughtSignature":"claude-signature-0123456789012345678901234567890123456789"}]}}],"usageMetadata":{"promptTokenCount":120,"cachedContentTokenCount":20}}}
+
+data: {"response":{"candidates":[{"content":{"parts":[{"thought":true,"text":"inspect.","thoughtSignature":"claude-signature-0123456789012345678901234567890123456789"},{"text":"Done."}]},"finishReason":"STOP"}],"usageMetadata":{"promptTokenCount":120,"candidatesTokenCount":9,"cachedContentTokenCount":20}}}
+

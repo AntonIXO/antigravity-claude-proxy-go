@@ -1,0 +1,29 @@
+{
+  "response": {
+    "candidates": [
+      {
+        "content": {
+          "role": "model",
+          "parts": [
+            {
+              "thought": true,
+              "text": "I should inspect the path.",
+              "thoughtSignature": "claude-signature-0123456789012345678901234567890123456789"
+            },
+            {"text": "I need one tool."},
+            {
+              "functionCall": {"id": "tool-1", "name": "file.read!", "args": {"path": "/tmp/a"}},
+              "thoughtSignature": "tool-signature-012345678901234567890123456789012345678901"
+            }
+          ]
+        },
+        "finishReason": "STOP"
+      }
+    ],
+    "usageMetadata": {
+      "promptTokenCount": 120,
+      "candidatesTokenCount": 12,
+      "cachedContentTokenCount": 20
+    }
+  }
+}

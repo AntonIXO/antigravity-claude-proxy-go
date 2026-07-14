@@ -1,0 +1,29 @@
+{
+  "id": "msg_fixture",
+  "type": "message",
+  "role": "assistant",
+  "content": [
+    {
+      "type": "thinking",
+      "thinking": "I should inspect the path.",
+      "signature": "claude-signature-0123456789012345678901234567890123456789"
+    },
+    {"type": "text", "text": "I need one tool."},
+    {
+      "type": "tool_use",
+      "id": "tool-1",
+      "name": "file.read!",
+      "input": {"path": "/tmp/a"},
+      "thoughtSignature": "tool-signature-012345678901234567890123456789012345678901"
+    }
+  ],
+  "model": "claude-sonnet-4-6-thinking",
+  "stop_reason": "end_turn",
+  "stop_sequence": null,
+  "usage": {
+    "input_tokens": 100,
+    "output_tokens": 12,
+    "cache_read_input_tokens": 20,
+    "cache_creation_input_tokens": 0
+  }
+}

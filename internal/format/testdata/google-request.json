@@ -1,0 +1,60 @@
+{
+  "contents": [
+    {
+      "role": "user",
+      "parts": [
+        {"text": "Inspect the fixture."},
+        {"inlineData": {"mimeType": "image/png", "data": "aW1hZ2U="}}
+      ]
+    },
+    {
+      "role": "model",
+      "parts": [
+        {"text": "I will inspect it."},
+        {"functionCall": {"name": "file.read!", "args": {"path": "/tmp/a"}, "id": "tool-1"}}
+      ]
+    },
+    {
+      "role": "user",
+      "parts": [
+        {"functionResponse": {"name": "tool-1", "response": {"result": "ok"}, "id": "tool-1"}},
+        {"inlineData": {"mimeType": "image/png", "data": "cmVzdWx0"}}
+      ]
+    }
+  ],
+  "generationConfig": {
+    "maxOutputTokens": 9192,
+    "temperature": 0,
+    "topP": 0.9,
+    "topK": 0,
+    "stopSequences": ["STOP"],
+    "thinkingConfig": {"include_thoughts": true, "thinking_budget": 1000}
+  },
+  "systemInstruction": {
+    "parts": [
+      {
+        "text": "You are a fixture assistant.\n\nInterleaved thinking is enabled. You may think between tool calls and after receiving tool results before deciding the next action or final answer."
+      }
+    ]
+  },
+  "tools": [
+    {
+      "functionDeclarations": [
+        {
+          "name": "file_read_",
+          "description": "Read one file",
+          "parameters": {
+            "type": "OBJECT",
+            "properties": {
+              "path": {"type": "STRING"},
+              "literal": {"type": "BOOLEAN", "enum": ["true"]},
+              "count": {"type": "INTEGER", "enum": ["1", "2"], "description": "Allowed: 1, 2 (Allowed: 1, 2)"}
+            },
+            "required": ["path"]
+          }
+        }
+      ]
+    }
+  ],
+  "toolConfig": {"functionCallingConfig": {"mode": "VALIDATED"}}
+}
