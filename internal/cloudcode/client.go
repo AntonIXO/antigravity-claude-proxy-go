@@ -88,6 +88,7 @@ type HTTPError struct {
 	StatusCode int
 	Status     string
 	Body       string
+	Header     http.Header
 }
 
 func (e *HTTPError) Error() string {
@@ -285,6 +286,7 @@ func readResponse(endpoint string, response *http.Response) (Response, error) {
 			StatusCode: response.StatusCode,
 			Status:     response.Status,
 			Body:       strings.TrimSpace(string(body)),
+			Header:     response.Header.Clone(),
 		}
 	}
 	return result, nil

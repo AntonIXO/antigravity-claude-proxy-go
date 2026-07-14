@@ -29,11 +29,17 @@ type Upstream interface {
 	StreamGenerateContent(context.Context, any, cloudcode.RequestOptions, func(cloudcode.SSEEvent) error) (cloudcode.Response, error)
 }
 
+type Backend interface {
+	FetchAvailableModels(context.Context) (cloudcode.Response, error)
+	StreamGenerateContent(context.Context, map[string]any, func(cloudcode.SSEEvent) error) (cloudcode.Response, error)
+}
+
 type Options struct {
 	APIKey      string
 	ProjectID   string
 	Credentials func(context.Context) (auth.Credentials, error)
 	NewUpstream func(string) Upstream
+	Backend     Backend
 	Builder     *proxyformat.Builder
 	Now         func() time.Time
 	Logger      *slog.Logger
@@ -44,6 +50,7 @@ type Server struct {
 	projectID   string
 	credentials func(context.Context) (auth.Credentials, error)
 	newUpstream func(string) Upstream
+	backend     Backend
 	builder     *proxyformat.Builder
 	now         func() time.Time
 	logger      *slog.Logger
@@ -59,10 +66,10 @@ func New(options Options) (*Server, error) {
 	if options.APIKey == "" {
 		return nil, errors.New("local API key is required")
 	}
-	if options.Credentials == nil {
+	if options.Backend == nil && options.Credentials == nil {
 		return nil, errors.New("credential provider is required")
 	}
-	if options.NewUpstream == nil {
+	if options.Backend == nil && options.NewUpstream == nil {
 		return nil, errors.New("Cloud Code client factory is required")
 	}
 	if options.Builder == nil {
@@ -76,7 +83,7 @@ func New(options Options) (*Server, error) {
 	}
 	return &Server{
 		apiKey: options.APIKey, projectID: options.ProjectID,
-		credentials: options.Credentials, newUpstream: options.NewUpstream,
+		credentials: options.Credentials, newUpstream: options.NewUpstream, backend: options.Backend,
 		builder: options.Builder, now: options.Now, logger: options.Logger,
 		projects: make(map[string]string),
 	}, nil
@@ -139,12 +146,20 @@ func (server *Server) health(writer http.ResponseWriter) {
 }
 
 func (server *Server) models(writer http.ResponseWriter, request *http.Request) {
-	credentials, upstream, err := server.client(request.Context())
-	if err != nil {
-		server.writeError(writer, err)
-		return
+	var response cloudcode.Response
+	var err error
+	accountLabel := "account pool"
+	if server.backend != nil {
+		response, err = server.backend.FetchAvailableModels(request.Context())
+	} else {
+		var credentials auth.Credentials
+		var upstream Upstream
+		credentials, upstream, err = server.client(request.Context())
+		if err == nil {
+			accountLabel = credentials.Email
+			response, err = upstream.FetchAvailableModels(request.Context(), "")
+		}
 	}
-	response, err := upstream.FetchAvailableModels(request.Context(), "")
 	if err != nil {
 		server.writeError(writer, err)
 		return
@@ -155,7 +170,7 @@ func (server *Server) models(writer http.ResponseWriter, request *http.Request) 
 		} `json:"models"`
 	}
 	if err := json.Unmarshal(response.Body, &document); err != nil {
-		server.writeError(writer, fmt.Errorf("decode Cloud Code models for %s: %w", credentials.Email, err))
+		server.writeError(writer, fmt.Errorf("decode Cloud Code models for %s: %w", accountLabel, err))
 		return
 	}
 	modelIDs := make([]string, 0, len(document.Models))
@@ -208,35 +223,47 @@ func (server *Server) messages(writer http.ResponseWriter, request *http.Request
 		}
 	}
 
-	credentials, upstream, err := server.client(request.Context())
-	if err != nil {
-		server.writeError(writer, err)
-		return
-	}
-	projectID, err := server.resolveProject(request.Context(), credentials, upstream)
-	if err != nil {
-		server.writeError(writer, err)
-		return
-	}
-	payload := server.builder.BuildCloudCodeRequest(anthropicRequest, projectID, credentials.Email)
-	innerRequest, _ := payload["request"].(map[string]any)
-	options := cloudcode.RequestOptions{SessionID: stringFrom(innerRequest["sessionId"])}
 	model := stringFrom(anthropicRequest["model"])
-	if proxyformat.GetModelFamily(model) == proxyformat.FamilyClaude && proxyformat.IsThinkingModel(model) {
-		options.Headers = make(http.Header)
-		options.Headers.Set("anthropic-beta", "interleaved-thinking-2025-05-14")
+	var send streamSender
+	if server.backend != nil {
+		send = func(ctx context.Context, consume func(cloudcode.SSEEvent) error) (cloudcode.Response, error) {
+			return server.backend.StreamGenerateContent(ctx, anthropicRequest, consume)
+		}
+	} else {
+		credentials, upstream, err := server.client(request.Context())
+		if err != nil {
+			server.writeError(writer, err)
+			return
+		}
+		projectID, err := server.resolveProject(request.Context(), credentials, upstream)
+		if err != nil {
+			server.writeError(writer, err)
+			return
+		}
+		payload := server.builder.BuildCloudCodeRequest(anthropicRequest, projectID, credentials.Email)
+		innerRequest, _ := payload["request"].(map[string]any)
+		options := cloudcode.RequestOptions{SessionID: stringFrom(innerRequest["sessionId"])}
+		if proxyformat.GetModelFamily(model) == proxyformat.FamilyClaude && proxyformat.IsThinkingModel(model) {
+			options.Headers = make(http.Header)
+			options.Headers.Set("anthropic-beta", "interleaved-thinking-2025-05-14")
+		}
+		send = func(ctx context.Context, consume func(cloudcode.SSEEvent) error) (cloudcode.Response, error) {
+			return upstream.StreamGenerateContent(ctx, payload, options, consume)
+		}
 	}
 
 	if stream, _ := anthropicRequest["stream"].(bool); stream {
-		server.streamMessage(writer, request, upstream, payload, options, model)
+		server.streamMessage(writer, request, send, model)
 		return
 	}
-	server.unaryMessage(writer, request, upstream, payload, options, model)
+	server.unaryMessage(writer, request, send, model)
 }
 
-func (server *Server) unaryMessage(writer http.ResponseWriter, request *http.Request, upstream Upstream, payload map[string]any, options cloudcode.RequestOptions, model string) {
+type streamSender func(context.Context, func(cloudcode.SSEEvent) error) (cloudcode.Response, error)
+
+func (server *Server) unaryMessage(writer http.ResponseWriter, request *http.Request, send streamSender, model string) {
 	accumulator := proxyformat.NewThinkingAccumulator()
-	_, err := upstream.StreamGenerateContent(request.Context(), payload, options, func(event cloudcode.SSEEvent) error {
+	_, err := send(request.Context(), func(event cloudcode.SSEEvent) error {
 		return accumulator.Consume(event.Data)
 	})
 	if err != nil {
@@ -247,7 +274,7 @@ func (server *Server) unaryMessage(writer http.ResponseWriter, request *http.Req
 	writeJSON(writer, http.StatusOK, response)
 }
 
-func (server *Server) streamMessage(writer http.ResponseWriter, request *http.Request, upstream Upstream, payload map[string]any, options cloudcode.RequestOptions, model string) {
+func (server *Server) streamMessage(writer http.ResponseWriter, request *http.Request, send streamSender, model string) {
 	converter := proxyformat.NewStreamConverter(model, server.builder.Cache, "")
 	started := false
 	writeEvents := func(events []map[string]any) error {
@@ -276,7 +303,7 @@ func (server *Server) streamMessage(writer http.ResponseWriter, request *http.Re
 		}
 		return nil
 	}
-	_, err := upstream.StreamGenerateContent(request.Context(), payload, options, func(event cloudcode.SSEEvent) error {
+	_, err := send(request.Context(), func(event cloudcode.SSEEvent) error {
 		events, err := converter.Consume(event.Data)
 		if err != nil {
 			return err

@@ -60,6 +60,33 @@ type tokenResponse struct {
 	ExpiresIn    int64  `json:"expires_in"`
 }
 
+// FromRefreshToken refreshes an explicitly configured OAuth account without
+// touching agy's token file. Composite Node-proxy refresh tokens are accepted;
+// only the first pipe-delimited segment is sent to Google.
+func (m Manager) FromRefreshToken(ctx context.Context, refreshToken, email string) (Credentials, error) {
+	if refreshToken == "" {
+		return Credentials{}, errors.New("OAuth account has no refresh_token")
+	}
+	response, err := m.refresh(ctx, refreshToken)
+	if err != nil {
+		return Credentials{}, err
+	}
+	if email == "" {
+		email, err = m.userEmail(ctx, response.AccessToken)
+		if err != nil {
+			return Credentials{}, err
+		}
+	}
+	now := time.Now
+	if m.Now != nil {
+		now = m.Now
+	}
+	return Credentials{
+		AccessToken: response.AccessToken, Email: email,
+		Expiry: now().Add(time.Duration(response.ExpiresIn) * time.Second), Refreshed: true,
+	}, nil
+}
+
 // DefaultTokenPath follows the same explicit-env-GEMINI_HOME-default order as
 // the Node proxy's agy token reader.
 func DefaultTokenPath() (string, error) {
