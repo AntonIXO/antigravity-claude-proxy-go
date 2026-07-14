@@ -8,8 +8,9 @@ proxy exposes a local Anthropic Messages API (`/v1/messages`) for Hermes Agent
 and calls Google Cloud Code over the same HTTPS REST/SSE transport as agy.
 
 The initial roadmap assumed agy used gRPC. A fresh packet capture and an agy
-application log taken on 2026-07-14 disproved that assumption. Current agy 1.1.2
-calls endpoints such as:
+application log taken on 2026-07-14 disproved that assumption. A second run
+explicitly selecting `Claude Sonnet 4.6 (Thinking)` confirmed this is not a
+Gemini-only behavior. Current agy 1.1.2 calls endpoints such as:
 
 - `https://daily-cloudcode-pa.googleapis.com/v1internal:loadCodeAssist`
 - `https://daily-cloudcode-pa.googleapis.com/v1internal:fetchAvailableModels`
@@ -20,7 +21,7 @@ the current Cloud Code ClientHello—not grpc-go.
 
 ## Packet-verified ground truth
 
-| Vector | Old Node proxy | Current agy 1.1.2 | Go proxy target |
+| Vector | Old Node proxy | Current agy 1.1.2 (Gemini and Claude) | Go proxy target |
 |---|---|---|---|
 | Application protocol | REST/SSE | REST/SSE | **REST/SSE** |
 | Cloud Code ALPN | `http/1.1`/OpenSSL behavior | absent | **absent** |
@@ -39,7 +40,16 @@ The authoritative baseline is:
 - `.reference/agy-current-capture.pcap`
 - `.reference/agy-current-baseline.txt`
 - SHA-256 `2d041c7f794c5ec018543c2f5b953ecaa2bf5855c69670b522b696e68c0f6ca9`
+- `.reference/agy-claude-current-capture.pcap`
+- `.reference/agy-claude-current-baseline.txt`
+- Claude-capture SHA-256
+  `89112ac5f3d7075b976d5be8fdd9bf6f23202ac532a5712baddddf403420f527`
 - Cloud Code JA4 `t13d131100_f57a46bbacb6_f50d94e863eb`
+
+The Gemini and Claude captures use the same Cloud Code SNI, omit ALPN, have the
+same exact JA4, and log the same `streamGenerateContent?alt=sse` generation
+path. Model selection therefore does not change the transport architecture in
+the currently installed CLI.
 
 Verify captures with:
 
@@ -123,6 +133,8 @@ evidence but are not the current-agy transport.
 ### Baseline correction — COMPLETE
 
 - Capture a clean current-agy one-shot request to Cloud Code.
+- Repeat the capture while explicitly selecting a Claude thinking model so the
+  transport decision is not inferred from Gemini mode alone.
 - Preserve the pcap and provenance under `.reference/`.
 - Confirm from agy's own log that generation uses REST/SSE.
 - Commit: `52ec2b8`.
@@ -210,8 +222,8 @@ evidence but are not the current-agy transport.
 - [ ] Go Cloud Code JA4 equals current agy exactly:
       `t13d131100_f57a46bbacb6_f50d94e863eb`, packet-verified.
 - [ ] Cloud Code SNI is correct and ALPN is absent, matching current agy.
-- [ ] Traffic uses the observed HTTPS REST/SSE paths, including
-      `streamGenerateContent?alt=sse`.
+- [ ] Traffic uses the HTTPS REST/SSE paths observed for both Gemini and Claude,
+      including `streamGenerateContent?alt=sse`.
 - [ ] `x-goog-api-client` begins with `gl-go/` and identity headers match agy.
 - [ ] `/v1/messages` and `/anthropic/v1/messages` return valid Anthropic JSON.
 - [ ] Streaming emits valid Anthropic SSE events.

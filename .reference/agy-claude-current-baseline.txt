@@ -1,0 +1,43 @@
+Current agy Claude-model Cloud Code baseline
+============================================
+
+Captured: 2026-07-14 23:43 Europe/Moscow
+Binary: /root/.local/bin/agy (agy 1.1.2)
+Build: go1.27-20260710-RC00 cl/945845058 +03845e30f7 X:fieldtrack,boringcrypto,simd
+Capture: .reference/agy-claude-current-capture.pcap
+SHA-256: 89112ac5f3d7075b976d5be8fdd9bf6f23202ac532a5712baddddf403420f527
+
+Invocation (the persisted Gemini model setting was not changed):
+
+  /root/.local/bin/agy \
+    --log-file=/tmp/agy-claude-current.log \
+    --model='Claude Sonnet 4.6 (Thinking)' \
+    --print='Reply with exactly CLAUDE_BASELINE_OK' \
+    --print-timeout=90s
+
+Observed response:
+
+  CLAUDE_BASELINE_OK
+
+Capture filter:
+
+  (host daily-cloudcode-pa.googleapis.com or host cloudcode-pa.googleapis.com) and tcp port 443
+
+Every captured Cloud Code ClientHello:
+
+  SNI:  daily-cloudcode-pa.googleapis.com
+  ALPN: absent
+  JA4:  t13d131100_f57a46bbacb6_f50d94e863eb
+
+The agy run log identified these application URLs:
+
+  https://daily-cloudcode-pa.googleapis.com/v1internal:loadCodeAssist
+  https://daily-cloudcode-pa.googleapis.com/v1internal:fetchAvailableModels
+  https://daily-cloudcode-pa.googleapis.com/v1internal:streamGenerateContent?alt=sse
+
+Conclusion:
+
+The current agy binary uses the same HTTPS REST/SSE Cloud Code transport for a
+Claude thinking model as it does for the Gemini baseline. Model selection does
+not switch the current CLI to gRPC. Both model-family captures have identical
+Cloud Code SNI, absent ALPN, and exact JA4.
