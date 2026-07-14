@@ -93,6 +93,13 @@ func TestLoadCodeAssistMetadata(t *testing.T) {
 	}
 }
 
+func TestProvisioningUsesDailyBeforeProduction(t *testing.T) {
+	t.Parallel()
+	if len(ProvisioningEndpoints) != 2 || ProvisioningEndpoints[0] != DailyEndpoint || ProvisioningEndpoints[1] != ProdEndpoint {
+		t.Fatalf("provisioning endpoint order = %#v", ProvisioningEndpoints)
+	}
+}
+
 func TestParseSSE(t *testing.T) {
 	t.Parallel()
 	input := ": keepalive\r\nid: one\r\nevent: message\r\nretry: 1500\r\ndata: {\"a\":\r\ndata: 1}\r\n\r\ndata: [DONE]"

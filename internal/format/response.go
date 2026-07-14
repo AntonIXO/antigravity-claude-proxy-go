@@ -7,6 +7,9 @@ func ConvertGoogleToAnthropic(googleResponse map[string]any, model string, cache
 }
 
 func ConvertGoogleToAnthropicWithID(googleResponse map[string]any, model string, cache *SignatureCache, messageID string) map[string]any {
+	if messageID == "" {
+		messageID = "msg_" + randomHex(16)
+	}
 	response := asMap(googleResponse["response"])
 	if response == nil {
 		response = googleResponse
