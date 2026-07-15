@@ -22,13 +22,13 @@ func main() {
 	listen := flag.String("listen", envOr("ANTIGRAVITY_PROXY_LISTEN", "127.0.0.1:8091"), "HTTP listen address")
 	apiKey := flag.String("api-key", envOr("ANTIGRAVITY_PROXY_API_KEY", os.Getenv("API_KEY")), "required local API key")
 	projectID := flag.String("project", os.Getenv("AGY_PROJECT_ID"), "optional managed Cloud Code project ID")
-	accountsPath := flag.String("accounts", os.Getenv("ANTIGRAVITY_ACCOUNTS_FILE"), "read-only Node accounts.json path (default ~/.config/antigravity-proxy/accounts.json)")
+	accountsPath := flag.String("accounts", os.Getenv("ANTIGRAVITY_ACCOUNTS_FILE"), "optional account-pool JSON path (default ~/.config/antigravity-proxy/accounts.json when present)")
 	strategy := flag.String("strategy", envOr("ACCOUNT_STRATEGY", accounts.DefaultStrategy), "account strategy: sticky, round-robin, or hybrid")
 	upstreamTimeout := flag.Duration("upstream-timeout", 5*time.Minute, "Cloud Code request timeout")
 	flag.Parse()
 
 	logger := slog.New(slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{Level: slog.LevelInfo}))
-	accountManager, err := accounts.NewFromFile(*accountsPath, *strategy, nil)
+	accountManager, err := accounts.NewDefault(*accountsPath, *strategy, nil)
 	if err != nil {
 		logger.Error("load account pool", "error", err)
 		os.Exit(2)

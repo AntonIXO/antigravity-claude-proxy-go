@@ -10,7 +10,6 @@ Group=root
 WorkingDirectory=/root/antigravity-go-proxy
 EnvironmentFile=/etc/antigravity-go-proxy.env
 Environment=ANTIGRAVITY_PROXY_LISTEN=127.0.0.1:8091
-Environment=ANTIGRAVITY_ACCOUNTS_FILE=/root/.config/antigravity-proxy/accounts.json
 ExecStart=/root/antigravity-go-proxy/bin/proxy
 Restart=on-failure
 RestartSec=5

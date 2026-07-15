@@ -13,11 +13,27 @@ import (
 
 func main() {
 	timeout := flag.Duration("timeout", 30*time.Second, "OAuth request timeout")
+	refresh := flag.Bool("refresh", false, "force a refresh using credentials discovered from the installed agy executable")
 	flag.Parse()
 
 	ctx, cancel := context.WithTimeout(context.Background(), *timeout)
 	defer cancel()
-	credentials, err := (auth.Manager{}).Get(ctx)
+	manager := auth.Manager{}
+	var credentials auth.Credentials
+	var err error
+	if *refresh {
+		path, pathErr := auth.DefaultTokenPath()
+		if pathErr != nil {
+			log.Fatal(pathErr)
+		}
+		token, readErr := auth.Read(path)
+		if readErr != nil {
+			log.Fatal(readErr)
+		}
+		credentials, err = manager.FromRefreshToken(ctx, token.RefreshToken, "")
+	} else {
+		credentials, err = manager.Get(ctx)
+	}
 	if err != nil {
 		log.Fatal(err)
 	}

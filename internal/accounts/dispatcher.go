@@ -192,7 +192,7 @@ func (dispatcher *Dispatcher) StreamGenerateContent(ctx context.Context, request
 			lastError = err
 			continue
 		}
-		payload := dispatcher.builder.BuildCloudCodeRequestWithModel(request, project, account.Email, proxyformat.ModelOptions{
+		payload := dispatcher.builder.BuildCloudCodeRequestWithModel(request, project, credentials.Email, proxyformat.ModelOptions{
 			SupportsThinking: modelDetails.SupportsThinking, ThinkingBudget: modelDetails.ThinkingBudget,
 			MinThinkingBudget: modelDetails.MinThinkingBudget, MaxOutputTokens: modelDetails.MaxOutputTokens,
 		})
@@ -325,7 +325,7 @@ func (dispatcher *Dispatcher) resolveProject(ctx context.Context, account *Accou
 		project = textValue(object["id"])
 	}
 	if project == "" {
-		project = "rising-fact-p41fc"
+		return "", fmt.Errorf("loadCodeAssist response for %s did not include a Cloud Code project", account.Email)
 	}
 	dispatcher.manager.CacheProject(account, project)
 	return project, nil

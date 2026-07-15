@@ -114,8 +114,8 @@ func NewThinkingAccumulator() *ThinkingAccumulator {
 func (accumulator *ThinkingAccumulator) Consume(data []byte) error {
 	inner, err := decodeCloudCodeEvent(data)
 	if err != nil || inner == nil {
-		// The Node SSE parser warns and skips malformed data frames rather than
-		// failing an otherwise healthy response stream.
+		// Skip malformed data frames rather than failing an otherwise healthy
+		// response stream.
 		return nil
 	}
 	if usage := asMap(inner["usageMetadata"]); usage != nil {

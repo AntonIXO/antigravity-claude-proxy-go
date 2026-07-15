@@ -13,7 +13,7 @@ import (
 	"antigravity-go-proxy/internal/cloudcode"
 )
 
-func TestRequestConversionMatchesNodeFixture(t *testing.T) {
+func TestRequestConversionMatchesParityFixture(t *testing.T) {
 	t.Parallel()
 	request := readObjectFixture(t, "testdata/anthropic-request.json")
 	want := readObjectFixture(t, "testdata/google-request.json")
@@ -29,7 +29,7 @@ func TestRequestConversionMatchesNodeFixture(t *testing.T) {
 	}
 }
 
-func TestResponseConversionMatchesNodeFixture(t *testing.T) {
+func TestResponseConversionMatchesParityFixture(t *testing.T) {
 	t.Parallel()
 	cache := NewSignatureCache()
 	response := readObjectFixture(t, "testdata/google-response.json")

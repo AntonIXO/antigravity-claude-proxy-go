@@ -8,8 +8,8 @@ const interleavedThinkingHint = "Interleaved thinking is enabled. You may think 
 
 var invalidToolName = regexp.MustCompile(`[^a-zA-Z0-9_-]`)
 
-// ConvertAnthropicToGoogle ports the Node proxy's Anthropic Messages to Google
-// Generative AI conversion. The returned object is the inner request, before
+// ConvertAnthropicToGoogle converts Anthropic Messages into the Google
+// Generative AI request. The returned object is the inner request, before
 // the Cloud Code project/model envelope is added.
 func ConvertAnthropicToGoogle(request map[string]any, cache *SignatureCache) map[string]any {
 	return convertAnthropicToGoogle(request, cache, nil)

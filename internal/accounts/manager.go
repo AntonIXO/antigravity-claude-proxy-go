@@ -10,6 +10,8 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	"antigravity-go-proxy/internal/auth"
 )
 
 const (
@@ -120,9 +122,9 @@ func DefaultConfigPath() (string, error) {
 	return filepath.Join(home, ".config", "antigravity-proxy", "accounts.json"), nil
 }
 
-// Load reads the Node account pool without ever opening it for writing. Invalid
-// state is reset on startup unless a verification URL requires user action,
-// matching the Node storage loader.
+// Load reads the account-pool configuration without ever opening it for
+// writing. Invalid state is reset on startup unless a verification URL requires
+// user action.
 func Load(path string) (File, error) {
 	if path == "" {
 		var err error
@@ -254,6 +256,36 @@ func NewFromFile(path, strategy string, now func() time.Time) (*Manager, error) 
 		return nil, err
 	}
 	return New(Options{Accounts: file.Accounts, ActiveIndex: file.ActiveIndex, Strategy: strategy, Now: now})
+}
+
+// NewDefault uses the optional account-pool configuration when it exists.
+// Otherwise it creates a one-account pool from the active agy login, so a
+// normal logged-in CLI requires no proxy-specific account configuration.
+func NewDefault(path, strategy string, now func() time.Time) (*Manager, error) {
+	if path != "" {
+		return NewFromFile(path, strategy, now)
+	}
+	configPath, err := DefaultConfigPath()
+	if err != nil {
+		return nil, err
+	}
+	if _, err := os.Stat(configPath); err == nil {
+		return NewFromFile(configPath, strategy, now)
+	} else if !errors.Is(err, os.ErrNotExist) {
+		return nil, fmt.Errorf("inspect account configuration: %w", err)
+	}
+	tokenPath, err := auth.DefaultTokenPath()
+	if err != nil {
+		return nil, err
+	}
+	if _, err := os.Stat(tokenPath); err != nil {
+		return nil, fmt.Errorf("no account configuration and no agy login token at %q: %w", tokenPath, err)
+	}
+	return New(Options{
+		Accounts: []*Account{{Email: "agy", Source: "agy", Enabled: true, AgyTokenPath: tokenPath}},
+		Strategy: strategy,
+		Now:      now,
+	})
 }
 
 func (manager *Manager) Count() int {

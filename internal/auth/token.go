@@ -63,8 +63,8 @@ type tokenResponse struct {
 }
 
 // FromRefreshToken refreshes an explicitly configured OAuth account without
-// touching agy's token file. Composite Node-proxy refresh tokens are accepted;
-// only the first pipe-delimited segment is sent to Google.
+// touching agy's token file. Composite refresh tokens are accepted; only the
+// first pipe-delimited segment is sent to Google.
 func (m Manager) FromRefreshToken(ctx context.Context, refreshToken, email string) (Credentials, error) {
 	if refreshToken == "" {
 		return Credentials{}, errors.New("OAuth account has no refresh_token")
@@ -89,8 +89,8 @@ func (m Manager) FromRefreshToken(ctx context.Context, refreshToken, email strin
 	}, nil
 }
 
-// DefaultTokenPath follows the same explicit-env-GEMINI_HOME-default order as
-// the Node proxy's agy token reader.
+// DefaultTokenPath resolves the active agy login token, honoring an explicit
+// path and GEMINI_HOME before using the current user's default location.
 func DefaultTokenPath() (string, error) {
 	if explicit := os.Getenv("AGY_TOKEN_PATH"); explicit != "" {
 		return explicit, nil
@@ -208,48 +208,71 @@ func (m Manager) Get(ctx context.Context) (Credentials, error) {
 }
 
 func (m Manager) refresh(ctx context.Context, refreshToken string) (tokenResponse, error) {
+	candidates, err := m.oauthCredentialCandidates()
+	if err != nil {
+		return tokenResponse{}, err
+	}
+	var lastError error
+	for _, candidate := range candidates {
+		response, invalidClient, err := m.refreshWithCredentials(ctx, refreshToken, candidate)
+		if err == nil {
+			return response, nil
+		}
+		lastError = err
+		if !invalidClient {
+			return tokenResponse{}, err
+		}
+	}
+	return tokenResponse{}, lastError
+}
+
+func (m Manager) refreshWithCredentials(ctx context.Context, refreshToken string, credentials oauthClientCredentials) (tokenResponse, bool, error) {
 	endpoint := m.TokenURL
 	if endpoint == "" {
 		endpoint = tokenURL
 	}
-	clientID, clientSecret, err := m.oauthCredentials()
-	if err != nil {
-		return tokenResponse{}, err
-	}
 	form := url.Values{
-		"client_id":     {clientID},
-		"client_secret": {clientSecret},
+		"client_id":     {credentials.clientID},
+		"client_secret": {credentials.clientSecret},
 		"refresh_token": {strings.SplitN(refreshToken, "|", 2)[0]},
 		"grant_type":    {"refresh_token"},
 	}
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, endpoint, strings.NewReader(form.Encode()))
 	if err != nil {
-		return tokenResponse{}, fmt.Errorf("create token refresh request: %w", err)
+		return tokenResponse{}, false, fmt.Errorf("create token refresh request: %w", err)
 	}
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 	response, err := m.client().Do(req)
 	if err != nil {
-		return tokenResponse{}, fmt.Errorf("refresh access token: %w", err)
+		return tokenResponse{}, false, fmt.Errorf("refresh access token: %w", err)
 	}
 	defer response.Body.Close()
 	body, err := io.ReadAll(io.LimitReader(response.Body, 1<<20))
 	if err != nil {
-		return tokenResponse{}, fmt.Errorf("read token refresh response: %w", err)
+		return tokenResponse{}, false, fmt.Errorf("read token refresh response: %w", err)
 	}
 	if response.StatusCode < 200 || response.StatusCode >= 300 {
-		return tokenResponse{}, fmt.Errorf("token refresh failed (%s): %s", response.Status, strings.TrimSpace(string(body)))
+		return tokenResponse{}, response.StatusCode == http.StatusUnauthorized && strings.Contains(string(body), "invalid_client"), fmt.Errorf("token refresh failed (%s): %s", response.Status, strings.TrimSpace(string(body)))
 	}
 	var refreshed tokenResponse
 	if err := json.Unmarshal(body, &refreshed); err != nil {
-		return tokenResponse{}, fmt.Errorf("decode token refresh response: %w", err)
+		return tokenResponse{}, false, fmt.Errorf("decode token refresh response: %w", err)
 	}
 	if refreshed.AccessToken == "" || refreshed.ExpiresIn <= 0 {
-		return tokenResponse{}, errors.New("token refresh response omitted access_token or expires_in")
+		return tokenResponse{}, false, errors.New("token refresh response omitted access_token or expires_in")
 	}
-	return refreshed, nil
+	return refreshed, false, nil
 }
 
 func (m Manager) oauthCredentials() (string, string, error) {
+	candidates, err := m.oauthCredentialCandidates()
+	if err != nil {
+		return "", "", err
+	}
+	return candidates[0].clientID, candidates[0].clientSecret, nil
+}
+
+func (m Manager) oauthCredentialCandidates() ([]oauthClientCredentials, error) {
 	clientID := m.OAuthClientID
 	if clientID == "" {
 		clientID = os.Getenv(oauthClientIDEnv)
@@ -258,13 +281,17 @@ func (m Manager) oauthCredentials() (string, string, error) {
 	if clientSecret == "" {
 		clientSecret = os.Getenv(oauthClientSecretEnv)
 	}
-	if clientID == "" || clientSecret == "" {
-		return "", "", fmt.Errorf(
-			"OAuth refresh credentials are not configured; set %s and %s",
-			oauthClientIDEnv, oauthClientSecretEnv,
-		)
+	if clientID != "" || clientSecret != "" {
+		if clientID == "" || clientSecret == "" {
+			return nil, fmt.Errorf("set both %s and %s or neither", oauthClientIDEnv, oauthClientSecretEnv)
+		}
+		return []oauthClientCredentials{{clientID: clientID, clientSecret: clientSecret}}, nil
 	}
-	return clientID, clientSecret, nil
+	candidates, err := agyOAuthCredentialCandidates()
+	if err != nil {
+		return nil, fmt.Errorf("read OAuth refresh credentials from installed agy: %w", err)
+	}
+	return candidates, nil
 }
 
 func (m Manager) userEmail(ctx context.Context, accessToken string) (string, error) {

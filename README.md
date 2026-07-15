@@ -6,9 +6,8 @@ the currently installed official `agy` CLI: native Go HTTPS, the same Cloud
 Code REST/SSE endpoints, the same client identity headers, and the same TLS
 ClientHello.
 
-The proxy listens on `127.0.0.1:8091`. The obsolete Node systemd unit is not
-required. Its `accounts.json` remains a read-only account source for the Go
-service and must not be deleted while that source is configured.
+The proxy listens on `127.0.0.1:8091`. A normal `agy` login is sufficient to
+start it; an optional account-pool JSON file enables multiple logins.
 
 ## What “matching agy” means
 
@@ -32,8 +31,7 @@ state, cipher list, and signature algorithms. Evidence is checked in at:
 
 Current `agy` does **not** use gRPC for Cloud Code generation. The older
 `t13d1312h2...` capture belongs to a `www.googleapis.com` connection, not a
-Cloud Code connection. `PLAN.md` records the capture-based correction from the
-original gRPC assumption.
+Cloud Code connection.
 
 TLS is intentionally boring: the upstream transport is the Go standard
 library with an empty `tls.Config{}`. The code never sets cipher suites, curves,
@@ -44,13 +42,15 @@ doing so changes the fingerprint.
 
 - Linux with systemd for the service instructions below
 - public Go `1.27rc2`, matching the current-agy signature-algorithm set
-- a valid Antigravity OAuth token or a readable Node proxy account pool
+- a logged-in `agy` CLI
 - `curl` for the examples; `tcpdump` and `tshark` for packet verification
 
-By default the proxy reads the Node account pool at
-`~/.config/antigravity-proxy/accounts.json` without writing to it. The agy token
-at `~/.gemini/antigravity-cli/antigravity-oauth-token` is also supported by the
-auth package and diagnostic client.
+By default the proxy uses the active `agy` token at
+`~/.gemini/antigravity-cli/antigravity-oauth-token` (or `AGY_TOKEN_PATH`). It
+reads the token under a file lock. If the access token expires, it obtains the
+OAuth client ID and secret directly from the installed `agy` executable, so
+they are never copied into this repository or `/etc/antigravity-go-proxy.env`.
+The refresh result remains in memory unless `AGY_TOKEN_WRITEBACK=1` is set.
 
 ## Build and test
 
@@ -75,7 +75,7 @@ Useful flags:
 |---|---|---|
 | `-listen` | `127.0.0.1:8091` | Local HTTP listen address |
 | `-api-key` | environment value | Required local API key |
-| `-accounts` | Node account path | Read-only account pool |
+| `-accounts` | auto | Optional account-pool JSON file |
 | `-strategy` | `hybrid` | `sticky`, `round-robin`, or `hybrid` selection |
 | `-project` | auto-detected | Explicit Cloud Code project override |
 | `-upstream-timeout` | `5m` | Per-request Cloud Code timeout |
@@ -83,12 +83,75 @@ Useful flags:
 The corresponding environment variables are
 `ANTIGRAVITY_PROXY_LISTEN`, `ANTIGRAVITY_PROXY_API_KEY`,
 `ANTIGRAVITY_ACCOUNTS_FILE`, `ACCOUNT_STRATEGY`, and `AGY_PROJECT_ID`.
-OAuth refresh credentials are deliberately not embedded in the binary or Git
-history. Put the official installed-app values in the root-only service
-environment file as `AGY_OAUTH_CLIENT_ID` and `AGY_OAUTH_CLIENT_SECRET`; they
-are only required when an agy token or OAuth account must be refreshed.
-OAuth refresh-token write-back is off by default and only enabled by explicitly
-setting `AGY_TOKEN_WRITEBACK=1`.
+For non-standard installations, `AGY_TOKEN_PATH` and `AGY_BINARY_PATH` select
+the login token and executable. OAuth refresh-token write-back is off by
+default and only enabled by explicitly setting `AGY_TOKEN_WRITEBACK=1`.
+
+## Accounts, multi-account support, and rotation
+
+Yes—multi-account support is built in. With no configuration file the proxy
+creates a single-account pool from the current `agy` login. To use more than
+one login, create `~/.config/antigravity-proxy/accounts.json` (or set
+`ANTIGRAVITY_ACCOUNTS_FILE` / `-accounts`). The JSON shape is intentionally
+stable and the file is read-only to the proxy:
+
+```json
+{
+  "activeIndex": 0,
+  "settings": {},
+  "accounts": [
+    {
+      "email": "personal@example.com",
+      "source": "agy",
+      "agyTokenPath": "/home/me/.gemini/antigravity-cli/antigravity-oauth-token"
+    },
+    {
+      "email": "work@example.com",
+      "source": "agy",
+      "agyTokenPath": "/secure/work-agy-token",
+      "projectId": "the-work-project"
+    }
+  ]
+}
+```
+
+Each `agyTokenPath` must be a token file created by a login for that account.
+The `email` is a stable pool label; the proxy resolves the actual email from
+the token before constructing a request. Per-account runtime state—health,
+cooldowns, rate limits, and discovered projects—is deliberately kept in memory
+and never written back to the pool file.
+
+`ACCOUNT_STRATEGY` (or `-strategy`) controls selection:
+
+- `hybrid` is the default. It skips invalid, cooling-down, rate-limited, low-health, and critically depleted accounts, then scores the remaining accounts by health, request pacing, live quota, and least-recent use.
+- `sticky` stays on the active account whenever possible. It only waits for a short current-account cooldown (up to two minutes); otherwise it selects another usable account.
+- `round-robin` moves to the next usable account for each selection.
+
+On a `429`, the cooldown is attached to the affected model and account, so an
+exhausted Claude route does not suppress an available Gemini route. Capacity
+errors receive bounded retries first; longer rate-limit waits rotate to another
+usable account. A stream that has already emitted data is never replayed on a
+different account, avoiding duplicated partial responses. Authentication
+revocation and verification-required responses mark only that account unusable
+until it is fixed.
+
+## Cloud Code project override
+
+A Cloud Code project is the project identifier the upstream API expects in the
+request's `project` field. It is not a general GCP-project selector and it does
+not grant access to a project the selected account cannot use.
+
+For a generation request, project selection is ordered as follows:
+
+1. `-project` or `AGY_PROJECT_ID`, a global override for every account.
+2. The selected account's `projectId` in the account-pool file.
+3. The project returned by that account's `loadCodeAssist` call, cached for the process lifetime.
+
+Usually leave the override empty: the detected project is the one provisioned
+for the logged-in account. Set an override only when you know that every routed
+account is authorized for that exact Cloud Code project. If the upstream
+response does not identify a project, the proxy fails clearly rather than
+silently substituting an unrelated project.
 
 ## Install as a service
 
@@ -352,11 +415,11 @@ daily-cloudcode-pa.googleapis.com    t13d131100_f57a46bbacb6_f50d94e863eb
 
 ## Safety and behavioral scope
 
-- The Node account file is read-only. Cooldowns and invalid-account state are
+- The account-pool file is read-only. Cooldowns and invalid-account state are
   maintained in Go memory.
 - Request conversion, schema sanitization, thinking signatures, SSE response
   conversion, backoff, endpoint failover, quota rotation, and auth failure
-  classification are ported from the Node proxy.
+  classification are implemented in Go.
 - The recovered protobuf sources remain schema evidence; no schema was
   fabricated.
 - `TODO(behavioral)`: the agy language-server sidecar and its non-generation

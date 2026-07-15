@@ -31,7 +31,7 @@ func NewStreamConverter(model string, cache *SignatureCache, messageID string) *
 func (converter *StreamConverter) Consume(data []byte) ([]map[string]any, error) {
 	inner, err := decodeCloudCodeEvent(data)
 	if err != nil || inner == nil {
-		// Match the Node streamer: malformed data frames are ignored.
+		// Malformed data frames are ignored.
 		return nil, nil
 	}
 	if usage := asMap(inner["usageMetadata"]); usage != nil {

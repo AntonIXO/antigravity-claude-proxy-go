@@ -19,7 +19,7 @@ var unsupportedSchemaFields = map[string]bool{
 	"examples": true, "allOf": true, "anyOf": true, "oneOf": true,
 }
 
-// SanitizeSchema mirrors the Node proxy's allowlist pass. Cloud Code's schema
+// SanitizeSchema applies Cloud Code's schema allowlist. Cloud Code's schema
 // protobuf rejects arbitrary JSON Schema keywords and non-string enums.
 func SanitizeSchema(value any) map[string]any {
 	schema := asMap(value)
@@ -90,8 +90,8 @@ func CleanSchema(value any) any {
 	if schema == nil {
 		return value
 	}
-	// The Node cleaner's hint passes recurse before its final cleanup, whose
-	// recursive cleanSchema calls run those passes again. Preserve that detail:
+	// The hint passes recurse before final cleanup, whose recursive cleanSchema
+	// calls run those passes again. Preserve that detail:
 	// nested enum/constraint descriptions intentionally accumulate hints.
 	result := cleanSchemaPhases(addSchemaHintsRecursive(cloneMap(schema)))
 	return result

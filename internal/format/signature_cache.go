@@ -14,8 +14,8 @@ type signatureEntry struct {
 }
 
 // SignatureCache retains Gemini tool-call signatures and records the model
-// family that produced thinking signatures. The Node proxy uses the same
-// process-local, two-hour cache because Claude clients may strip these fields.
+// family that produced thinking signatures. It is process-local for two hours
+// because Claude clients may strip these fields.
 type SignatureCache struct {
 	mu       sync.Mutex
 	now      func() time.Time

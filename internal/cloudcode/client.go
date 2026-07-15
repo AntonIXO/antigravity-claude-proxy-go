@@ -293,7 +293,7 @@ func readResponse(endpoint string, response *http.Response) (Response, error) {
 }
 
 // ParseSSE implements the event-stream field and multi-line data rules used by
-// both agy and the Node proxy. A final unterminated event is dispatched at EOF.
+// agy. A final unterminated event is dispatched at EOF.
 func ParseSSE(reader io.Reader, consume func(SSEEvent) error) error {
 	scanner := bufio.NewScanner(reader)
 	scanner.Buffer(make([]byte, 64<<10), 16<<20)

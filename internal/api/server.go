@@ -19,10 +19,7 @@ import (
 	"antigravity-go-proxy/internal/modelcatalog"
 )
 
-const (
-	DefaultProjectID = "rising-fact-p41fc"
-	maxRequestBody   = 50 << 20
-)
+const maxRequestBody = 50 << 20
 
 type Upstream interface {
 	LoadCodeAssist(context.Context, string) (cloudcode.Response, error)
@@ -481,7 +478,7 @@ func (server *Server) resolveProject(ctx context.Context, credentials auth.Crede
 		projectID = stringFrom(project["id"])
 	}
 	if projectID == "" {
-		projectID = DefaultProjectID
+		return "", errors.New("loadCodeAssist response did not include a Cloud Code project")
 	}
 	server.mu.Lock()
 	server.projects[credentials.Email] = projectID

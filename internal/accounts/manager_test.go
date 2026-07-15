@@ -8,7 +8,7 @@ import (
 	"time"
 )
 
-func TestLoadIsReadOnlyAndMatchesNodeStartupReset(t *testing.T) {
+func TestLoadIsReadOnlyAndResetsTransientStartupState(t *testing.T) {
 	t.Parallel()
 	directory := t.TempDir()
 	path := filepath.Join(directory, "accounts.json")
@@ -54,6 +54,24 @@ func TestLoadIsReadOnlyAndMatchesNodeStartupReset(t *testing.T) {
 	}
 	if !reflect.DeepEqual(afterContents, original) || after.Mode() != before.Mode() || !after.ModTime().Equal(before.ModTime()) {
 		t.Fatalf("Load changed the account file: mode %v -> %v, mtime %v -> %v", before.Mode(), after.Mode(), before.ModTime(), after.ModTime())
+	}
+}
+
+func TestNewDefaultUsesActiveAgyLoginWithoutAccountFile(t *testing.T) {
+	directory := t.TempDir()
+	t.Setenv("HOME", directory)
+	path := filepath.Join(directory, "antigravity-oauth-token")
+	if err := os.WriteFile(path, []byte(`{"token":{"access_token":"token","expiry":"2030-01-01T00:00:00Z"}}`), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("AGY_TOKEN_PATH", path)
+	manager, err := NewDefault("", StrategyHybrid, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	selection := manager.Select("gemini")
+	if selection.Account == nil || selection.Account.Source != "agy" || selection.Account.AgyTokenPath != path {
+		t.Fatalf("selection = %#v", selection)
 	}
 }
 
