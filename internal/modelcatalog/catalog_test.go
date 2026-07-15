@@ -10,7 +10,7 @@ func TestParseUsesAgyAgentModelOrderAndResolvesRoutingAlias(t *testing.T) {
 			"gemini-3.5-flash-low","gemini-3-flash-agent","gemini-pro-agent","claude-opus-4-6-thinking","gpt-oss-120b-medium"
 		]}]}],
 		"models":{
-			"gemini-3.5-flash-low":{"displayName":"Gemini 3.5 Flash (Medium)","supportsThinking":true,"thinkingBudget":4000,"maxTokens":1048576,"maxOutputTokens":65536},
+			"gemini-3.5-flash-low":{"displayName":"Gemini 3.5 Flash (Medium)","supportsThinking":true,"thinkingBudget":4000,"maxTokens":1048576,"maxOutputTokens":65536,"quotaInfo":{"remainingFraction":0.75,"resetTime":"2026-07-15T06:26:33Z"}},
 			"gemini-3-flash-agent":{"displayName":"Gemini 3.5 Flash (High)","supportsThinking":true,"thinkingBudget":10000,"maxTokens":1048576,"maxOutputTokens":65536},
 			"gemini-3.1-pro-high":{"displayName":"Gemini 3.1 Pro (High)","supportsThinking":true,"thinkingBudget":10001,"maxOutputTokens":65535},
 			"gemini-pro-agent":{"displayName":"Gemini 3.1 Pro (High)","supportsThinking":true,"thinkingBudget":10001,"maxTokens":1048576,"maxOutputTokens":65535},
@@ -31,6 +31,9 @@ func TestParseUsesAgyAgentModelOrderAndResolvesRoutingAlias(t *testing.T) {
 		if models[index].ID != id {
 			t.Fatalf("model %d=%q, want %q", index, models[index].ID, id)
 		}
+	}
+	if models[0].QuotaRemainingFraction == nil || *models[0].QuotaRemainingFraction != 0.75 || models[0].QuotaResetTime != "2026-07-15T06:26:33Z" {
+		t.Fatalf("model quota=%#v", models[0])
 	}
 	resolved, err := catalog.Resolve("gemini-3.1-pro-high")
 	if err != nil {

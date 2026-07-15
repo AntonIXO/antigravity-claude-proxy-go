@@ -124,7 +124,7 @@ func TestStreamingMessagesEmitAnthropicSSE(t *testing.T) {
 func TestAPIKeyIsRequiredForBothPrefixes(t *testing.T) {
 	t.Parallel()
 	handler := newTestHandler(t, &fakeUpstream{}, "project")
-	for _, path := range []string{"/v1/models", "/anthropic/v1/models", "/v1/messages", "/anthropic/v1/messages"} {
+	for _, path := range []string{"/v1/models", "/anthropic/v1/models", "/v1/usage", "/anthropic/v1/usage", "/v1/messages", "/anthropic/v1/messages"} {
 		method := http.MethodGet
 		if strings.HasSuffix(path, "messages") {
 			method = http.MethodPost
@@ -142,9 +142,9 @@ func TestModelsAndHealthAliases(t *testing.T) {
 	upstream := &fakeUpstream{modelsBody: []byte(`{
 		"agentModelSorts":[{"groups":[{"modelIds":["gemini-3.5-flash-low","gpt-oss","claude-sonnet-4-6"]}]}],
 		"models":{
-			"gemini-3.5-flash-low":{"displayName":"Gemini Flash"},
-			"gpt-oss":{"displayName":"GPT OSS"},
-			"claude-sonnet-4-6":{"displayName":"Claude Sonnet"}
+			"gemini-3.5-flash-low":{"displayName":"Gemini Flash","quotaInfo":{"remainingFraction":0.875,"resetTime":"2026-07-15T18:00:00Z"}},
+			"gpt-oss":{"displayName":"GPT OSS","quotaInfo":{"remainingFraction":0.5,"resetTime":"2026-07-16T00:00:00Z"}},
+			"claude-sonnet-4-6":{"displayName":"Claude Sonnet","quotaInfo":{"remainingFraction":0.5,"resetTime":"2026-07-16T00:00:00Z"}}
 		}
 	}`)}
 	handler := newTestHandler(t, upstream, "project")
@@ -161,6 +161,28 @@ func TestModelsAndHealthAliases(t *testing.T) {
 		models := list["data"].([]any)
 		if len(models) != 3 || models[0].(map[string]any)["id"] != "gemini-3.5-flash-low" || models[1].(map[string]any)["id"] != "gpt-oss" || models[2].(map[string]any)["id"] != "claude-sonnet-4-6" {
 			t.Fatalf("models=%#v", models)
+		}
+	}
+	for _, path := range []string{"/v1/usage", "/anthropic/v1/usage"} {
+		request := httptest.NewRequest(http.MethodGet, path, nil)
+		request.Header.Set("Authorization", "Bearer local-key")
+		response := httptest.NewRecorder()
+		handler.ServeHTTP(response, request)
+		if response.Code != http.StatusOK {
+			t.Fatalf("%s status=%d body=%s", path, response.Code, response.Body.String())
+		}
+		var usage map[string]any
+		decodeBody(t, response.Body, &usage)
+		if usage["provider"] != "antigravity-proxy" || usage["source"] != "cloudcode.fetchAvailableModels" {
+			t.Fatalf("usage=%#v", usage)
+		}
+		models := usage["models"].([]any)
+		if len(models) != 3 || models[0].(map[string]any)["remaining_fraction"] != 0.875 || models[0].(map[string]any)["used_percent"] != 12.5 {
+			t.Fatalf("usage models=%#v", models)
+		}
+		windows := usage["windows"].([]any)
+		if len(windows) != 2 || windows[0].(map[string]any)["label"] != "Gemini quota" || windows[1].(map[string]any)["label"] != "GPT-OSS / Anthropic quota" {
+			t.Fatalf("usage windows=%#v", windows)
 		}
 	}
 	for _, path := range []string{"/health", "/anthropic/health"} {

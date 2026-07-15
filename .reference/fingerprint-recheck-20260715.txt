@@ -1,0 +1,74 @@
+Live agy/proxy fingerprint recheck
+==================================
+
+Captured: 2026-07-15 05:11 Europe/Moscow
+Official binary: /root/.local/bin/agy (agy 1.1.2)
+Go proxy toolchain: public go1.27rc2 linux/amd64
+
+Official agy invocation:
+
+  /root/.local/bin/agy \
+    --log-file=/tmp/agy-current-recheck-20260715.log \
+    --model='Gemini 3.5 Flash (Low)' \
+    --print='Reply with exactly AGY_RECHECK_OK' \
+    --print-timeout=90s
+
+Observed response:
+
+  AGY_RECHECK_OK
+
+Go proxy invocation:
+
+  systemctl restart antigravity-go-proxy.service
+  curl -H 'x-api-key: <redacted>' \
+    http://127.0.0.1:8091/anthropic/v1/usage
+
+Both captures used:
+
+  tcpdump -i any -c 20 \
+    'host daily-cloudcode-pa.googleapis.com and tcp port 443'
+
+Capture SHA-256 values:
+
+  agy:   02f2458690f4a613096ec2c947bf584aaca24cab5d82a7a4d8bc880646411625
+  proxy: 273da1dade90fae21ef2fd96f2de4114c6a47ab22e2987e13bc184a1821e29ce
+
+The pcaps were retained as runtime verification artifacts at:
+
+  /tmp/agy-current-recheck-20260715.pcap
+  /tmp/antigravity-go-usage-20260715.pcap
+
+tshark command:
+
+  tshark -r <capture> \
+    -Y 'tls.handshake.type==1 && tls.handshake.extensions_server_name contains "cloudcode"' \
+    -T fields \
+    -e tls.handshake.extensions_server_name \
+    -e tls.handshake.extensions_alpn_str \
+    -e tls.handshake.ja4 \
+    -e tls.handshake.ciphersuite \
+    -e tls.handshake.sig_hash_alg
+
+Official agy and Go proxy produced the same values:
+
+  SNI:  daily-cloudcode-pa.googleapis.com
+  ALPN: absent
+  JA4:  t13d131100_f57a46bbacb6_f50d94e863eb
+
+  Cipher suites:
+  0xc02b,0xc02f,0xc02c,0xc030,0xcca9,0xcca8,0xc009,0xc013,0xc00a,0xc014,0x1301,0x1302,0x1303
+
+  Signature algorithms:
+  0x0904,0x0905,0x0906,0x0804,0x0403,0x0807,0x0805,0x0806,0x0401,0x0501,0x0601,0x0503,0x0603,0x0904,0x0905,0x0906,0x0804,0x0403,0x0807,0x0805,0x0806,0x0401,0x0501,0x0601,0x0503,0x0603,0x0201,0x0203
+
+The agy log again recorded the current REST/SSE application paths:
+
+  https://daily-cloudcode-pa.googleapis.com/v1internal:loadCodeAssist
+  https://daily-cloudcode-pa.googleapis.com/v1internal:fetchAvailableModels
+  https://daily-cloudcode-pa.googleapis.com/v1internal:streamGenerateContent?alt=sse
+
+Conclusion:
+
+The live official agy binary and the deployed Go proxy still have identical
+Cloud Code ClientHello fingerprints. The new usage endpoint obtains quota data
+through agy's fetchAvailableModels path without changing TLS behavior.

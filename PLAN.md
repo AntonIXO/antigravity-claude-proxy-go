@@ -214,6 +214,24 @@ evidence but are not the current-agy transport.
   return HTTP 200; Hermes' exact 182 KB Opus request succeeds after its
   requested 128,000 output tokens are capped to Cloud Code's live 64,000 limit.
 
+### Post-acceptance usage integration and fingerprint recheck — COMPLETE
+
+- Add authenticated `GET /v1/usage` and `/anthropic/v1/usage` routes backed by
+  Cloud Code's live `fetchAvailableModels` quota data.
+- Preserve every selectable model's `remainingFraction` and `resetTime` while
+  grouping only identical quota buckets for display. Gemini and Anthropic
+  usage remain separate; GPT-OSS currently shares Anthropic's exact bucket.
+- Extend Hermes' existing account-usage abstraction so custom providers may
+  expose an optional `/v1/usage` endpoint. The integration is fail-open for
+  custom providers that do not implement it.
+- **Gate:** Hermes' real gateway `/usage` handler renders separate `Gemini
+  quota` and `Anthropic / GPT-OSS quota` lines from the deployed proxy.
+- **Fingerprint gate:** fresh live captures of both `agy 1.1.2` and the
+  deployed Go `/v1/usage` request again match exact JA4
+  `t13d131100_f57a46bbacb6_f50d94e863eb`, daily Cloud Code SNI, absent ALPN,
+  cipher list, and signature algorithms. See
+  `.reference/fingerprint-recheck-20260715.txt`.
+
 ## Behavioral-mimicry scope
 
 - **Do** use `loadCodeAssist` and `onboardUser` when project provisioning needs
@@ -256,3 +274,7 @@ evidence but are not the current-agy transport.
       non-agent raw routes.
 - [x] Every advertised model returns a real response, and Hermes Opus requests
       respect the live 64,000-token output cap instead of failing HTTP 400.
+- [x] `/v1/usage` returns live, separate Gemini and Anthropic quota windows.
+- [x] Hermes `/usage` renders the Go proxy's Cloud Code account limits.
+- [x] A fresh live agy/proxy packet recheck still matches the complete JA4,
+      SNI, ALPN state, cipher suites, and signature algorithms.

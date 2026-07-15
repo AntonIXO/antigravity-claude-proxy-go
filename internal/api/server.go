@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"log/slog"
 	"net/http"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -120,6 +121,8 @@ func (server *Server) serveHTTP(writer http.ResponseWriter, request *http.Reques
 	switch {
 	case path == "/v1/models" && request.Method == http.MethodGet:
 		server.models(writer, request)
+	case path == "/v1/usage" && request.Method == http.MethodGet:
+		server.usage(writer, request)
 	case path == "/v1/messages" && request.Method == http.MethodPost:
 		server.messages(writer, request)
 	case path == "/v1/messages/count_tokens" && request.Method == http.MethodPost:
@@ -146,27 +149,9 @@ func (server *Server) health(writer http.ResponseWriter) {
 }
 
 func (server *Server) models(writer http.ResponseWriter, request *http.Request) {
-	var response cloudcode.Response
-	var err error
-	accountLabel := "account pool"
-	if server.backend != nil {
-		response, err = server.backend.FetchAvailableModels(request.Context())
-	} else {
-		var credentials auth.Credentials
-		var upstream Upstream
-		credentials, upstream, err = server.client(request.Context())
-		if err == nil {
-			accountLabel = credentials.Email
-			response, err = upstream.FetchAvailableModels(request.Context(), "")
-		}
-	}
+	catalog, err := server.fetchModelCatalog(request.Context())
 	if err != nil {
 		server.writeError(writer, err)
-		return
-	}
-	catalog, err := modelcatalog.Parse(response.Body)
-	if err != nil {
-		server.writeError(writer, fmt.Errorf("decode Cloud Code models for %s: %w", accountLabel, err))
 		return
 	}
 	selectable := catalog.Selectable()
@@ -191,6 +176,128 @@ func (server *Server) models(writer http.ResponseWriter, request *http.Request) 
 		})
 	}
 	writeJSON(writer, http.StatusOK, map[string]any{"object": "list", "data": models})
+}
+
+func (server *Server) usage(writer http.ResponseWriter, request *http.Request) {
+	catalog, err := server.fetchModelCatalog(request.Context())
+	if err != nil {
+		server.writeError(writer, err)
+		return
+	}
+	selectable := catalog.Selectable()
+	models := make([]any, 0, len(selectable))
+	for _, details := range selectable {
+		if details.QuotaRemainingFraction == nil {
+			continue
+		}
+		remaining := min(1, max(0, *details.QuotaRemainingFraction))
+		models = append(models, map[string]any{
+			"id":                 details.ID,
+			"display_name":       details.DisplayName,
+			"remaining_fraction": remaining,
+			"used_percent":       (1 - remaining) * 100,
+			"reset_at":           details.QuotaResetTime,
+		})
+	}
+	writeJSON(writer, http.StatusOK, map[string]any{
+		"object":     "account_usage",
+		"provider":   "antigravity-proxy",
+		"source":     "cloudcode.fetchAvailableModels",
+		"fetched_at": server.now().UTC().Format(time.RFC3339Nano),
+		"windows":    groupQuotaWindows(selectable),
+		"models":     models,
+	})
+}
+
+func groupQuotaWindows(models []modelcatalog.Model) []any {
+	type group struct {
+		remaining float64
+		resetAt   string
+		modelIDs  []string
+		families  []string
+	}
+	groups := make([]group, 0)
+	byQuota := make(map[string]int)
+	for _, model := range models {
+		if model.QuotaRemainingFraction == nil {
+			continue
+		}
+		remaining := min(1, max(0, *model.QuotaRemainingFraction))
+		key := strconv.FormatFloat(remaining, 'g', -1, 64) + "\x00" + model.QuotaResetTime
+		index, exists := byQuota[key]
+		if !exists {
+			index = len(groups)
+			byQuota[key] = index
+			groups = append(groups, group{remaining: remaining, resetAt: model.QuotaResetTime})
+		}
+		groups[index].modelIDs = append(groups[index].modelIDs, model.ID)
+		family := quotaFamily(model.ID)
+		if family != "" && !containsString(groups[index].families, family) {
+			groups[index].families = append(groups[index].families, family)
+		}
+	}
+	windows := make([]any, 0, len(groups))
+	for _, group := range groups {
+		label := strings.Join(group.families, " / ")
+		if label == "" {
+			label = "Model"
+		}
+		windows = append(windows, map[string]any{
+			"label":              label + " quota",
+			"remaining_fraction": group.remaining,
+			"used_percent":       (1 - group.remaining) * 100,
+			"reset_at":           group.resetAt,
+			"model_ids":          group.modelIDs,
+		})
+	}
+	return windows
+}
+
+func quotaFamily(model string) string {
+	switch proxyformat.GetModelFamily(model) {
+	case proxyformat.FamilyGemini:
+		return "Gemini"
+	case proxyformat.FamilyClaude:
+		return "Anthropic"
+	case proxyformat.FamilyOpenAI:
+		return "GPT-OSS"
+	default:
+		return ""
+	}
+}
+
+func containsString(values []string, wanted string) bool {
+	for _, value := range values {
+		if value == wanted {
+			return true
+		}
+	}
+	return false
+}
+
+func (server *Server) fetchModelCatalog(ctx context.Context) (*modelcatalog.Catalog, error) {
+	var response cloudcode.Response
+	var err error
+	accountLabel := "account pool"
+	if server.backend != nil {
+		response, err = server.backend.FetchAvailableModels(ctx)
+	} else {
+		var credentials auth.Credentials
+		var upstream Upstream
+		credentials, upstream, err = server.client(ctx)
+		if err == nil {
+			accountLabel = credentials.Email
+			response, err = upstream.FetchAvailableModels(ctx, "")
+		}
+	}
+	if err != nil {
+		return nil, err
+	}
+	catalog, err := modelcatalog.Parse(response.Body)
+	if err != nil {
+		return nil, fmt.Errorf("decode Cloud Code models for %s: %w", accountLabel, err)
+	}
+	return catalog, nil
 }
 
 func (server *Server) messages(writer http.ResponseWriter, request *http.Request) {

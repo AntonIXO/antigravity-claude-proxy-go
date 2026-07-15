@@ -1,71 +1,187 @@
 # Antigravity Go Proxy
 
-This is a Go reimplementation of the Antigravity Cloud Code proxy. It exposes
-an Anthropic-compatible HTTP API while sending upstream requests with the same
-standard-library HTTPS REST/SSE transport and TLS fingerprint as the current
-`agy` CLI.
+`antigravity-go-proxy` exposes a local Anthropic Messages API for Hermes Agent,
+Claude Code, and other Anthropic-compatible clients. Upstream, it behaves like
+the currently installed official `agy` CLI: native Go HTTPS, the same Cloud
+Code REST/SSE endpoints, the same client identity headers, and the same TLS
+ClientHello.
 
-The existing Node proxy remains separate on `127.0.0.1:8090`. This proxy uses
-`127.0.0.1:8091` and loads the Node account pool read-only.
+The proxy listens on `127.0.0.1:8091`. The older Node proxy remains independent
+on `127.0.0.1:8090`; installing or restarting this service does not stop it or
+modify its `accounts.json`.
 
-## Verified baseline
+## What “matching agy” means
 
-Fresh captures were taken from `agy 1.1.2` with both its Gemini setting and an
-explicit `Claude Sonnet 4.6 (Thinking)` selection. Both model families used:
+Fresh packet captures from `agy 1.1.2` were taken with both Gemini and Claude
+models. Both used:
 
+- `POST https://daily-cloudcode-pa.googleapis.com/v1internal:streamGenerateContent?alt=sse`
 - SNI `daily-cloudcode-pa.googleapis.com`
 - no ALPN extension
 - JA4 `t13d131100_f57a46bbacb6_f50d94e863eb`
-- `POST /v1internal:streamGenerateContent?alt=sse`
+- Go-style `gl-go/...` and Antigravity client identity headers
 
-The public Go `1.27rc2` client capture matched that complete JA4 exactly. See
-[the Gemini baseline](.reference/agy-current-baseline.txt), [the Claude
-baseline](.reference/agy-claude-current-baseline.txt), and [the Go gate](.reference/go-current-baseline.txt).
+The Go proxy was captured separately and matched the complete JA4, SNI, ALPN
+state, cipher list, and signature algorithms. Evidence is checked in at:
 
-The older checked-in JA4 prefix `t13d1312h2` belongs to a
-`www.googleapis.com` connection, not current Cloud Code traffic. `PLAN.md`
-records the evidence and why the implementation was revised from gRPC to the
-current observed REST/SSE behavior.
+- [agy Gemini baseline](.reference/agy-current-baseline.txt)
+- [agy Claude baseline](.reference/agy-claude-current-baseline.txt)
+- [Go proxy fingerprint gate](.reference/go-current-baseline.txt)
+- [live agy/proxy recheck](.reference/fingerprint-recheck-20260715.txt)
+- [current model catalog](.reference/agy-current-models.txt)
 
-## Safety invariants
+Current `agy` does **not** use gRPC for Cloud Code generation. The older
+`t13d1312h2...` capture belongs to a `www.googleapis.com` connection, not a
+Cloud Code connection. `PLAN.md` records the capture-based correction from the
+original gRPC assumption.
 
-- TLS uses an empty `tls.Config{}`. Cipher suites, curves, extensions, and ALPN
-  are never customized.
-- `~/.config/antigravity-proxy/accounts.json` is only read. Runtime cooldowns
-  and invalid-account state remain in Go memory and are never persisted over
-  the Node proxy's state.
-- OAuth token write-back is disabled unless `AGY_TOKEN_WRITEBACK=1` is set
-  explicitly.
-- The daily Cloud Code endpoint is tried before production fallback.
+TLS is intentionally boring: the upstream transport is the Go standard
+library with an empty `tls.Config{}`. The code never sets cipher suites, curves,
+ALPN, TLS versions, or a custom ClientHello. Do not add any of those settings;
+doing so changes the fingerprint.
+
+## Requirements
+
+- Linux with systemd for the service instructions below
+- public Go `1.27rc2`, matching the current-agy signature-algorithm set
+- a valid Antigravity OAuth token or a readable Node proxy account pool
+- `curl` for the examples; `tcpdump` and `tshark` for packet verification
+
+By default the proxy reads the Node account pool at
+`~/.config/antigravity-proxy/accounts.json` without writing to it. The agy token
+at `~/.gemini/antigravity-cli/antigravity-oauth-token` is also supported by the
+auth package and diagnostic client.
 
 ## Build and test
 
 ```sh
-go build -o bin/proxy ./cmd/proxy
-go test ./...
-go test -race ./...
-go vet ./...
+cd /root/antigravity-go-proxy
+GOTOOLCHAIN=go1.27rc2 go build -o bin/proxy ./cmd/proxy
+GOTOOLCHAIN=go1.27rc2 go test ./...
+GOTOOLCHAIN=go1.27rc2 go test -race ./...
+GOTOOLCHAIN=go1.27rc2 go vet ./...
 ```
 
-Run locally:
+Run it directly:
 
 ```sh
-ANTIGRAVITY_PROXY_API_KEY=local-secret ./bin/proxy
-curl -H 'x-api-key: local-secret' http://127.0.0.1:8091/v1/models
+export ANTIGRAVITY_PROXY_API_KEY='choose-a-local-secret'
+./bin/proxy
 ```
 
-Canonical routes are `GET /health`, `GET /v1/models`, `POST /v1/messages`,
-and `POST /v1/messages/count_tokens`. They are also available below the
-`/anthropic` prefix for Hermes and Claude Code.
+Useful flags:
 
-Useful flags are `-listen`, `-accounts`, `-strategy`, `-project`, and
-`-upstream-timeout`. Selection strategies are `sticky`, `round-robin`, and
-`hybrid`.
+| Flag | Default | Purpose |
+|---|---|---|
+| `-listen` | `127.0.0.1:8091` | Local HTTP listen address |
+| `-api-key` | environment value | Required local API key |
+| `-accounts` | Node account path | Read-only account pool |
+| `-strategy` | `hybrid` | `sticky`, `round-robin`, or `hybrid` selection |
+| `-project` | auto-detected | Explicit Cloud Code project override |
+| `-upstream-timeout` | `5m` | Per-request Cloud Code timeout |
+
+The corresponding environment variables are
+`ANTIGRAVITY_PROXY_LISTEN`, `ANTIGRAVITY_PROXY_API_KEY`,
+`ANTIGRAVITY_ACCOUNTS_FILE`, `ACCOUNT_STRATEGY`, and `AGY_PROJECT_ID`.
+OAuth refresh-token write-back is off by default and only enabled by explicitly
+setting `AGY_TOKEN_WRITEBACK=1`.
+
+## Install as a separate service
+
+Create the secret environment file without replacing the Node service:
+
+```sh
+install -m 0644 antigravity-go-proxy.service /etc/systemd/system/
+install -m 0600 antigravity-go-proxy.env.example /etc/antigravity-go-proxy.env
+editor /etc/antigravity-go-proxy.env
+systemctl daemon-reload
+systemctl enable --now antigravity-go-proxy.service
+```
+
+Check both proxies:
+
+```sh
+systemctl status antigravity-go-proxy.service antigravity-proxy.service
+ss -ltnp '( sport = :8091 or sport = :8090 )'
+journalctl -u antigravity-go-proxy.service -f
+```
+
+## HTTP API usage
+
+All `/v1/*` endpoints require either `x-api-key` or a bearer token containing
+the local proxy secret. Every route is also mirrored below `/anthropic`.
+
+Set these once for the examples:
+
+```sh
+export AGY_PROXY_URL=http://127.0.0.1:8091/anthropic
+export AGY_PROXY_KEY='your-local-secret'
+```
+
+Health does not require authentication:
+
+```sh
+curl -sS "$AGY_PROXY_URL/health" | jq
+```
+
+List exactly the models selectable by `agy models`:
+
+```sh
+curl -sS -H "x-api-key: $AGY_PROXY_KEY" \
+  "$AGY_PROXY_URL/v1/models" | jq
+```
+
+Read live Cloud Code quotas. This calls the same
+`v1internal:fetchAvailableModels` endpoint as `agy` and returns both per-model
+values and grouped quota windows:
+
+```sh
+curl -sS -H "x-api-key: $AGY_PROXY_KEY" \
+  "$AGY_PROXY_URL/v1/usage" | jq
+```
+
+Send a non-streaming message:
+
+```sh
+curl -sS "$AGY_PROXY_URL/v1/messages" \
+  -H "x-api-key: $AGY_PROXY_KEY" \
+  -H 'anthropic-version: 2023-06-01' \
+  -H 'content-type: application/json' \
+  -d '{
+    "model": "gemini-3.5-flash-low",
+    "max_tokens": 256,
+    "messages": [{"role": "user", "content": "Reply with exactly OK"}]
+  }' | jq
+```
+
+Stream Anthropic SSE events:
+
+```sh
+curl -N "$AGY_PROXY_URL/v1/messages" \
+  -H "x-api-key: $AGY_PROXY_KEY" \
+  -H 'anthropic-version: 2023-06-01' \
+  -H 'content-type: application/json' \
+  -d '{
+    "model": "claude-sonnet-4-6",
+    "stream": true,
+    "max_tokens": 256,
+    "messages": [{"role": "user", "content": "Reply with exactly STREAM_OK"}]
+  }'
+```
+
+Canonical routes are:
+
+- `GET /health`
+- `GET /v1/models`
+- `GET /v1/usage`
+- `POST /v1/messages`
+- `POST /v1/messages/count_tokens` — currently returns `501`
 
 ## Selectable models
 
-`GET /v1/models` follows the same `agentModelSorts` list as `agy models`; it
-does not advertise every raw entry returned by Cloud Code. The live list is:
+`GET /v1/models` follows Cloud Code's `agentModelSorts`, the same list printed
+by `agy models`. It deliberately excludes image, tab-completion, deprecated,
+and other non-agent routes.
 
 | Selection ID | agy label | Context | Max output |
 |---|---|---:|---:|
@@ -78,57 +194,167 @@ does not advertise every raw entry returned by Cloud Code. The live list is:
 | `claude-opus-4-6-thinking` | Claude Opus 4.6 (Thinking) | 250,000 | 64,000 |
 | `gpt-oss-120b-medium` | GPT-OSS 120B (Medium) | 131,072 | 32,768 |
 
-The IDs are Cloud Code routing names, not clean product names. In particular,
-`gemini-3.5-flash-low` currently means the **Medium** tier. High is routed by
-`gemini-3-flash-agent`, and the user-visible Low tier is routed by
-`gemini-3.5-flash-extra-low`.
+The routing IDs are not product names. In particular:
 
-Likewise, `gemini-pro-agent` is the agent-optimized routing ID for Gemini 3.1
-Pro High. Cloud Code also publishes `gemini-3.1-pro-high` in its raw model map,
-but does not put it in agy's agent list and rejects requests to it. For backward
-compatibility the proxy accepts `gemini-3.1-pro-high` and rewrites it to the
-valid `gemini-pro-agent` route.
+- `gemini-3.5-flash-low` is the current **Medium** tier.
+- `gemini-3-flash-agent` is the High tier.
+- `gemini-3.5-flash-extra-low` is the user-visible Low tier.
+- `gemini-pro-agent` is the agent route for Gemini 3.1 Pro High, not a
+  separate subscription or “pro agent” product.
 
-The catalog and per-model limits are refreshed from Cloud Code every five
-minutes. The proxy applies the returned thinking budget and output cap before
-generation; this is necessary because clients such as Hermes may request more
-output than a model accepts. The captured model evidence is in
-[the current model baseline](.reference/agy-current-models.txt).
+Cloud Code exposes `gemini-3.1-pro-high` in its raw map but rejects it for agent
+generation. The proxy accepts that legacy name as an input alias and rewrites
+it to `gemini-pro-agent`; it does not advertise the invalid route.
 
-## Systemd and clients
+The catalog is refreshed every five minutes. Live thinking budgets, context
+windows, and maximum output sizes are applied before sending a request. This
+also caps oversized Hermes requests—for example, Claude Opus requests for
+128,000 output tokens are reduced to Cloud Code's live 64,000-token maximum.
 
-The repository includes [the independent service unit](antigravity-go-proxy.service)
-and [an environment template](antigravity-go-proxy.env.example). Install them
-without replacing or stopping `antigravity-proxy.service`:
+## Hermes Agent integration
 
-```sh
-install -m 0644 antigravity-go-proxy.service /etc/systemd/system/
-install -m 0600 antigravity-go-proxy.env.example /etc/antigravity-go-proxy.env
-systemctl daemon-reload
-systemctl enable --now antigravity-go-proxy.service
+Add the provider to `~/.hermes/config.yaml`. Keep the Gemini context window at
+1,048,576 tokens:
+
+```yaml
+custom_providers:
+  - name: antigravity-proxy
+    provider: anthropic
+    api_mode: anthropic_messages
+    base_url: http://127.0.0.1:8091/anthropic
+    api_key: your-local-secret
+    models:
+      gemini-3.5-flash-low:
+        context_length: 1048576
+      gemini-3-flash-agent:
+        context_length: 1048576
+      gemini-3.5-flash-extra-low:
+        context_length: 1048576
+      gemini-3.1-pro-low:
+        context_length: 1048576
+      gemini-pro-agent:
+        context_length: 1048576
+      claude-sonnet-4-6:
+        context_length: 250000
+      claude-opus-4-6-thinking:
+        context_length: 250000
+      gpt-oss-120b-medium:
+        context_length: 131072
 ```
 
-Hermes provider `custom:antigravity-proxy` should use
-`http://127.0.0.1:8091/anthropic`. For an isolated Claude Code run, set
-`ANTHROPIC_BASE_URL` to that same URL, set its API key to the local proxy key,
-and explicitly map the aliases:
+Validate the configuration and select the provider interactively:
+
+```sh
+hermes config check
+hermes model --refresh
+```
+
+Or force it for a single request:
+
+```sh
+hermes chat -q 'Reply with exactly HERMES_OK' \
+  --provider custom:antigravity-proxy \
+  -m gemini-3.5-flash-low
+```
+
+Hermes `/usage` uses the proxy's protected `/v1/usage` extension. After a
+request through this provider it displays live Cloud Code quota groups, for
+example:
+
+```text
+📈 Account limits
+Provider: antigravity-proxy
+Gemini quota: 86% remaining (14% used) • resets in 4h 18m (... MSK)
+Anthropic / GPT-OSS quota: 95% remaining (5% used) • resets in 4h 36m (... MSK)
+```
+
+Cloud Code supplies per-model quota pools rather than Anthropic's named
+“current session” and “current week” windows. Models with identical remaining
+fractions and reset timestamps are grouped so `/usage` does not print eight
+duplicate lines. The raw per-model data remains available from `/v1/usage`.
+
+Restart the messaging gateway (which owns slash commands) and the desktop
+backend after changing Hermes code or provider configuration:
+
+```sh
+systemctl restart hermes-gateway.service hermes-serve.service
+systemctl status hermes-gateway.service hermes-serve.service --no-pager
+```
+
+## Claude Code integration
+
+Use an isolated shell or settings directory so normal Claude configuration is
+not overwritten:
 
 ```sh
 export ANTHROPIC_BASE_URL=http://127.0.0.1:8091/anthropic
-export ANTHROPIC_API_KEY=local-secret
+export ANTHROPIC_API_KEY='your-local-secret'
 export ANTHROPIC_DEFAULT_SONNET_MODEL=claude-sonnet-4-6
 export ANTHROPIC_DEFAULT_OPUS_MODEL=claude-opus-4-6-thinking
+
 claude --bare -p --model sonnet 'Reply with exactly SONNET_OK'
 claude --bare -p --model opus 'Reply with exactly OPUS_OK'
 ```
 
-## Behavioral scope
+## Re-run the fingerprint gate
 
-Request conversion, schema sanitization, thought-signature handling, response
-streaming, account selection, per-model cooldowns, capacity retry, quota
-rotation, and permanent account-failure detection are ported from the Node
-proxy.
+Build with the fingerprinted toolchain, start a capture, then trigger any
+upstream call such as `/v1/usage`:
 
-`TODO(behavioral)`: the language-server sidecar and its non-generation client
-events are intentionally deferred. They are not part of the primary Cloud Code
-content path verified here.
+```sh
+tcpdump -i any -w /tmp/antigravity-go.pcap \
+  'host daily-cloudcode-pa.googleapis.com and tcp port 443'
+```
+
+In another shell:
+
+```sh
+curl -sS -H "x-api-key: $AGY_PROXY_KEY" \
+  "$AGY_PROXY_URL/v1/usage" >/dev/null
+```
+
+Stop `tcpdump` and inspect every Cloud Code ClientHello:
+
+```sh
+tshark -r /tmp/antigravity-go.pcap \
+  -Y 'tls.handshake.type==1 && tls.handshake.extensions_server_name contains "cloudcode"' \
+  -T fields \
+  -e tls.handshake.extensions_server_name \
+  -e tls.handshake.extensions_alpn_str \
+  -e tls.handshake.ja4
+```
+
+The expected row has daily Cloud Code SNI, an empty ALPN field, and exact JA4:
+
+```text
+daily-cloudcode-pa.googleapis.com    t13d131100_f57a46bbacb6_f50d94e863eb
+```
+
+## Troubleshooting
+
+- `401` from the local proxy means the local `x-api-key`/bearer token is
+  missing or does not match `/etc/antigravity-go-proxy.env`.
+- Cloud Code `400 INVALID_ARGUMENT` usually means a raw, non-agent model ID or
+  an output limit above the live model cap. Refresh `/v1/models`; use
+  `gemini-pro-agent`, not raw `gemini-3.1-pro-high`.
+- `429 RESOURCE_EXHAUSTED` is handled with the ported per-model cooldown and
+  account rotation logic. `/v1/usage` shows the current reset timestamps.
+- A Google `403` requiring verification is treated as a permanent account
+  intervention state, not retried indefinitely.
+- If JA4 changes, first verify `go version`, then check that nobody added TLS
+  fields or enabled HTTP/2 on the dedicated Cloud Code transport.
+- The production endpoint is only a fallback; daily Cloud Code is always tried
+  first, matching current `agy`.
+
+## Safety and behavioral scope
+
+- The Node account file is read-only. Cooldowns and invalid-account state are
+  maintained in Go memory.
+- Request conversion, schema sanitization, thinking signatures, SSE response
+  conversion, backoff, endpoint failover, quota rotation, and auth failure
+  classification are ported from the Node proxy.
+- The recovered protobuf sources remain schema evidence; no schema was
+  fabricated.
+- `TODO(behavioral)`: the agy language-server sidecar and its non-generation
+  client events are intentionally deferred. They are not part of the verified
+  Cloud Code content path.

@@ -22,6 +22,8 @@ type Model struct {
 	MinThinkingBudget        int
 	MaxTokens                int
 	MaxOutputTokens          int
+	QuotaRemainingFraction   *float64
+	QuotaResetTime           string
 }
 
 type Catalog struct {
@@ -54,16 +56,22 @@ type modelGroup struct {
 }
 
 type modelDetails struct {
-	DisplayName              string `json:"displayName"`
-	Description              string `json:"description"`
-	Disabled                 bool   `json:"disabled"`
-	Recommended              bool   `json:"recommended"`
-	SupportsThinking         bool   `json:"supportsThinking"`
-	SupportsAdaptiveThinking bool   `json:"supportsAdaptiveThinking"`
-	ThinkingBudget           int    `json:"thinkingBudget"`
-	MinThinkingBudget        int    `json:"minThinkingBudget"`
-	MaxTokens                int    `json:"maxTokens"`
-	MaxOutputTokens          int    `json:"maxOutputTokens"`
+	DisplayName              string    `json:"displayName"`
+	Description              string    `json:"description"`
+	Disabled                 bool      `json:"disabled"`
+	Recommended              bool      `json:"recommended"`
+	SupportsThinking         bool      `json:"supportsThinking"`
+	SupportsAdaptiveThinking bool      `json:"supportsAdaptiveThinking"`
+	ThinkingBudget           int       `json:"thinkingBudget"`
+	MinThinkingBudget        int       `json:"minThinkingBudget"`
+	MaxTokens                int       `json:"maxTokens"`
+	MaxOutputTokens          int       `json:"maxOutputTokens"`
+	QuotaInfo                quotaInfo `json:"quotaInfo"`
+}
+
+type quotaInfo struct {
+	RemainingFraction *float64 `json:"remainingFraction"`
+	ResetTime         string   `json:"resetTime"`
 }
 
 var routingAliases = map[string]string{
@@ -125,6 +133,8 @@ func Parse(body []byte) (*Catalog, error) {
 			SupportsAdaptiveThinking: details.SupportsAdaptiveThinking,
 			ThinkingBudget:           details.ThinkingBudget, MinThinkingBudget: details.MinThinkingBudget,
 			MaxTokens: details.MaxTokens, MaxOutputTokens: details.MaxOutputTokens,
+			QuotaRemainingFraction: details.QuotaInfo.RemainingFraction,
+			QuotaResetTime:         details.QuotaInfo.ResetTime,
 		}
 		if model.DisplayName == "" {
 			model.DisplayName = id
