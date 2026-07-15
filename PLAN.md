@@ -115,7 +115,7 @@ next begins.
 - Generate compileable Go schema/service types under `gen/`.
 - **Gate:** recovered `NewCloudCodeClient` and `NewPredictionServiceClient`
   compile.
-- Commit: `27c9332`.
+- Commit: `180472e`.
 
 The recovered schema also established that `PredictionService`, not
 `CloudCode`, owns `GenerateContent`. Generated gRPC stubs are retained as schema
@@ -128,7 +128,7 @@ evidence but are not the current-agy transport.
   write-back behind `AGY_TOKEN_WRITEBACK=1`.
 - Resolve the account email using Google userinfo.
 - **Gate:** a real expired token refresh succeeds and resolves the email.
-- Commit: `48b95d8`.
+- Commit: `8d85333`.
 
 ### Baseline correction — COMPLETE
 
@@ -137,7 +137,7 @@ evidence but are not the current-agy transport.
   transport decision is not inferred from Gemini mode alone.
 - Preserve the pcap and provenance under `.reference/`.
 - Confirm from agy's own log that generation uses REST/SSE.
-- Commit: `52ec2b8`.
+- Commit: `e8b630b`.
 
 ### Phase 2 — Native Go REST/SSE client with current-agy fingerprint
 
