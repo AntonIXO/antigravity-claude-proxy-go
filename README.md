@@ -56,11 +56,17 @@ The refresh result remains in memory unless `AGY_TOKEN_WRITEBACK=1` is set.
 
 ```sh
 cd /root/antigravity-go-proxy
-GOTOOLCHAIN=go1.27rc2 go build -o bin/proxy ./cmd/proxy
+GOTOOLCHAIN=go1.27rc2 go build -ldflags="-s -w" -trimpath -o bin/proxy ./cmd/proxy
 GOTOOLCHAIN=go1.27rc2 go test ./...
 GOTOOLCHAIN=go1.27rc2 go test -race ./...
 GOTOOLCHAIN=go1.27rc2 go vet ./...
 ```
+
+For maximum performance, you can use Profile-Guided Optimization (PGO):
+1. Run the proxy with `--pprof` to enable the `localhost:6060` profiler.
+2. Generate load against the proxy.
+3. Capture a profile: `curl -o default.pgo http://localhost:6060/debug/pprof/profile?seconds=60`
+4. Rebuild with PGO: `GOTOOLCHAIN=go1.27rc2 go build -pgo=default.pgo -ldflags="-s -w" -trimpath -o bin/proxy ./cmd/proxy`
 
 Run it directly:
 
@@ -79,6 +85,7 @@ Useful flags:
 | `-strategy` | `hybrid` | `sticky`, `round-robin`, or `hybrid` selection |
 | `-project` | auto-detected | Explicit Cloud Code project override |
 | `-upstream-timeout` | `5m` | Per-request Cloud Code timeout |
+| `-pprof` | `false` | Enable pprof server on localhost:6060 |
 
 The corresponding environment variables are
 `ANTIGRAVITY_PROXY_LISTEN`, `ANTIGRAVITY_PROXY_API_KEY`,

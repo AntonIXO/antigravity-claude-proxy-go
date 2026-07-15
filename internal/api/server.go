@@ -1,6 +1,8 @@
 package api
 
 import (
+	"bufio"
+	"bytes"
 	"context"
 	"crypto/subtle"
 	"encoding/json"
@@ -20,6 +22,12 @@ import (
 )
 
 const maxRequestBody = 50 << 20
+
+var jsonBufferPool = sync.Pool{
+	New: func() any {
+		return new(bytes.Buffer)
+	},
+}
 
 type Upstream interface {
 	LoadCodeAssist(context.Context, string) (cloudcode.Response, error)
@@ -377,6 +385,8 @@ func (server *Server) unaryMessage(writer http.ResponseWriter, request *http.Req
 func (server *Server) streamMessage(writer http.ResponseWriter, request *http.Request, send streamSender, model string) {
 	converter := proxyformat.NewStreamConverter(model, server.builder.Cache, "")
 	started := false
+	flusher, hasFlusher := writer.(http.Flusher)
+	bw := bufio.NewWriterSize(writer, 4096)
 	writeEvents := func(events []map[string]any) error {
 		if len(events) == 0 {
 			return nil
@@ -390,16 +400,26 @@ func (server *Server) streamMessage(writer http.ResponseWriter, request *http.Re
 			started = true
 		}
 		for _, event := range events {
-			encoded, err := json.Marshal(event)
+			buf := jsonBufferPool.Get().(*bytes.Buffer)
+			buf.Reset()
+			err := json.NewEncoder(buf).Encode(event)
+			if err == nil {
+				eventType, _ := event["type"].(string)
+				bw.WriteString("event: ")
+				bw.WriteString(eventType)
+				bw.WriteString("\ndata: ")
+				// json.Encoder adds a trailing newline, so we only need one more
+				bw.Write(buf.Bytes())
+				bw.WriteString("\n")
+			}
+			jsonBufferPool.Put(buf)
 			if err != nil {
 				return err
 			}
-			if _, err := fmt.Fprintf(writer, "event: %s\ndata: %s\n\n", event["type"], encoded); err != nil {
-				return err
-			}
-			if flusher, ok := writer.(http.Flusher); ok {
-				flusher.Flush()
-			}
+		}
+		bw.Flush()
+		if hasFlusher {
+			flusher.Flush()
 		}
 		return nil
 	}

@@ -47,7 +47,7 @@ func (converter *StreamConverter) Consume(data []byte) ([]map[string]any, error)
 	}
 	candidate := firstCandidate(inner)
 	parts := candidateParts(candidate)
-	events := make([]map[string]any, 0)
+	events := make([]map[string]any, 0, 2)
 	if !converter.hasStarted && len(parts) > 0 {
 		converter.hasStarted = true
 		events = append(events, map[string]any{

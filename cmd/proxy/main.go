@@ -18,6 +18,8 @@ import (
 	proxyformat "antigravity-go-proxy/internal/format"
 )
 
+var startPprof func(*slog.Logger)
+
 func main() {
 	listen := flag.String("listen", envOr("ANTIGRAVITY_PROXY_LISTEN", "127.0.0.1:8091"), "HTTP listen address")
 	apiKey := flag.String("api-key", envOr("ANTIGRAVITY_PROXY_API_KEY", os.Getenv("API_KEY")), "required local API key")
@@ -25,9 +27,13 @@ func main() {
 	accountsPath := flag.String("accounts", os.Getenv("ANTIGRAVITY_ACCOUNTS_FILE"), "optional account-pool JSON path (default ~/.config/antigravity-proxy/accounts.json when present)")
 	strategy := flag.String("strategy", envOr("ACCOUNT_STRATEGY", accounts.DefaultStrategy), "account strategy: sticky, round-robin, or hybrid")
 	upstreamTimeout := flag.Duration("upstream-timeout", 5*time.Minute, "Cloud Code request timeout")
+	pprof := flag.Bool("pprof", false, "enable pprof server on localhost:6060")
 	flag.Parse()
 
 	logger := slog.New(slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{Level: slog.LevelInfo}))
+	if *pprof && startPprof != nil {
+		startPprof(logger)
+	}
 	accountManager, err := accounts.NewDefault(*accountsPath, *strategy, nil)
 	if err != nil {
 		logger.Error("load account pool", "error", err)

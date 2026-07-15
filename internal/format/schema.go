@@ -340,13 +340,12 @@ func flattenTypeArray(result map[string]any, nullable map[string]bool, name stri
 }
 
 func appendDescriptionHint(schema map[string]any, hint string) map[string]any {
-	result := cloneMap(schema)
-	if description := stringValue(result["description"]); description != "" {
-		result["description"] = description + " (" + hint + ")"
+	if description := stringValue(schema["description"]); description != "" {
+		schema["description"] = description + " (" + hint + ")"
 	} else {
-		result["description"] = hint
+		schema["description"] = hint
 	}
-	return result
+	return schema
 }
 
 func schemaScore(schema map[string]any) int {

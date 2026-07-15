@@ -11,7 +11,7 @@ import (
 const AntigravitySystemInstruction = "You are Antigravity, a powerful agentic AI coding assistant designed by the Google Deepmind team working on Advanced Agentic Coding.You are pair programming with a USER to solve their coding task. The task may require creating a new codebase, modifying or debugging an existing codebase, or simply answering a question.**Absolute paths only****Proactiveness**"
 
 type SessionStore struct {
-	mu       sync.Mutex
+	mu       sync.RWMutex
 	sessions map[string]string
 	newID    func() string
 }
@@ -24,15 +24,21 @@ func (store *SessionStore) Derive(accountEmail string) string {
 	if store == nil {
 		return binaryStyleSessionID()
 	}
-	store.mu.Lock()
-	defer store.mu.Unlock()
 	if accountEmail == "" {
 		return store.newID()
 	}
+	store.mu.RLock()
+	session := store.sessions[accountEmail]
+	store.mu.RUnlock()
+	if session != "" {
+		return session
+	}
+	store.mu.Lock()
+	defer store.mu.Unlock()
 	if session := store.sessions[accountEmail]; session != "" {
 		return session
 	}
-	session := store.newID()
+	session = store.newID()
 	store.sessions[accountEmail] = session
 	return session
 }
@@ -101,11 +107,44 @@ func binaryStyleSessionID() string {
 	return randomUUID() + fmt.Sprint(time.Now().UnixMilli())
 }
 
+var randPool = sync.Pool{
+	New: func() any {
+		b := make([]byte, 256)
+		if _, err := rand.Read(b); err != nil {
+			panic(fmt.Sprintf("read cryptographic randomness: %v", err))
+		}
+		return &randBuffer{data: b, pos: 0}
+	},
+}
+
+type randBuffer struct {
+	data []byte
+	pos  int
+}
+
+func readRandom(dest []byte) {
+	n := len(dest)
+	if n > 256 {
+		if _, err := rand.Read(dest); err != nil {
+			panic(fmt.Sprintf("read cryptographic randomness: %v", err))
+		}
+		return
+	}
+	buf := randPool.Get().(*randBuffer)
+	if buf.pos+n > len(buf.data) {
+		if _, err := rand.Read(buf.data); err != nil {
+			panic(fmt.Sprintf("read cryptographic randomness: %v", err))
+		}
+		buf.pos = 0
+	}
+	copy(dest, buf.data[buf.pos:buf.pos+n])
+	buf.pos += n
+	randPool.Put(buf)
+}
+
 func randomUUID() string {
 	var value [16]byte
-	if _, err := rand.Read(value[:]); err != nil {
-		panic(fmt.Sprintf("read cryptographic randomness: %v", err))
-	}
+	readRandom(value[:])
 	value[6] = value[6]&0x0f | 0x40
 	value[8] = value[8]&0x3f | 0x80
 	encoded := hex.EncodeToString(value[:])
@@ -114,8 +153,6 @@ func randomUUID() string {
 
 func randomHex(bytes int) string {
 	value := make([]byte, bytes)
-	if _, err := rand.Read(value); err != nil {
-		panic(fmt.Sprintf("read cryptographic randomness: %v", err))
-	}
+	readRandom(value)
 	return hex.EncodeToString(value)
 }

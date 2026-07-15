@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"strconv"
 	"strings"
+	"sync"
 )
 
 const (
@@ -33,43 +34,65 @@ type ModelOptions struct {
 	MaxOutputTokens   int
 }
 
-func GetModelFamily(model string) ModelFamily {
+type modelFamilyInfo struct {
+	family     ModelFamily
+	isThinking bool
+}
+
+var modelFamilyCache sync.Map // map[string]modelFamilyInfo
+
+func getModelFamilyInfo(model string) modelFamilyInfo {
+	if cached, ok := modelFamilyCache.Load(model); ok {
+		return cached.(modelFamilyInfo)
+	}
+
 	lower := strings.ToLower(model)
+	var family ModelFamily
 	switch {
 	case strings.Contains(lower, "claude"):
-		return FamilyClaude
+		family = FamilyClaude
 	case strings.Contains(lower, "gemini"):
-		return FamilyGemini
+		family = FamilyGemini
 	case strings.Contains(lower, "gpt"):
-		return FamilyOpenAI
+		family = FamilyOpenAI
 	default:
-		return FamilyUnknown
+		family = FamilyUnknown
 	}
+
+	isThinking := false
+	if family == FamilyClaude && strings.Contains(lower, "thinking") {
+		isThinking = true
+	} else if family == FamilyGemini {
+		if strings.Contains(lower, "thinking") {
+			isThinking = true
+		} else {
+			const marker = "gemini-"
+			index := strings.Index(lower, marker)
+			if index >= 0 {
+				version := lower[index+len(marker):]
+				end := 0
+				for end < len(version) && version[end] >= '0' && version[end] <= '9' {
+					end++
+				}
+				major, err := strconv.Atoi(version[:end])
+				if err == nil && major >= 3 {
+					isThinking = true
+				}
+			}
+		}
+	}
+
+	info := modelFamilyInfo{family: family, isThinking: isThinking}
+	modelFamilyCache.Store(model, info)
+	return info
+}
+
+func GetModelFamily(model string) ModelFamily {
+	return getModelFamilyInfo(model).family
 }
 
 func IsThinkingModel(model string) bool {
-	lower := strings.ToLower(model)
-	if strings.Contains(lower, "claude") && strings.Contains(lower, "thinking") {
-		return true
-	}
-	if !strings.Contains(lower, "gemini") {
-		return false
-	}
-	if strings.Contains(lower, "thinking") {
-		return true
-	}
-	const marker = "gemini-"
-	index := strings.Index(lower, marker)
-	if index < 0 {
-		return false
-	}
-	version := lower[index+len(marker):]
-	end := 0
-	for end < len(version) && version[end] >= '0' && version[end] <= '9' {
-		end++
-	}
-	major, err := strconv.Atoi(version[:end])
-	return err == nil && major >= 3
+	return getModelFamilyInfo(model).isThinking
 }
 
 func clampGeminiThinkingBudget(model string, value any) int {

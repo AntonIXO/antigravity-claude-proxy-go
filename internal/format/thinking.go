@@ -3,31 +3,20 @@ package format
 import "strings"
 
 func cleanCacheControl(messages []any) []any {
-	cleaned := make([]any, 0, len(messages))
 	for _, rawMessage := range messages {
 		message := asMap(rawMessage)
 		if message == nil {
-			cleaned = append(cleaned, rawMessage)
 			continue
 		}
-		copyMessage := cloneMap(message)
-		if blocks := asSlice(copyMessage["content"]); blocks != nil {
-			copyBlocks := make([]any, 0, len(blocks))
+		if blocks := asSlice(message["content"]); blocks != nil {
 			for _, rawBlock := range blocks {
-				block := asMap(rawBlock)
-				if block == nil {
-					copyBlocks = append(copyBlocks, rawBlock)
-					continue
+				if block := asMap(rawBlock); block != nil {
+					delete(block, "cache_control")
 				}
-				copyBlock := cloneMap(block)
-				delete(copyBlock, "cache_control")
-				copyBlocks = append(copyBlocks, copyBlock)
 			}
-			copyMessage["content"] = copyBlocks
 		}
-		cleaned = append(cleaned, copyMessage)
 	}
-	return cleaned
+	return messages
 }
 
 func isThinkingPart(block map[string]any) bool {
@@ -315,7 +304,7 @@ func isPlainUserMessage(message map[string]any) bool {
 }
 
 func copyFields(source map[string]any, fields ...string) map[string]any {
-	result := make(map[string]any)
+	result := make(map[string]any, len(fields))
 	for _, field := range fields {
 		if value, exists := source[field]; exists {
 			result[field] = cloneJSON(value)

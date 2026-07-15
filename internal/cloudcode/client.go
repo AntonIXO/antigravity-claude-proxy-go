@@ -53,6 +53,7 @@ type Client struct {
 	clientVersion         string
 	contentEndpoints      []string
 	provisioningEndpoints []string
+	defaultHeader         http.Header
 }
 
 type ClientMetadata struct {
@@ -122,17 +123,34 @@ func New(options Options) *Client {
 		// Current agy's Cloud Code ClientHello has no ALPN. A dedicated standard
 		// Transport with only an empty TLS config reproduces that behavior. Do
 		// not set ForceAttemptHTTP2 or any field inside tls.Config.
-		transport = &http.Transport{TLSClientConfig: &tls.Config{}}
+		transport = &http.Transport{
+			TLSClientConfig:     &tls.Config{},
+			MaxIdleConnsPerHost: 10,
+			MaxIdleConns:        20,
+			IdleConnTimeout:     90 * time.Second,
+		}
 		client = &http.Client{Transport: transport, Timeout: options.Timeout}
 	}
+
+	userAgent := platformUserAgent(options.UserAgentVersion)
+	header := make(http.Header)
+	header.Set("Authorization", "Bearer "+options.AccessToken)
+	header.Set("Content-Type", "application/json")
+	header.Set("Accept-Encoding", "identity")
+	header.Set("User-Agent", userAgent)
+	header.Set("X-Client-Name", "antigravity")
+	header.Set("X-Client-Version", options.ClientVersion)
+	header.Set("x-goog-api-client", GoogleAPIClient)
+
 	return &Client{
 		httpClient:            client,
 		transport:             transport,
 		accessToken:           options.AccessToken,
-		userAgent:             platformUserAgent(options.UserAgentVersion),
+		userAgent:             userAgent,
 		clientVersion:         options.ClientVersion,
 		contentEndpoints:      append([]string(nil), ContentEndpoints...),
 		provisioningEndpoints: append([]string(nil), ProvisioningEndpoints...),
+		defaultHeader:         header,
 	}
 }
 
@@ -227,7 +245,7 @@ func (c *Client) DoSSE(ctx context.Context, endpoints []string, path string, pay
 			}
 			continue
 		}
-		result := Response{Endpoint: endpoint, StatusCode: response.StatusCode, Header: response.Header.Clone()}
+		result := Response{Endpoint: endpoint, StatusCode: response.StatusCode, Header: response.Header}
 		err = ParseSSE(response.Body, consume)
 		closeErr := response.Body.Close()
 		if err != nil {
@@ -246,13 +264,7 @@ func (c *Client) newRequest(ctx context.Context, endpoint, path string, body []b
 	if err != nil {
 		return nil, fmt.Errorf("create Cloud Code request: %w", err)
 	}
-	request.Header.Set("Authorization", "Bearer "+c.accessToken)
-	request.Header.Set("Content-Type", "application/json")
-	request.Header.Set("Accept-Encoding", "identity")
-	request.Header.Set("User-Agent", c.userAgent)
-	request.Header.Set("X-Client-Name", "antigravity")
-	request.Header.Set("X-Client-Version", c.clientVersion)
-	request.Header.Set("x-goog-api-client", GoogleAPIClient)
+	request.Header = c.defaultHeader.Clone()
 	if options.Accept != "" && options.Accept != "application/json" {
 		request.Header.Set("Accept", options.Accept)
 	}
@@ -277,7 +289,7 @@ func readResponse(endpoint string, response *http.Response) (Response, error) {
 	result := Response{
 		Endpoint:   endpoint,
 		StatusCode: response.StatusCode,
-		Header:     response.Header.Clone(),
+		Header:     response.Header,
 		Body:       body,
 	}
 	if response.StatusCode < 200 || response.StatusCode >= 300 {
@@ -286,7 +298,7 @@ func readResponse(endpoint string, response *http.Response) (Response, error) {
 			StatusCode: response.StatusCode,
 			Status:     response.Status,
 			Body:       strings.TrimSpace(string(body)),
-			Header:     response.Header.Clone(),
+			Header:     response.Header,
 		}
 	}
 	return result, nil
@@ -305,7 +317,11 @@ func ParseSSE(reader io.Reader, consume func(SSEEvent) error) error {
 			event.Retry = 0
 			return nil
 		}
-		event.Data = []byte(strings.Join(data, "\n"))
+		if len(data) == 1 {
+			event.Data = []byte(data[0])
+		} else {
+			event.Data = []byte(strings.Join(data, "\n"))
+		}
 		if consume != nil {
 			if err := consume(event); err != nil {
 				return err

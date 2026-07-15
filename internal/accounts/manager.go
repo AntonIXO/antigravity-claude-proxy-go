@@ -204,7 +204,7 @@ type tokenBucket struct {
 }
 
 type Manager struct {
-	mu           sync.Mutex
+	mu           sync.RWMutex
 	accounts     []*Account
 	strategy     string
 	currentIndex int
@@ -289,8 +289,8 @@ func NewDefault(path, strategy string, now func() time.Time) (*Manager, error) {
 }
 
 func (manager *Manager) Count() int {
-	manager.mu.Lock()
-	defer manager.mu.Unlock()
+	manager.mu.RLock()
+	defer manager.mu.RUnlock()
 	return len(manager.accounts)
 }
 
@@ -403,14 +403,14 @@ func (manager *Manager) IncrementFailure(account *Account) int {
 }
 
 func (manager *Manager) FailureCount(account *Account) int {
-	manager.mu.Lock()
-	defer manager.mu.Unlock()
+	manager.mu.RLock()
+	defer manager.mu.RUnlock()
 	return account.ConsecutiveFailure
 }
 
 func (manager *Manager) Project(account *Account) string {
-	manager.mu.Lock()
-	defer manager.mu.Unlock()
+	manager.mu.RLock()
+	defer manager.mu.RUnlock()
 	if project := manager.projects[account.Email]; project != "" {
 		return project
 	}

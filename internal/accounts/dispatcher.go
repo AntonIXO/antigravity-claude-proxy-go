@@ -65,7 +65,7 @@ type Dispatcher struct {
 	now                func() time.Time
 	modelCacheTTL      time.Duration
 
-	mu        sync.Mutex
+	mu        sync.RWMutex
 	clients   map[string]accountClient
 	catalog   *modelcatalog.Catalog
 	catalogAt time.Time
@@ -265,10 +265,10 @@ func (dispatcher *Dispatcher) StreamGenerateContent(ctx context.Context, request
 }
 
 func (dispatcher *Dispatcher) resolveModel(ctx context.Context, requested string) (modelcatalog.Model, error) {
-	dispatcher.mu.Lock()
+	dispatcher.mu.RLock()
 	catalog := dispatcher.catalog
 	fresh := catalog != nil && dispatcher.now().Sub(dispatcher.catalogAt) < dispatcher.modelCacheTTL
-	dispatcher.mu.Unlock()
+	dispatcher.mu.RUnlock()
 	if !fresh {
 		response, err := dispatcher.FetchAvailableModels(ctx)
 		if err != nil {
@@ -332,9 +332,16 @@ func (dispatcher *Dispatcher) resolveProject(ctx context.Context, account *Accou
 }
 
 func (dispatcher *Dispatcher) client(account *Account, token string) CloudClient {
+	dispatcher.mu.RLock()
+	entry, exists := dispatcher.clients[account.Email]
+	dispatcher.mu.RUnlock()
+	if exists && entry.token == token {
+		return entry.client
+	}
+
 	dispatcher.mu.Lock()
 	defer dispatcher.mu.Unlock()
-	entry, exists := dispatcher.clients[account.Email]
+	entry, exists = dispatcher.clients[account.Email]
 	if exists && entry.token == token {
 		return entry.client
 	}

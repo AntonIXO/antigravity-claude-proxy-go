@@ -17,7 +17,7 @@ type signatureEntry struct {
 // family that produced thinking signatures. It is process-local for two hours
 // because Claude clients may strip these fields.
 type SignatureCache struct {
-	mu       sync.Mutex
+	mu       sync.RWMutex
 	now      func() time.Time
 	tools    map[string]signatureEntry
 	thinking map[string]signatureEntry
@@ -44,14 +44,16 @@ func (cache *SignatureCache) Tool(toolID string) string {
 	if cache == nil || toolID == "" {
 		return ""
 	}
-	cache.mu.Lock()
-	defer cache.mu.Unlock()
+	cache.mu.RLock()
 	entry, ok := cache.tools[toolID]
+	cache.mu.RUnlock()
 	if !ok {
 		return ""
 	}
 	if cache.now().Sub(entry.createdAt) > signatureCacheTTL {
+		cache.mu.Lock()
 		delete(cache.tools, toolID)
+		cache.mu.Unlock()
 		return ""
 	}
 	return entry.signature
@@ -70,14 +72,16 @@ func (cache *SignatureCache) ThinkingFamily(signature string) ModelFamily {
 	if cache == nil || signature == "" {
 		return FamilyUnknown
 	}
-	cache.mu.Lock()
-	defer cache.mu.Unlock()
+	cache.mu.RLock()
 	entry, ok := cache.thinking[signature]
+	cache.mu.RUnlock()
 	if !ok {
 		return FamilyUnknown
 	}
 	if cache.now().Sub(entry.createdAt) > signatureCacheTTL {
+		cache.mu.Lock()
 		delete(cache.thinking, signature)
+		cache.mu.Unlock()
 		return FamilyUnknown
 	}
 	return entry.family
