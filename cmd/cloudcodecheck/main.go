@@ -16,6 +16,7 @@ func main() {
 	operation := flag.String("operation", "models", "gate operation: models or load")
 	project := flag.String("project", "", "optional Cloud Code project ID")
 	timeout := flag.Duration("timeout", 30*time.Second, "request timeout")
+	details := flag.Bool("details", false, "print the successful response JSON for inspection")
 	flag.Parse()
 
 	ctx, cancel := context.WithTimeout(context.Background(), *timeout)
@@ -42,6 +43,18 @@ func main() {
 	var document map[string]json.RawMessage
 	if err := json.Unmarshal(response.Body, &document); err != nil {
 		log.Fatalf("decode successful Cloud Code response: %v", err)
+	}
+	if *details {
+		var pretty any
+		if err := json.Unmarshal(response.Body, &pretty); err != nil {
+			log.Fatalf("decode successful Cloud Code response details: %v", err)
+		}
+		encoded, err := json.MarshalIndent(pretty, "", "  ")
+		if err != nil {
+			log.Fatalf("encode successful Cloud Code response details: %v", err)
+		}
+		fmt.Println(string(encoded))
+		return
 	}
 	fmt.Printf("cloudcode_ok operation=%s endpoint=%s status=%d bytes=%d top_level_fields=%d\n",
 		*operation, response.Endpoint, response.StatusCode, len(response.Body), len(document))

@@ -58,6 +58,15 @@ func NewBuilder() *Builder {
 
 func (builder *Builder) BuildCloudCodeRequest(request map[string]any, projectID, accountEmail string) map[string]any {
 	googleRequest := ConvertAnthropicToGoogle(request, builder.Cache)
+	return builder.buildCloudCodeRequest(request, googleRequest, projectID, accountEmail)
+}
+
+func (builder *Builder) BuildCloudCodeRequestWithModel(request map[string]any, projectID, accountEmail string, options ModelOptions) map[string]any {
+	googleRequest := ConvertAnthropicToGoogleWithModel(request, builder.Cache, options)
+	return builder.buildCloudCodeRequest(request, googleRequest, projectID, accountEmail)
+}
+
+func (builder *Builder) buildCloudCodeRequest(request, googleRequest map[string]any, projectID, accountEmail string) map[string]any {
 	googleRequest["sessionId"] = builder.Sessions.Derive(accountEmail)
 
 	systemParts := []any{

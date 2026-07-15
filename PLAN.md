@@ -200,6 +200,20 @@ evidence but are not the current-agy transport.
   gemini-3.5-flash-low` returns a real answer through the Go proxy, and Claude
   Code returns real answers through each forced model mapping.
 
+### Post-acceptance model catalog correction — COMPLETE
+
+- Use `agentModelSorts` from `fetchAvailableModels` as the authoritative list
+  behind `/v1/models`, matching the eight entries printed by `agy models`.
+- Preserve Cloud Code's routing IDs and display labels, including the
+  counterintuitive `gemini-3.5-flash-low` → Medium mapping.
+- Route the compatibility input `gemini-3.1-pro-high` to the selectable
+  `gemini-pro-agent` ID used for Gemini 3.1 Pro High.
+- Apply live `supportsThinking`, `thinkingBudget`, `minThinkingBudget`, context,
+  and maximum-output metadata while building requests.
+- **Gate:** all eight advertised IDs and the Pro High compatibility alias
+  return HTTP 200; Hermes' exact 182 KB Opus request succeeds after its
+  requested 128,000 output tokens are capped to Cloud Code's live 64,000 limit.
+
 ## Behavioral-mimicry scope
 
 - **Do** use `loadCodeAssist` and `onboardUser` when project provisioning needs
@@ -238,3 +252,7 @@ evidence but are not the current-agy transport.
       proxy's advertised model IDs.
 - [x] New systemd unit runs on 8091; Node port 8090 remains untouched.
 - [x] README documents current baseline evidence and the deferred sidecar gap.
+- [x] `/v1/models` matches agy's complete selectable agent list and excludes
+      non-agent raw routes.
+- [x] Every advertised model returns a real response, and Hermes Opus requests
+      respect the live 64,000-token output cap instead of failing HTTP 400.

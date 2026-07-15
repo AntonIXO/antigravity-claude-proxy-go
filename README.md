@@ -62,6 +62,39 @@ Useful flags are `-listen`, `-accounts`, `-strategy`, `-project`, and
 `-upstream-timeout`. Selection strategies are `sticky`, `round-robin`, and
 `hybrid`.
 
+## Selectable models
+
+`GET /v1/models` follows the same `agentModelSorts` list as `agy models`; it
+does not advertise every raw entry returned by Cloud Code. The live list is:
+
+| Selection ID | agy label | Context | Max output |
+|---|---|---:|---:|
+| `gemini-3.5-flash-low` | Gemini 3.5 Flash (Medium) | 1,048,576 | 65,536 |
+| `gemini-3-flash-agent` | Gemini 3.5 Flash (High) | 1,048,576 | 65,536 |
+| `gemini-3.5-flash-extra-low` | Gemini 3.5 Flash (Low) | 1,048,576 | 65,536 |
+| `gemini-3.1-pro-low` | Gemini 3.1 Pro (Low) | 1,048,576 | 65,535 |
+| `gemini-pro-agent` | Gemini 3.1 Pro (High) | 1,048,576 | 65,535 |
+| `claude-sonnet-4-6` | Claude Sonnet 4.6 (Thinking) | 250,000 | 64,000 |
+| `claude-opus-4-6-thinking` | Claude Opus 4.6 (Thinking) | 250,000 | 64,000 |
+| `gpt-oss-120b-medium` | GPT-OSS 120B (Medium) | 131,072 | 32,768 |
+
+The IDs are Cloud Code routing names, not clean product names. In particular,
+`gemini-3.5-flash-low` currently means the **Medium** tier. High is routed by
+`gemini-3-flash-agent`, and the user-visible Low tier is routed by
+`gemini-3.5-flash-extra-low`.
+
+Likewise, `gemini-pro-agent` is the agent-optimized routing ID for Gemini 3.1
+Pro High. Cloud Code also publishes `gemini-3.1-pro-high` in its raw model map,
+but does not put it in agy's agent list and rejects requests to it. For backward
+compatibility the proxy accepts `gemini-3.1-pro-high` and rewrites it to the
+valid `gemini-pro-agent` route.
+
+The catalog and per-model limits are refreshed from Cloud Code every five
+minutes. The proxy applies the returned thinking budget and output cap before
+generation; this is necessary because clients such as Hermes may request more
+output than a model accepts. The captured model evidence is in
+[the current model baseline](.reference/agy-current-models.txt).
+
 ## Systemd and clients
 
 The repository includes [the independent service unit](antigravity-go-proxy.service)

@@ -8,7 +8,6 @@ import (
 	"fmt"
 	"log/slog"
 	"net/http"
-	"sort"
 	"strings"
 	"sync"
 	"time"
@@ -16,6 +15,7 @@ import (
 	"antigravity-go-proxy/internal/auth"
 	"antigravity-go-proxy/internal/cloudcode"
 	proxyformat "antigravity-go-proxy/internal/format"
+	"antigravity-go-proxy/internal/modelcatalog"
 )
 
 const (
@@ -164,34 +164,30 @@ func (server *Server) models(writer http.ResponseWriter, request *http.Request) 
 		server.writeError(writer, err)
 		return
 	}
-	var document struct {
-		Models map[string]struct {
-			DisplayName string `json:"displayName"`
-		} `json:"models"`
-	}
-	if err := json.Unmarshal(response.Body, &document); err != nil {
+	catalog, err := modelcatalog.Parse(response.Body)
+	if err != nil {
 		server.writeError(writer, fmt.Errorf("decode Cloud Code models for %s: %w", accountLabel, err))
 		return
 	}
-	modelIDs := make([]string, 0, len(document.Models))
-	for id := range document.Models {
-		modelIDs = append(modelIDs, id)
-	}
-	sort.Strings(modelIDs)
-	models := make([]any, 0, len(document.Models))
-	for _, id := range modelIDs {
-		details := document.Models[id]
-		family := proxyformat.GetModelFamily(id)
-		if family != proxyformat.FamilyClaude && family != proxyformat.FamilyGemini {
-			continue
-		}
+	selectable := catalog.Selectable()
+	models := make([]any, 0, len(selectable))
+	for _, details := range selectable {
 		description := details.DisplayName
 		if description == "" {
-			description = id
+			description = details.ID
+		}
+		ownedBy := "google"
+		switch proxyformat.GetModelFamily(details.ID) {
+		case proxyformat.FamilyClaude:
+			ownedBy = "anthropic"
+		case proxyformat.FamilyOpenAI:
+			ownedBy = "openai"
 		}
 		models = append(models, map[string]any{
-			"id": id, "object": "model", "created": server.now().Unix(),
-			"owned_by": "anthropic", "description": description,
+			"id": details.ID, "object": "model", "created": server.now().Unix(),
+			"owned_by": ownedBy, "description": description,
+			"context_window": details.MaxTokens, "max_output_tokens": details.MaxOutputTokens,
+			"supports_thinking": details.SupportsThinking,
 		})
 	}
 	writeJSON(writer, http.StatusOK, map[string]any{"object": "list", "data": models})
@@ -211,7 +207,7 @@ func (server *Server) messages(writer http.ResponseWriter, request *http.Request
 		return
 	}
 	if model, _ := anthropicRequest["model"].(string); model == "" {
-		anthropicRequest["model"] = "claude-3-5-sonnet-20241022"
+		anthropicRequest["model"] = "gemini-3.5-flash-low"
 	}
 	if _, exists := anthropicRequest["max_tokens"]; !exists {
 		anthropicRequest["max_tokens"] = 4096
@@ -393,6 +389,10 @@ func (server *Server) writeError(writer http.ResponseWriter, err error) {
 }
 
 func classifyError(err error) (int, string, string) {
+	var selectionError *modelcatalog.SelectionError
+	if errors.As(err, &selectionError) {
+		return http.StatusBadRequest, "invalid_request_error", selectionError.Error()
+	}
 	var upstreamError *cloudcode.HTTPError
 	if errors.As(err, &upstreamError) {
 		switch upstreamError.StatusCode {

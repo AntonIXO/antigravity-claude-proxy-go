@@ -79,10 +79,12 @@ type scriptedResult struct {
 }
 
 type scriptedClient struct {
-	mu      sync.Mutex
-	results []scriptedResult
-	calls   int
-	payload map[string]any
+	mu            sync.Mutex
+	results       []scriptedResult
+	calls         int
+	payload       map[string]any
+	requestOption cloudcode.RequestOptions
+	modelsBody    []byte
 }
 
 func (client *scriptedClient) LoadCodeAssist(context.Context, string) (cloudcode.Response, error) {
@@ -90,16 +92,25 @@ func (client *scriptedClient) LoadCodeAssist(context.Context, string) (cloudcode
 }
 
 func (client *scriptedClient) FetchAvailableModels(context.Context, string) (cloudcode.Response, error) {
-	return cloudcode.Response{StatusCode: http.StatusOK, Body: []byte(`{"models":{}}`)}, nil
+	body := client.modelsBody
+	if len(body) == 0 {
+		body = []byte(`{
+			"defaultAgentModelId":"claude-sonnet-4-6",
+			"agentModelSorts":[{"groups":[{"modelIds":["claude-sonnet-4-6"]}]}],
+			"models":{"claude-sonnet-4-6":{"displayName":"Claude Sonnet 4.6 (Thinking)","supportsThinking":true,"thinkingBudget":1024,"maxTokens":250000,"maxOutputTokens":64000}}
+		}`)
+	}
+	return cloudcode.Response{StatusCode: http.StatusOK, Body: body}, nil
 }
 
-func (client *scriptedClient) StreamGenerateContent(_ context.Context, payload any, _ cloudcode.RequestOptions, consume func(cloudcode.SSEEvent) error) (cloudcode.Response, error) {
+func (client *scriptedClient) StreamGenerateContent(_ context.Context, payload any, options cloudcode.RequestOptions, consume func(cloudcode.SSEEvent) error) (cloudcode.Response, error) {
 	client.mu.Lock()
 	index := client.calls
 	client.calls++
 	if object, ok := payload.(map[string]any); ok {
 		client.payload = object
 	}
+	client.requestOption = options
 	result := client.results[min(index, len(client.results)-1)]
 	client.mu.Unlock()
 	for _, data := range result.events {
@@ -108,6 +119,54 @@ func (client *scriptedClient) StreamGenerateContent(_ context.Context, payload a
 		}
 	}
 	return cloudcode.Response{Endpoint: cloudcode.DailyEndpoint, StatusCode: http.StatusOK}, result.err
+}
+
+func TestDispatcherUsesAgyAgentRouteAndLiveOutputLimit(t *testing.T) {
+	t.Parallel()
+	now := time.Date(2026, 7, 15, 4, 0, 0, 0, time.UTC)
+	account := testAccount("models@example.com")
+	manager, err := New(Options{Accounts: []*Account{account}, Strategy: StrategySticky, Now: func() time.Time { return now }})
+	if err != nil {
+		t.Fatal(err)
+	}
+	modelsBody := []byte(`{
+		"agentModelSorts":[{"groups":[{"modelIds":["gemini-pro-agent","claude-opus-4-6-thinking"]}]}],
+		"models":{
+			"gemini-3.1-pro-high":{"displayName":"Gemini 3.1 Pro (High)","supportsThinking":true,"thinkingBudget":10001,"maxOutputTokens":65535},
+			"gemini-pro-agent":{"displayName":"Gemini 3.1 Pro (High)","supportsThinking":true,"thinkingBudget":10001,"maxTokens":1048576,"maxOutputTokens":65535},
+			"claude-opus-4-6-thinking":{"displayName":"Claude Opus 4.6 (Thinking)","supportsThinking":true,"thinkingBudget":1024,"maxTokens":250000,"maxOutputTokens":64000}
+		}
+	}`)
+	client := &scriptedClient{modelsBody: modelsBody, results: []scriptedResult{{events: [][]byte{[]byte(`{}`)}}, {events: [][]byte{[]byte(`{}`)}}}}
+	dispatcher := newTestDispatcher(t, manager, &staticResolver{tokens: map[string]string{account.Email: "token"}}, map[string]*scriptedClient{"token": client}, now, func(context.Context, time.Duration) error { return nil })
+
+	request := testRequest()
+	request["model"] = "gemini-3.1-pro-high"
+	if _, err := dispatcher.StreamGenerateContent(context.Background(), request, func(cloudcode.SSEEvent) error { return nil }); err != nil {
+		t.Fatal(err)
+	}
+	if client.payload["model"] != "gemini-pro-agent" {
+		t.Fatalf("upstream model=%v", client.payload["model"])
+	}
+
+	request["model"] = "claude-opus-4-6-thinking"
+	request["max_tokens"] = float64(128000)
+	request["thinking"] = map[string]any{"type": "adaptive", "display": "summarized"}
+	if _, err := dispatcher.StreamGenerateContent(context.Background(), request, func(cloudcode.SSEEvent) error { return nil }); err != nil {
+		t.Fatal(err)
+	}
+	inner := client.payload["request"].(map[string]any)
+	generation := inner["generationConfig"].(map[string]any)
+	if generation["maxOutputTokens"] != 64000 {
+		t.Fatalf("maxOutputTokens=%v", generation["maxOutputTokens"])
+	}
+	thinking := generation["thinkingConfig"].(map[string]any)
+	if thinking["thinking_budget"] != 1024 {
+		t.Fatalf("thinkingConfig=%#v", thinking)
+	}
+	if client.requestOption.Headers.Get("anthropic-beta") != "interleaved-thinking-2025-05-14" {
+		t.Fatalf("headers=%v", client.requestOption.Headers)
+	}
 }
 
 func TestForcedQuota429CoolsDownAndRotates(t *testing.T) {

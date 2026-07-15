@@ -13,6 +13,7 @@ import (
 	"antigravity-go-proxy/internal/auth"
 	"antigravity-go-proxy/internal/cloudcode"
 	proxyformat "antigravity-go-proxy/internal/format"
+	"antigravity-go-proxy/internal/modelcatalog"
 )
 
 type CloudClient interface {
@@ -41,6 +42,7 @@ type DispatcherOptions struct {
 	SwitchDelay        time.Duration
 	Sleep              SleepFunc
 	Now                func() time.Time
+	ModelCacheTTL      time.Duration
 }
 
 type accountClient struct {
@@ -61,9 +63,12 @@ type Dispatcher struct {
 	switchDelay        time.Duration
 	sleep              SleepFunc
 	now                func() time.Time
+	modelCacheTTL      time.Duration
 
-	mu      sync.Mutex
-	clients map[string]accountClient
+	mu        sync.Mutex
+	clients   map[string]accountClient
+	catalog   *modelcatalog.Catalog
+	catalogAt time.Time
 }
 
 func NewDispatcher(options DispatcherOptions) (*Dispatcher, error) {
@@ -94,13 +99,17 @@ func NewDispatcher(options DispatcherOptions) (*Dispatcher, error) {
 	if options.Now == nil {
 		options.Now = time.Now
 	}
+	if options.ModelCacheTTL <= 0 {
+		options.ModelCacheTTL = 5 * time.Minute
+	}
 	return &Dispatcher{
 		manager: options.Manager, resolver: options.Resolver, builder: options.Builder,
 		newClient: options.NewClient, projectID: options.ProjectID,
 		maxRetries: options.MaxRetries, maxWait: options.MaxWait,
 		capacityBackoffs: options.CapacityBackoffs, maxCapacityRetries: options.MaxCapacityRetries,
 		switchDelay: options.SwitchDelay, sleep: options.Sleep, now: options.Now,
-		clients: make(map[string]accountClient),
+		modelCacheTTL: options.ModelCacheTTL,
+		clients:       make(map[string]accountClient),
 	}, nil
 }
 
@@ -120,6 +129,7 @@ func (dispatcher *Dispatcher) FetchAvailableModels(ctx context.Context) (cloudco
 		response, err := dispatcher.client(selection.Account, credentials.AccessToken).FetchAvailableModels(ctx, dispatcher.project(selection.Account))
 		if err == nil {
 			dispatcher.manager.MarkSuccess(selection.Account, "")
+			dispatcher.cacheCatalog(response.Body)
 			return response, nil
 		}
 		lastError = err
@@ -131,7 +141,14 @@ func (dispatcher *Dispatcher) FetchAvailableModels(ctx context.Context) (cloudco
 }
 
 func (dispatcher *Dispatcher) StreamGenerateContent(ctx context.Context, request map[string]any, consume func(cloudcode.SSEEvent) error) (cloudcode.Response, error) {
-	model, _ := request["model"].(string)
+	requestedModel, _ := request["model"].(string)
+	modelDetails, err := dispatcher.resolveModel(ctx, requestedModel)
+	if err != nil {
+		return cloudcode.Response{}, err
+	}
+	request = cloneRequest(request)
+	request["model"] = modelDetails.ID
+	model := modelDetails.ID
 	maxAttempts := max(dispatcher.maxRetries, dispatcher.manager.Count()+1)
 	var lastError error
 	for attempt := 0; attempt < maxAttempts; attempt++ {
@@ -175,10 +192,13 @@ func (dispatcher *Dispatcher) StreamGenerateContent(ctx context.Context, request
 			lastError = err
 			continue
 		}
-		payload := dispatcher.builder.BuildCloudCodeRequest(request, project, account.Email)
+		payload := dispatcher.builder.BuildCloudCodeRequestWithModel(request, project, account.Email, proxyformat.ModelOptions{
+			SupportsThinking: modelDetails.SupportsThinking, ThinkingBudget: modelDetails.ThinkingBudget,
+			MinThinkingBudget: modelDetails.MinThinkingBudget, MaxOutputTokens: modelDetails.MaxOutputTokens,
+		})
 		inner, _ := payload["request"].(map[string]any)
 		options := cloudcode.RequestOptions{SessionID: textValue(inner["sessionId"])}
-		if proxyformat.GetModelFamily(model) == proxyformat.FamilyClaude && proxyformat.IsThinkingModel(model) {
+		if proxyformat.GetModelFamily(model) == proxyformat.FamilyClaude && modelDetails.SupportsThinking {
 			options.Headers = make(http.Header)
 			options.Headers.Set("anthropic-beta", "interleaved-thinking-2025-05-14")
 		}
@@ -242,6 +262,47 @@ func (dispatcher *Dispatcher) StreamGenerateContent(ctx context.Context, request
 		}
 	}
 	return cloudcode.Response{}, fmt.Errorf("max retries exceeded: %w", lastError)
+}
+
+func (dispatcher *Dispatcher) resolveModel(ctx context.Context, requested string) (modelcatalog.Model, error) {
+	dispatcher.mu.Lock()
+	catalog := dispatcher.catalog
+	fresh := catalog != nil && dispatcher.now().Sub(dispatcher.catalogAt) < dispatcher.modelCacheTTL
+	dispatcher.mu.Unlock()
+	if !fresh {
+		response, err := dispatcher.FetchAvailableModels(ctx)
+		if err != nil {
+			return modelcatalog.Model{}, fmt.Errorf("refresh selectable models: %w", err)
+		}
+		catalog, err = modelcatalog.Parse(response.Body)
+		if err != nil {
+			return modelcatalog.Model{}, err
+		}
+		dispatcher.storeCatalog(catalog)
+	}
+	return catalog.Resolve(requested)
+}
+
+func (dispatcher *Dispatcher) cacheCatalog(body []byte) {
+	catalog, err := modelcatalog.Parse(body)
+	if err == nil {
+		dispatcher.storeCatalog(catalog)
+	}
+}
+
+func (dispatcher *Dispatcher) storeCatalog(catalog *modelcatalog.Catalog) {
+	dispatcher.mu.Lock()
+	defer dispatcher.mu.Unlock()
+	dispatcher.catalog = catalog
+	dispatcher.catalogAt = dispatcher.now()
+}
+
+func cloneRequest(request map[string]any) map[string]any {
+	cloned := make(map[string]any, len(request))
+	for key, value := range request {
+		cloned[key] = value
+	}
+	return cloned
 }
 
 func (dispatcher *Dispatcher) resolveProject(ctx context.Context, account *Account, client CloudClient) (string, error) {

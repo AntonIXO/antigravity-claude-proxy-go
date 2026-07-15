@@ -20,7 +20,18 @@ const (
 	FamilyUnknown ModelFamily = "unknown"
 	FamilyClaude  ModelFamily = "claude"
 	FamilyGemini  ModelFamily = "gemini"
+	FamilyOpenAI  ModelFamily = "openai"
 )
+
+// ModelOptions carries the live limits returned by fetchAvailableModels. The
+// upstream routing ID, not name heuristics, is authoritative when these values
+// are available.
+type ModelOptions struct {
+	SupportsThinking  bool
+	ThinkingBudget    int
+	MinThinkingBudget int
+	MaxOutputTokens   int
+}
 
 func GetModelFamily(model string) ModelFamily {
 	lower := strings.ToLower(model)
@@ -29,6 +40,8 @@ func GetModelFamily(model string) ModelFamily {
 		return FamilyClaude
 	case strings.Contains(lower, "gemini"):
 		return FamilyGemini
+	case strings.Contains(lower, "gpt"):
+		return FamilyOpenAI
 	default:
 		return FamilyUnknown
 	}

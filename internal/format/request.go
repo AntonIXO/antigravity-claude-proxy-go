@@ -12,9 +12,28 @@ var invalidToolName = regexp.MustCompile(`[^a-zA-Z0-9_-]`)
 // Generative AI conversion. The returned object is the inner request, before
 // the Cloud Code project/model envelope is added.
 func ConvertAnthropicToGoogle(request map[string]any, cache *SignatureCache) map[string]any {
+	return convertAnthropicToGoogle(request, cache, nil)
+}
+
+// ConvertAnthropicToGoogleWithModel applies live Cloud Code model limits and
+// capabilities while performing the normal format conversion.
+func ConvertAnthropicToGoogleWithModel(request map[string]any, cache *SignatureCache, options ModelOptions) map[string]any {
+	return convertAnthropicToGoogle(request, cache, &options)
+}
+
+func convertAnthropicToGoogle(request map[string]any, cache *SignatureCache, options *ModelOptions) map[string]any {
 	model := stringValue(request["model"])
 	family := GetModelFamily(model)
 	isThinking := IsThinkingModel(model)
+	defaultThinkingBudget := 0
+	minThinkingBudget := 0
+	maxOutputTokens := 0
+	if options != nil {
+		isThinking = options.SupportsThinking
+		defaultThinkingBudget = options.ThinkingBudget
+		minThinkingBudget = options.MinThinkingBudget
+		maxOutputTokens = options.MaxOutputTokens
+	}
 	messages := cleanCacheControl(asSlice(request["messages"]))
 
 	result := map[string]any{
@@ -107,19 +126,38 @@ func ConvertAnthropicToGoogle(request map[string]any, cache *SignatureCache) map
 
 	thinking := asMap(request["thinking"])
 	if isThinking && family == FamilyClaude {
-		budget := intValue(thinking["budget_tokens"], DefaultClaudeThinkBudget)
+		if defaultThinkingBudget <= 0 {
+			defaultThinkingBudget = DefaultClaudeThinkBudget
+		}
+		budget := intValue(thinking["budget_tokens"], defaultThinkingBudget)
 		if budget == 0 {
-			budget = DefaultClaudeThinkBudget
+			budget = defaultThinkingBudget
+		}
+		if budget < minThinkingBudget {
+			budget = minThinkingBudget
 		}
 		generation["thinkingConfig"] = map[string]any{"include_thoughts": true, "thinking_budget": budget}
 		maximum := intValue(generation["maxOutputTokens"], 0)
 		if maximum > 0 && maximum <= budget {
 			generation["maxOutputTokens"] = budget + 8192
 		}
-	} else if isThinking && family == FamilyGemini {
+	} else if isThinking {
+		budget := defaultThinkingBudget
+		if _, explicit := thinking["budget_tokens"]; explicit {
+			budget = intValue(thinking["budget_tokens"], budget)
+		}
+		if family == FamilyGemini && options == nil {
+			budget = clampGeminiThinkingBudget(model, thinking["budget_tokens"])
+		}
+		if budget <= 0 {
+			budget = DefaultGeminiThinkBudget
+		}
+		if budget < minThinkingBudget {
+			budget = minThinkingBudget
+		}
 		generation["thinkingConfig"] = map[string]any{
 			"includeThoughts": true,
-			"thinkingBudget":  clampGeminiThinkingBudget(model, thinking["budget_tokens"]),
+			"thinkingBudget":  budget,
 		}
 	}
 
@@ -158,6 +196,9 @@ func ConvertAnthropicToGoogle(request map[string]any, cache *SignatureCache) map
 
 	if family == FamilyGemini && intValue(generation["maxOutputTokens"], 0) > GeminiMaxOutputTokens {
 		generation["maxOutputTokens"] = GeminiMaxOutputTokens
+	}
+	if maxOutputTokens > 0 && intValue(generation["maxOutputTokens"], 0) > maxOutputTokens {
+		generation["maxOutputTokens"] = maxOutputTokens
 	}
 	return result
 }

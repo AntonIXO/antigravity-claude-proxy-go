@@ -140,9 +140,10 @@ func TestAPIKeyIsRequiredForBothPrefixes(t *testing.T) {
 func TestModelsAndHealthAliases(t *testing.T) {
 	t.Parallel()
 	upstream := &fakeUpstream{modelsBody: []byte(`{
+		"agentModelSorts":[{"groups":[{"modelIds":["gemini-3.5-flash-low","gpt-oss","claude-sonnet-4-6"]}]}],
 		"models":{
 			"gemini-3.5-flash-low":{"displayName":"Gemini Flash"},
-			"gpt-oss":{"displayName":"Filtered"},
+			"gpt-oss":{"displayName":"GPT OSS"},
 			"claude-sonnet-4-6":{"displayName":"Claude Sonnet"}
 		}
 	}`)}
@@ -158,7 +159,7 @@ func TestModelsAndHealthAliases(t *testing.T) {
 		var list map[string]any
 		decodeBody(t, response.Body, &list)
 		models := list["data"].([]any)
-		if len(models) != 2 || models[0].(map[string]any)["id"] != "claude-sonnet-4-6" || models[1].(map[string]any)["id"] != "gemini-3.5-flash-low" {
+		if len(models) != 3 || models[0].(map[string]any)["id"] != "gemini-3.5-flash-low" || models[1].(map[string]any)["id"] != "gpt-oss" || models[2].(map[string]any)["id"] != "claude-sonnet-4-6" {
 			t.Fatalf("models=%#v", models)
 		}
 	}

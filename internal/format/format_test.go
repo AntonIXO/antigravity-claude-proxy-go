@@ -204,6 +204,26 @@ func TestSignatureCacheExpires(t *testing.T) {
 	}
 }
 
+func TestLiveModelOptionsCapOutputAndApplyDefaultThinkingBudget(t *testing.T) {
+	t.Parallel()
+	request := map[string]any{
+		"model": "claude-opus-4-6-thinking", "max_tokens": float64(128000),
+		"thinking": map[string]any{"type": "adaptive", "display": "summarized"},
+		"messages": []any{map[string]any{"role": "user", "content": "hello"}},
+	}
+	converted := ConvertAnthropicToGoogleWithModel(request, NewSignatureCache(), ModelOptions{
+		SupportsThinking: true, ThinkingBudget: 1024, MaxOutputTokens: 64000,
+	})
+	generation := asMap(converted["generationConfig"])
+	if generation["maxOutputTokens"] != 64000 {
+		t.Fatalf("maxOutputTokens=%v", generation["maxOutputTokens"])
+	}
+	thinking := asMap(generation["thinkingConfig"])
+	if thinking["thinking_budget"] != 1024 || thinking["include_thoughts"] != true {
+		t.Fatalf("thinkingConfig=%#v", thinking)
+	}
+}
+
 func TestGeminiToolLoopWithoutThinkingGetsRecoveryTurn(t *testing.T) {
 	t.Parallel()
 	request := map[string]any{
