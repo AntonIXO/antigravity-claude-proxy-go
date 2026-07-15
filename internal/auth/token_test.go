@@ -40,6 +40,8 @@ func TestManagerRefreshesWrappedTokenAndResolvesEmail(t *testing.T) {
 			if err := request.ParseForm(); err != nil {
 				t.Error(err)
 			}
+			assertFormValue(t, request.Form, "client_id", "test-client-id")
+			assertFormValue(t, request.Form, "client_secret", "test-client-secret")
 			assertFormValue(t, request.Form, "grant_type", "refresh_token")
 			assertFormValue(t, request.Form, "refresh_token", "refresh")
 			writer.Header().Set("Content-Type", "application/json")
@@ -57,12 +59,14 @@ func TestManagerRefreshesWrappedTokenAndResolvesEmail(t *testing.T) {
 	defer server.Close()
 
 	manager := Manager{
-		Path:        path,
-		HTTPClient:  server.Client(),
-		WriteBack:   true,
-		TokenURL:    server.URL + "/token",
-		UserInfoURL: server.URL + "/userinfo",
-		Now:         func() time.Time { return now },
+		Path:              path,
+		HTTPClient:        server.Client(),
+		WriteBack:         true,
+		TokenURL:          server.URL + "/token",
+		UserInfoURL:       server.URL + "/userinfo",
+		OAuthClientID:     "test-client-id",
+		OAuthClientSecret: "test-client-secret",
+		Now:               func() time.Time { return now },
 	}
 	credentials, err := manager.Get(context.Background())
 	if err != nil {
@@ -80,6 +84,19 @@ func TestManagerRefreshesWrappedTokenAndResolvesEmail(t *testing.T) {
 	}
 	if written.Expiry != now.Add(time.Hour) {
 		t.Fatalf("expiry = %s", written.Expiry)
+	}
+}
+
+func TestManagerReadsOAuthCredentialsFromEnvironment(t *testing.T) {
+	t.Setenv(oauthClientIDEnv, "environment-client-id")
+	t.Setenv(oauthClientSecretEnv, "environment-client-secret")
+
+	clientID, clientSecret, err := (Manager{}).oauthCredentials()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if clientID != "environment-client-id" || clientSecret != "environment-client-secret" {
+		t.Fatalf("unexpected OAuth credentials returned from environment")
 	}
 }
 

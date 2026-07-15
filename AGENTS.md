@@ -30,8 +30,9 @@ default crypto/tls reproduces `agy`'s JA3/JA4 for free. Overriding anything
 
 ## Key facts
 - Go 1.26.4 installed. `protoc`/`protodump` are NOT — install in Phase 0.
-- agy OAuth token: `~/.gemini/antigravity-cli/antigravity-oauth-token`. Shared
-  client_id `REMOVED-OAUTH-CLIENT-ID`.
+- agy OAuth token: `~/.gemini/antigravity-cli/antigravity-oauth-token`.
+  Never commit OAuth client credentials; inject the official installed-app
+  values through the root-only service environment file.
 - Target host: `cloudcode-pa.googleapis.com:443` (daily fallback: `daily-cloudcode-pa.googleapis.com`).
 - New port **8091** (Node proxy owns 8090 — leave it running & untouched).
 - Fingerprint gate command:

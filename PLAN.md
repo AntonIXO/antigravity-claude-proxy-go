@@ -232,6 +232,17 @@ evidence but are not the current-agy transport.
   cipher list, and signature algorithms. See
   `.reference/fingerprint-recheck-20260715.txt`.
 
+### Post-acceptance credential and service cleanup — COMPLETE
+
+- Remove OAuth client credentials from source and inject them through the
+  root-only `/etc/antigravity-go-proxy.env` file.
+- Rewrite the unpublished local Git history so push protection cannot find the
+  former credential values in any commit.
+- Remove the obsolete Node systemd unit after explicit user approval while
+  retaining its `accounts.json` as the Go proxy's read-only account source.
+- **Gate:** unit, race, and vet checks pass; a real `/v1/messages` call and an
+  end-to-end Hermes request both succeed after restarting the Go service.
+
 ## Behavioral-mimicry scope
 
 - **Do** use `loadCodeAssist` and `onboardUser` when project provisioning needs
@@ -251,7 +262,7 @@ evidence but are not the current-agy transport.
 3. Never claim Phase 2 passed without a real tcpdump/tshark exact JA4 match.
 4. Never fabricate protobuf/JSON schema.
 5. Port Node business logic rather than redesigning it.
-6. Use port 8091 and do not disturb the Node service or its accounts file.
+6. Use port 8091 and never modify or delete the configured accounts file.
 7. Commit each completed phase with its real gate output.
 
 ## Acceptance
@@ -268,7 +279,8 @@ evidence but are not the current-agy transport.
 - [x] Hermes answers end-to-end through `custom:antigravity-proxy`.
 - [x] Claude Code answers end-to-end with Sonnet and Opus forced to the Go
       proxy's advertised model IDs.
-- [x] New systemd unit runs on 8091; Node port 8090 remains untouched.
+- [x] Go systemd unit runs on 8091; the obsolete Node unit is removed while its
+      account file remains available read-only to the Go proxy.
 - [x] README documents current baseline evidence and the deferred sidecar gap.
 - [x] `/v1/models` matches agy's complete selectable agent list and excludes
       non-agent raw routes.

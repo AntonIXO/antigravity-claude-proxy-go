@@ -6,9 +6,9 @@ the currently installed official `agy` CLI: native Go HTTPS, the same Cloud
 Code REST/SSE endpoints, the same client identity headers, and the same TLS
 ClientHello.
 
-The proxy listens on `127.0.0.1:8091`. The older Node proxy remains independent
-on `127.0.0.1:8090`; installing or restarting this service does not stop it or
-modify its `accounts.json`.
+The proxy listens on `127.0.0.1:8091`. The obsolete Node systemd unit is not
+required. Its `accounts.json` remains a read-only account source for the Go
+service and must not be deleted while that source is configured.
 
 ## What “matching agy” means
 
@@ -83,12 +83,16 @@ Useful flags:
 The corresponding environment variables are
 `ANTIGRAVITY_PROXY_LISTEN`, `ANTIGRAVITY_PROXY_API_KEY`,
 `ANTIGRAVITY_ACCOUNTS_FILE`, `ACCOUNT_STRATEGY`, and `AGY_PROJECT_ID`.
+OAuth refresh credentials are deliberately not embedded in the binary or Git
+history. Put the official installed-app values in the root-only service
+environment file as `AGY_OAUTH_CLIENT_ID` and `AGY_OAUTH_CLIENT_SECRET`; they
+are only required when an agy token or OAuth account must be refreshed.
 OAuth refresh-token write-back is off by default and only enabled by explicitly
 setting `AGY_TOKEN_WRITEBACK=1`.
 
-## Install as a separate service
+## Install as a service
 
-Create the secret environment file without replacing the Node service:
+Create the root-only environment file and install the Go service:
 
 ```sh
 install -m 0644 antigravity-go-proxy.service /etc/systemd/system/
@@ -98,11 +102,11 @@ systemctl daemon-reload
 systemctl enable --now antigravity-go-proxy.service
 ```
 
-Check both proxies:
+Check the Go proxy:
 
 ```sh
-systemctl status antigravity-go-proxy.service antigravity-proxy.service
-ss -ltnp '( sport = :8091 or sport = :8090 )'
+systemctl status antigravity-go-proxy.service
+ss -ltnp '( sport = :8091 )'
 journalctl -u antigravity-go-proxy.service -f
 ```
 

@@ -18,11 +18,11 @@ import (
 )
 
 const (
-	clientID      = "REMOVED-OAUTH-CLIENT-ID"
-	clientSecret  = "REMOVED-OAUTH-CLIENT-SECRET"
-	tokenURL      = "https://oauth2.googleapis.com/token"
-	userInfoURL   = "https://www.googleapis.com/oauth2/v1/userinfo"
-	freshnessSkew = time.Minute
+	oauthClientIDEnv     = "AGY_OAUTH_CLIENT_ID"
+	oauthClientSecretEnv = "AGY_OAUTH_CLIENT_SECRET"
+	tokenURL             = "https://oauth2.googleapis.com/token"
+	userInfoURL          = "https://www.googleapis.com/oauth2/v1/userinfo"
+	freshnessSkew        = time.Minute
 )
 
 // Token is the normalized form of agy's wrapped or flat OAuth token file.
@@ -45,12 +45,14 @@ type Credentials struct {
 
 // Manager reads and refreshes the OAuth token written by agy.
 type Manager struct {
-	Path        string
-	HTTPClient  *http.Client
-	WriteBack   bool
-	TokenURL    string
-	UserInfoURL string
-	Now         func() time.Time
+	Path              string
+	HTTPClient        *http.Client
+	WriteBack         bool
+	TokenURL          string
+	UserInfoURL       string
+	OAuthClientID     string
+	OAuthClientSecret string
+	Now               func() time.Time
 }
 
 type tokenResponse struct {
@@ -210,6 +212,10 @@ func (m Manager) refresh(ctx context.Context, refreshToken string) (tokenRespons
 	if endpoint == "" {
 		endpoint = tokenURL
 	}
+	clientID, clientSecret, err := m.oauthCredentials()
+	if err != nil {
+		return tokenResponse{}, err
+	}
 	form := url.Values{
 		"client_id":     {clientID},
 		"client_secret": {clientSecret},
@@ -241,6 +247,24 @@ func (m Manager) refresh(ctx context.Context, refreshToken string) (tokenRespons
 		return tokenResponse{}, errors.New("token refresh response omitted access_token or expires_in")
 	}
 	return refreshed, nil
+}
+
+func (m Manager) oauthCredentials() (string, string, error) {
+	clientID := m.OAuthClientID
+	if clientID == "" {
+		clientID = os.Getenv(oauthClientIDEnv)
+	}
+	clientSecret := m.OAuthClientSecret
+	if clientSecret == "" {
+		clientSecret = os.Getenv(oauthClientSecretEnv)
+	}
+	if clientID == "" || clientSecret == "" {
+		return "", "", fmt.Errorf(
+			"OAuth refresh credentials are not configured; set %s and %s",
+			oauthClientIDEnv, oauthClientSecretEnv,
+		)
+	}
+	return clientID, clientSecret, nil
 }
 
 func (m Manager) userEmail(ctx context.Context, accessToken string) (string, error) {
