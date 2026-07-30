@@ -29,6 +29,26 @@ func TestRequestConversionMatchesParityFixture(t *testing.T) {
 	}
 }
 
+func TestConvertAnthropicToGoogleStripsTrailingModelTurn(t *testing.T) {
+	t.Parallel()
+	request := map[string]any{
+		"model": "gemini-3.6-flash-medium",
+		"messages": []any{
+			map[string]any{"role": "user", "content": "hello"},
+			map[string]any{"role": "assistant", "content": "prefill text"},
+		},
+	}
+	got := ConvertAnthropicToGoogle(request, NewSignatureCache())
+	contents := asSlice(got["contents"])
+	if len(contents) != 1 {
+		t.Fatalf("expected 1 content item after stripping trailing model turn, got %d", len(contents))
+	}
+	last := asMap(contents[0])
+	if stringValue(last["role"]) != "user" {
+		t.Fatalf("expected last role to be user, got %s", stringValue(last["role"]))
+	}
+}
+
 func TestResponseConversionMatchesParityFixture(t *testing.T) {
 	t.Parallel()
 	cache := NewSignatureCache()

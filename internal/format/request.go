@@ -111,6 +111,26 @@ func convertAnthropicToGoogle(request map[string]any, cache *SignatureCache, opt
 		}
 		contents = append(contents, map[string]any{"role": convertRole(role), "parts": parts})
 	}
+	for len(contents) > 0 {
+		last := asMap(contents[len(contents)-1])
+		if last != nil && stringValue(last["role"]) == "model" {
+			hasUser := false
+			for i := 0; i < len(contents)-1; i++ {
+				if item := asMap(contents[i]); item != nil && stringValue(item["role"]) == "user" {
+					hasUser = true
+					break
+				}
+			}
+			if hasUser {
+				contents = contents[:len(contents)-1]
+			} else {
+				last["role"] = "user"
+				break
+			}
+		} else {
+			break
+		}
+	}
 	result["contents"] = contents
 
 	generation := asMap(result["generationConfig"])
