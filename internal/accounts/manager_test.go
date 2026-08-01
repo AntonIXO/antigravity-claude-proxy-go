@@ -120,6 +120,34 @@ func TestStickyWaitsOnlyForShortCurrentLimit(t *testing.T) {
 	}
 }
 
+func TestMarkFailureDoesNotRateLimitEmptyModel(t *testing.T) {
+	t.Parallel()
+	now := time.Date(2026, 7, 14, 12, 0, 0, 0, time.UTC)
+	account := testAccount("empty-model@example.com")
+	manager, err := New(Options{Accounts: []*Account{account}, Strategy: StrategyHybrid, Now: func() time.Time { return now }})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	for i := 0; i < 3; i++ {
+		manager.MarkFailure(account, "")
+	}
+	if account.IsInvalid || account.ModelRateLimits[""] != nil {
+		t.Fatalf("empty-model MarkFailure created a rate limit or invalidation: IsInvalid=%v ModelRateLimits[\"\"]=%#v", account.IsInvalid, account.ModelRateLimits[""])
+	}
+
+	for i := 0; i < 2; i++ {
+		manager.MarkFailure(account, "claude")
+	}
+	if account.ModelRateLimits["claude"] != nil {
+		t.Fatalf("rate limit created before 3 consecutive failures: %#v", account.ModelRateLimits["claude"])
+	}
+	manager.MarkFailure(account, "claude")
+	if limit := account.ModelRateLimits["claude"]; limit == nil || !limit.IsRateLimited {
+		t.Fatalf("expected per-model rate limit after 3 consecutive failures, got %#v", limit)
+	}
+}
+
 func testAccount(email string) *Account {
 	return &Account{Email: email, Source: "manual", Enabled: true, APIKey: "token-" + email, ProjectID: "project-" + email}
 }
