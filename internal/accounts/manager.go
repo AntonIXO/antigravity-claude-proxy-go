@@ -388,7 +388,7 @@ func (manager *Manager) MarkFailure(account *Account, model string) {
 	defer manager.mu.Unlock()
 	account.ConsecutiveFailure++
 	manager.recordFailureLocked(account.Email)
-	if account.ConsecutiveFailure >= 3 {
+	if model != "" && account.ConsecutiveFailure >= 3 {
 		account.ModelRateLimits[model] = &RateLimit{
 			IsRateLimited: true, ResetTimeMS: manager.now().Add(time.Minute).UnixMilli(), ActualResetMS: time.Minute.Milliseconds(),
 		}

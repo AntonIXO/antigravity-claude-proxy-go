@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net/http"
 	"reflect"
+	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -119,6 +120,35 @@ func (client *scriptedClient) StreamGenerateContent(_ context.Context, payload a
 		}
 	}
 	return cloudcode.Response{Endpoint: cloudcode.DailyEndpoint, StatusCode: http.StatusOK}, result.err
+}
+
+func TestFetchAvailableModelsTransientCredentialErrorDoesNotBlockCatalog(t *testing.T) {
+	t.Parallel()
+	now := time.Date(2026, 7, 14, 12, 0, 0, 0, time.UTC)
+	account := testAccount("transient@example.com")
+	manager, err := New(Options{Accounts: []*Account{account}, Strategy: StrategyHybrid, Now: func() time.Time { return now }})
+	if err != nil {
+		t.Fatal(err)
+	}
+	// Resolver fails with a transient credential error. The dispatcher should
+	// retry, but it must not leave the account invalid or rate-limited on model
+	// "" (which Select("") checks and would make catalog refresh fail with
+	// "no accounts available").
+	dispatcher := newTestDispatcher(t, manager, &staticResolver{}, map[string]*scriptedClient{}, now, func(context.Context, time.Duration) error { return nil })
+	_, err = dispatcher.FetchAvailableModels(context.Background())
+	if err == nil {
+		t.Fatal("expected error from exhausted retries")
+	}
+	if strings.Contains(err.Error(), "no accounts available") {
+		t.Fatalf("unexpected 'no accounts available' from empty-model rate limit: %v", err)
+	}
+	snapshot := manager.Snapshot()[0]
+	if snapshot.Invalid {
+		t.Fatalf("account was permanently invalidated by a catalog refresh failure: %#v", snapshot)
+	}
+	if _, ok := snapshot.Limits[""]; ok {
+		t.Fatalf("empty-model rate limit was created: %#v", snapshot.Limits)
+	}
 }
 
 func TestDispatcherUsesAgyAgentRouteAndLiveOutputLimit(t *testing.T) {
