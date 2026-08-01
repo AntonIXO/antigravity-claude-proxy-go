@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"log/slog"
 	"net/http"
 	"strings"
 	"sync"
@@ -122,7 +123,10 @@ func (dispatcher *Dispatcher) FetchAvailableModels(ctx context.Context) (cloudco
 		}
 		credentials, err := dispatcher.resolver.Resolve(ctx, selection.Account)
 		if err != nil {
-			dispatcher.handleCredentialError(selection.Account, err)
+			// For model catalog refresh, use MarkFailure (not MarkInvalid) — a
+			// transient credential error should not permanently disable an account
+			// based solely on a background list-models call.
+			dispatcher.manager.MarkFailure(selection.Account, "")
 			lastError = err
 			continue
 		}
@@ -366,6 +370,7 @@ func (dispatcher *Dispatcher) handleCredentialError(account *Account, err error)
 	if IsPermanentAuthFailure(err.Error()) || containsAny(strings.ToLower(err.Error()), "auth_invalid", "invalid_grant") {
 		dispatcher.manager.MarkInvalid(account, "Credentials are invalid - re-authentication required", "")
 	} else {
+		slog.Warn("credential error — marking account as failed", "email", account.Email, "error", err)
 		dispatcher.manager.MarkFailure(account, "")
 	}
 }

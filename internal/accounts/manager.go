@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"log/slog"
 	"os"
 	"path/filepath"
 	"sort"
@@ -171,6 +172,12 @@ func Load(path string) (File, error) {
 		if stored.VerifyURL != "" {
 			account.IsInvalid = stored.IsInvalid
 			account.InvalidReason = stored.InvalidReason
+		} else if stored.IsInvalid {
+			// accounts.json had isInvalid=true but no verifyURL — reset it on startup
+			// (agy or a previous proxy run may have written this; we clear it so a
+			// simple restart recovers the account without user intervention)
+			slog.Warn("account was marked invalid in accounts.json without verifyURL — resetting on startup",
+				"email", stored.Email, "reason", stored.InvalidReason)
 		}
 		account.LastUsedMS = parseMilliseconds(stored.LastUsed)
 		result.Accounts = append(result.Accounts, account)
@@ -373,6 +380,7 @@ func (manager *Manager) MarkInvalid(account *Account, reason, verifyURL string) 
 	account.InvalidReason = reason
 	account.VerifyURL = verifyURL
 	manager.recordFailureLocked(account.Email)
+	slog.Warn("account marked invalid", "email", account.Email, "reason", reason, "verifyURL", verifyURL)
 }
 
 func (manager *Manager) MarkFailure(account *Account, model string) {
