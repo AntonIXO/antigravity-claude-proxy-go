@@ -62,7 +62,7 @@ type Quota struct {
 type Subscription struct {
 	Tier       string `json:"tier"`
 	ProjectID  string `json:"projectId"`
-	DetectedAt string `json:"detectedAt"`
+	DetectedAt any    `json:"detectedAt,omitempty"`
 }
 
 type Account struct {
@@ -192,6 +192,8 @@ type Options struct {
 	Accounts    []*Account
 	ActiveIndex int
 	Strategy    string
+	ConfigPath  string
+	Settings    map[string]any
 	Now         func() time.Time
 }
 
@@ -212,7 +214,9 @@ type tokenBucket struct {
 
 type Manager struct {
 	mu           sync.RWMutex
+	configPath   string
 	accounts     []*Account
+	settings     map[string]any
 	strategy     string
 	currentIndex int
 	cursor       int
@@ -251,7 +255,8 @@ func New(options Options) (*Manager, error) {
 		options.ActiveIndex = 0
 	}
 	return &Manager{
-		accounts: options.Accounts, strategy: strategy, currentIndex: options.ActiveIndex,
+		configPath: options.ConfigPath, accounts: options.Accounts, settings: options.Settings,
+		strategy: strategy, currentIndex: options.ActiveIndex,
 		now: options.Now, health: make(map[string]healthRecord),
 		buckets: make(map[string]tokenBucket), projects: make(map[string]string),
 	}, nil
@@ -262,7 +267,7 @@ func NewFromFile(path, strategy string, now func() time.Time) (*Manager, error) 
 	if err != nil {
 		return nil, err
 	}
-	return New(Options{Accounts: file.Accounts, ActiveIndex: file.ActiveIndex, Strategy: strategy, Now: now})
+	return New(Options{Accounts: file.Accounts, ActiveIndex: file.ActiveIndex, Settings: file.Settings, ConfigPath: path, Strategy: strategy, Now: now})
 }
 
 // NewDefault uses the optional account-pool configuration when it exists.
@@ -672,3 +677,370 @@ func quotaFresh(value any, now time.Time) bool {
 		return false
 	}
 }
+
+// Save persists the account configuration to disk.
+func Save(path string, accounts []*Account, settings map[string]any, activeIndex int) error {
+	if path == "" {
+		var err error
+		path, err = DefaultConfigPath()
+		if err != nil {
+			return err
+		}
+	}
+	dir := filepath.Dir(path)
+	if err := os.MkdirAll(dir, 0755); err != nil {
+		return fmt.Errorf("create config directory: %w", err)
+	}
+
+	diskAccounts := make([]diskAccount, 0, len(accounts))
+	for _, acc := range accounts {
+		enabled := acc.Enabled
+		da := diskAccount{
+			Email:                acc.Email,
+			Source:               acc.Source,
+			Enabled:              &enabled,
+			DBPath:               acc.DBPath,
+			RefreshToken:         acc.RefreshToken,
+			APIKey:               acc.APIKey,
+			AgyTokenPath:         acc.AgyTokenPath,
+			ProjectID:            acc.ProjectID,
+			Subscription:         acc.Subscription,
+			Quota:                acc.Quota,
+			QuotaThreshold:       acc.QuotaThreshold,
+			ModelQuotaThresholds: acc.ModelThreshold,
+			IsInvalid:            acc.IsInvalid,
+			InvalidReason:        acc.InvalidReason,
+			VerifyURL:            acc.VerifyURL,
+			ModelRateLimits:      acc.ModelRateLimits,
+		}
+		if acc.LastUsedMS > 0 {
+			da.LastUsed = json.RawMessage(fmt.Sprintf("%d", acc.LastUsedMS))
+		}
+		diskAccounts = append(diskAccounts, da)
+	}
+
+	doc := struct {
+		Accounts    []diskAccount  `json:"accounts"`
+		Settings    map[string]any `json:"settings"`
+		ActiveIndex int            `json:"activeIndex"`
+	}{
+		Accounts:    diskAccounts,
+		Settings:    settings,
+		ActiveIndex: activeIndex,
+	}
+
+	data, err := json.MarshalIndent(doc, "", "  ")
+	if err != nil {
+		return fmt.Errorf("marshal account config: %w", err)
+	}
+
+	tmpFile := path + ".tmp"
+	if err := os.WriteFile(tmpFile, data, 0600); err != nil {
+		return fmt.Errorf("write temp account config: %w", err)
+	}
+	return os.Rename(tmpFile, path)
+}
+
+func (manager *Manager) SaveOAuthAccount(email, refreshToken string) error {
+	acc := &Account{
+		Email:        email,
+		Source:       "oauth",
+		RefreshToken: refreshToken,
+		Enabled:      true,
+	}
+	return manager.AddOrUpdateAccount(acc)
+}
+
+func (manager *Manager) SaveToDisk() error {
+	manager.mu.RLock()
+	path := manager.configPath
+	accounts := make([]*Account, len(manager.accounts))
+	copy(accounts, manager.accounts)
+	settings := manager.settings
+	activeIndex := manager.currentIndex
+	manager.mu.RUnlock()
+
+	return Save(path, accounts, settings, activeIndex)
+}
+
+func (manager *Manager) ConfigPath() string {
+	manager.mu.RLock()
+	defer manager.mu.RUnlock()
+	return manager.configPath
+}
+
+func (manager *Manager) SetConfigPath(path string) {
+	manager.mu.Lock()
+	defer manager.mu.Unlock()
+	manager.configPath = path
+}
+
+func (manager *Manager) GetAllAccounts() []*Account {
+	manager.mu.RLock()
+	defer manager.mu.RUnlock()
+	result := make([]*Account, len(manager.accounts))
+	copy(result, manager.accounts)
+	return result
+}
+
+func (manager *Manager) GetSettings() map[string]any {
+	manager.mu.RLock()
+	defer manager.mu.RUnlock()
+	if manager.settings == nil {
+		return make(map[string]any)
+	}
+	result := make(map[string]any, len(manager.settings))
+	for k, v := range manager.settings {
+		result[k] = v
+	}
+	return result
+}
+
+func (manager *Manager) GetStrategy() string {
+	manager.mu.RLock()
+	defer manager.mu.RUnlock()
+	return manager.strategy
+}
+
+func (manager *Manager) SetStrategy(strategy string) {
+	manager.mu.Lock()
+	defer manager.mu.Unlock()
+	manager.strategy = normalizeStrategy(strategy)
+}
+
+func (manager *Manager) ActiveIndex() int {
+	manager.mu.RLock()
+	defer manager.mu.RUnlock()
+	return manager.currentIndex
+}
+
+func (manager *Manager) ClearInvalid(email string) {
+	manager.mu.Lock()
+	for _, acc := range manager.accounts {
+		if acc.Email == email {
+			acc.IsInvalid = false
+			acc.InvalidReason = ""
+			acc.VerifyURL = ""
+			break
+		}
+	}
+	manager.mu.Unlock()
+	_ = manager.SaveToDisk()
+}
+
+func (manager *Manager) ClearTokenCache(email string) {
+	manager.mu.Lock()
+	delete(manager.projects, email)
+	delete(manager.health, email)
+	delete(manager.buckets, email)
+	manager.mu.Unlock()
+}
+
+func (manager *Manager) ClearProjectCache(email string) {
+	manager.mu.Lock()
+	delete(manager.projects, email)
+	manager.mu.Unlock()
+}
+
+func (manager *Manager) SetAccountEnabled(email string, enabled bool) error {
+	manager.mu.Lock()
+	found := false
+	for _, acc := range manager.accounts {
+		if acc.Email == email {
+			acc.Enabled = enabled
+			found = true
+			break
+		}
+	}
+	manager.mu.Unlock()
+	if !found {
+		return fmt.Errorf("account %s not found", email)
+	}
+	return manager.SaveToDisk()
+}
+
+func (manager *Manager) RemoveAccount(email string) error {
+	manager.mu.Lock()
+	index := -1
+	for i, acc := range manager.accounts {
+		if acc.Email == email {
+			index = i
+			break
+		}
+	}
+	if index == -1 {
+		manager.mu.Unlock()
+		return fmt.Errorf("account %s not found", email)
+	}
+	manager.accounts = append(manager.accounts[:index], manager.accounts[index+1:]...)
+	if manager.currentIndex >= len(manager.accounts) {
+		manager.currentIndex = max(0, len(manager.accounts)-1)
+	}
+	delete(manager.projects, email)
+	delete(manager.health, email)
+	delete(manager.buckets, email)
+	manager.mu.Unlock()
+	return manager.SaveToDisk()
+}
+
+func (manager *Manager) AddOrUpdateAccount(account *Account) error {
+	if account == nil || account.Email == "" {
+		return errors.New("invalid account data: email is required")
+	}
+	manager.mu.Lock()
+	if account.Source == "" {
+		account.Source = "oauth"
+	}
+	if account.ModelRateLimits == nil {
+		account.ModelRateLimits = make(map[string]*RateLimit)
+	}
+	if account.ModelThreshold == nil {
+		account.ModelThreshold = make(map[string]float64)
+	}
+	if account.Quota.Models == nil {
+		account.Quota.Models = make(map[string]ModelQuota)
+	}
+
+	found := false
+	for i, existing := range manager.accounts {
+		if existing.Email == account.Email {
+			account.Enabled = true
+			account.IsInvalid = false
+			account.InvalidReason = ""
+			account.VerifyURL = ""
+			manager.accounts[i] = account
+			found = true
+			break
+		}
+	}
+	if !found {
+		account.Enabled = true
+		manager.accounts = append(manager.accounts, account)
+	}
+	manager.mu.Unlock()
+	return manager.SaveToDisk()
+}
+
+func (manager *Manager) UpdateThresholds(email string, quotaThreshold *float64, modelThreshold map[string]float64) error {
+	manager.mu.Lock()
+	found := false
+	for _, acc := range manager.accounts {
+		if acc.Email == email {
+			acc.QuotaThreshold = quotaThreshold
+			if modelThreshold != nil {
+				acc.ModelThreshold = modelThreshold
+			}
+			found = true
+			break
+		}
+	}
+	manager.mu.Unlock()
+	if !found {
+		return fmt.Errorf("account %s not found", email)
+	}
+	return manager.SaveToDisk()
+}
+
+func (manager *Manager) Reload(path string) error {
+	if path == "" {
+		path = manager.ConfigPath()
+	}
+	file, err := Load(path)
+	if err != nil {
+		return err
+	}
+	manager.mu.Lock()
+	defer manager.mu.Unlock()
+	manager.configPath = path
+	manager.accounts = file.Accounts
+	manager.settings = file.Settings
+	manager.currentIndex = file.ActiveIndex
+	return nil
+}
+
+func (manager *Manager) GetStatus() map[string]any {
+	manager.mu.Lock()
+	defer manager.mu.Unlock()
+	manager.clearExpiredLocked()
+
+	now := manager.now().UnixMilli()
+	availableCount := 0
+	invalidCount := 0
+	rateLimitedCount := 0
+
+	accountList := make([]map[string]any, 0, len(manager.accounts))
+	for _, acc := range manager.accounts {
+		if acc.Enabled && !acc.IsInvalid {
+			availableCount++
+		}
+		if acc.IsInvalid {
+			invalidCount++
+		}
+		isRateLimited := false
+		for _, rl := range acc.ModelRateLimits {
+			if rl != nil && rl.IsRateLimited && rl.ResetTimeMS > now {
+				isRateLimited = true
+				break
+			}
+		}
+		if isRateLimited {
+			rateLimitedCount++
+		}
+
+		item := map[string]any{
+			"email":                acc.Email,
+			"source":               acc.Source,
+			"enabled":              acc.Enabled,
+			"projectId":            acc.ProjectID,
+			"modelRateLimits":      acc.ModelRateLimits,
+			"isInvalid":            acc.IsInvalid,
+			"invalidReason":        acc.InvalidReason,
+			"verifyUrl":            acc.VerifyURL,
+			"lastUsed":             acc.LastUsedMS,
+			"subscription":         acc.Subscription,
+			"quota":                acc.Quota,
+			"quotaThreshold":       acc.QuotaThreshold,
+			"modelQuotaThresholds": acc.ModelThreshold,
+		}
+		accountList = append(accountList, item)
+	}
+
+	summary := fmt.Sprintf("%d total, %d available, %d rate-limited, %d invalid",
+		len(manager.accounts), availableCount, rateLimitedCount, invalidCount)
+
+	return map[string]any{
+		"total":       len(manager.accounts),
+		"available":   availableCount,
+		"rateLimited": rateLimitedCount,
+		"invalid":     invalidCount,
+		"summary":     summary,
+		"accounts":    accountList,
+	}
+}
+
+func (manager *Manager) GetStrategyHealthData() map[string]any {
+	manager.mu.RLock()
+	defer manager.mu.RUnlock()
+
+	accounts := make([]map[string]any, 0, len(manager.accounts))
+	for _, acc := range manager.accounts {
+		accounts = append(accounts, map[string]any{
+			"email":       acc.Email,
+			"healthScore": manager.healthScoreLocked(acc.Email),
+			"tokens":      manager.tokensLocked(acc.Email),
+			"failures":    acc.ConsecutiveFailure,
+			"isInvalid":   acc.IsInvalid,
+			"enabled":     acc.Enabled,
+			"lastUsed":    acc.LastUsedMS,
+			"rateLimits":  acc.ModelRateLimits,
+		})
+	}
+
+	return map[string]any{
+		"strategy": manager.strategy,
+		"trackers": map[string]any{
+			"accounts": accounts,
+		},
+	}
+}
+

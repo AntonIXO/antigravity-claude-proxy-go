@@ -13,8 +13,6 @@ import (
 	"strconv"
 	"strings"
 	"time"
-
-	"golang.org/x/sys/unix"
 )
 
 const (
@@ -113,10 +111,10 @@ func Read(path string) (Token, error) {
 		return Token{}, fmt.Errorf("open agy token: %w", err)
 	}
 	defer file.Close()
-	if err := unix.Flock(int(file.Fd()), unix.LOCK_SH); err != nil {
+	if err := flockShared(file.Fd()); err != nil {
 		return Token{}, fmt.Errorf("lock agy token: %w", err)
 	}
-	defer unix.Flock(int(file.Fd()), unix.LOCK_UN) //nolint:errcheck
+	defer flockUnlock(file.Fd()) //nolint:errcheck
 
 	raw, err := io.ReadAll(file)
 	if err != nil {
@@ -151,10 +149,10 @@ func (m Manager) Get(ctx context.Context) (Credentials, error) {
 		return Credentials{}, fmt.Errorf("open agy token: %w", err)
 	}
 	defer file.Close()
-	if err := unix.Flock(int(file.Fd()), unix.LOCK_EX); err != nil {
+	if err := flockExclusive(file.Fd()); err != nil {
 		return Credentials{}, fmt.Errorf("lock agy token: %w", err)
 	}
-	defer unix.Flock(int(file.Fd()), unix.LOCK_UN) //nolint:errcheck
+	defer flockUnlock(file.Fd()) //nolint:errcheck
 
 	raw, err := io.ReadAll(file)
 	if err != nil {
