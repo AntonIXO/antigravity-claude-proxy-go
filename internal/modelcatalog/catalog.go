@@ -81,6 +81,9 @@ var routingAliases = map[string]string{
 	"gemini-3.5-flash-high":      "Gemini 3.5 Flash (High)",
 	"gemini-3.5-flash-medium":    "Gemini 3.5 Flash (Medium)",
 	"claude-sonnet-4-6-thinking": "Claude Sonnet 4.6 (Thinking)",
+	"gemini-3.7-flash-high":      "Gemini 3.7 Flash (High)",
+	"gemini-3.7-flash-medium":    "Gemini 3.7 Flash (Medium)",
+	"gemini-3.7-flash-low":       "Gemini 3.7 Flash (Low)",
 }
 
 func Parse(body []byte) (*Catalog, error) {
@@ -143,6 +146,34 @@ func Parse(body []byte) (*Catalog, error) {
 		catalog.byID[strings.ToLower(id)] = model
 		catalog.byDisplay[strings.ToLower(model.DisplayName)] = model
 	}
+
+	synthetic37 := []struct {
+		id          string
+		displayName string
+		baseID      string
+	}{
+		{"gemini-3.7-flash-high", "Gemini 3.7 Flash (High)", "gemini-3.6-flash-high"},
+		{"gemini-3.7-flash-medium", "Gemini 3.7 Flash (Medium)", "gemini-3.6-flash-medium"},
+		{"gemini-3.7-flash-low", "Gemini 3.7 Flash (Low)", "gemini-3.6-flash-low"},
+	}
+
+	var syntheticModels []Model
+	for _, synth := range synthetic37 {
+		if _, exists := catalog.byID[synth.id]; !exists {
+			if baseModel, exists := catalog.byID[synth.baseID]; exists {
+				synthModel := baseModel
+				synthModel.ID = synth.id
+				synthModel.DisplayName = synth.displayName
+				catalog.byID[synth.id] = synthModel
+				catalog.byDisplay[strings.ToLower(synth.displayName)] = synthModel
+				syntheticModels = append(syntheticModels, synthModel)
+			}
+		}
+	}
+	if len(syntheticModels) > 0 {
+		catalog.selectable = append(syntheticModels, catalog.selectable...)
+	}
+
 	if len(catalog.selectable) == 0 {
 		return nil, errors.New("Cloud Code catalog has no selectable agent models")
 	}
