@@ -137,7 +137,10 @@ func TestMarkFailureDoesNotRateLimitEmptyModel(t *testing.T) {
 	}
 
 	account.ConsecutiveFailure = 0
+<<<<<<< HEAD
 
+=======
+>>>>>>> 0cb3daa (feat(proxy): replace node backend with Go implementation)
 	for i := 0; i < 2; i++ {
 		manager.MarkFailure(account, "claude")
 	}

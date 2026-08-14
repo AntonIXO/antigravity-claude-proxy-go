@@ -15,9 +15,11 @@ import (
 	"sync"
 	"time"
 
+	"antigravity-go-proxy/internal/accounts"
 	"antigravity-go-proxy/internal/auth"
 	"antigravity-go-proxy/internal/cloudcode"
 	proxyformat "antigravity-go-proxy/internal/format"
+	"antigravity-go-proxy/internal/logger"
 	"antigravity-go-proxy/internal/modelcatalog"
 )
 
@@ -41,25 +43,33 @@ type Backend interface {
 }
 
 type Options struct {
-	APIKey      string
-	ProjectID   string
-	Credentials func(context.Context) (auth.Credentials, error)
-	NewUpstream func(string) Upstream
-	Backend     Backend
-	Builder     *proxyformat.Builder
-	Now         func() time.Time
-	Logger      *slog.Logger
+	APIKey         string
+	ProjectID      string
+	Credentials    func(context.Context) (auth.Credentials, error)
+	NewUpstream    func(string) Upstream
+	Backend        Backend
+	Builder        *proxyformat.Builder
+	Now            func() time.Time
+	Logger         *slog.Logger
+	AccountManager *accounts.Manager
+	Broadcaster    *logger.Broadcaster
+	WebUI          http.Handler
+	OAuthHandler   http.Handler
 }
 
 type Server struct {
-	apiKey      string
-	projectID   string
-	credentials func(context.Context) (auth.Credentials, error)
-	newUpstream func(string) Upstream
-	backend     Backend
-	builder     *proxyformat.Builder
-	now         func() time.Time
-	logger      *slog.Logger
+	apiKey         string
+	projectID      string
+	credentials    func(context.Context) (auth.Credentials, error)
+	newUpstream    func(string) Upstream
+	backend        Backend
+	builder        *proxyformat.Builder
+	now            func() time.Time
+	logger         *slog.Logger
+	accountManager *accounts.Manager
+	broadcaster    *logger.Broadcaster
+	webUI          http.Handler
+	oauthHandler   http.Handler
 
 	mu                sync.Mutex
 	cachedCredentials auth.Credentials
@@ -91,6 +101,8 @@ func New(options Options) (*Server, error) {
 		apiKey: options.APIKey, projectID: options.ProjectID,
 		credentials: options.Credentials, newUpstream: options.NewUpstream, backend: options.Backend,
 		builder: options.Builder, now: options.Now, logger: options.Logger,
+		accountManager: options.AccountManager, broadcaster: options.Broadcaster,
+		webUI: options.WebUI, oauthHandler: options.OAuthHandler,
 		projects: make(map[string]string),
 	}, nil
 }
@@ -111,30 +123,44 @@ func (server *Server) serveHTTP(writer http.ResponseWriter, request *http.Reques
 		writer.WriteHeader(http.StatusNoContent)
 		return
 	}
-	if path == "/health" && request.Method == http.MethodGet {
-		server.health(writer)
+
+	// First try management handlers (/health, /account-limits, /api/*)
+	if server.handleManagement(writer, request, path) {
 		return
 	}
+
 	if path == "/" && request.Method == http.MethodPost {
 		writeJSON(writer, http.StatusOK, map[string]any{"status": "ok"})
 		return
 	}
-	if strings.HasPrefix(path, "/v1/") && !server.authorized(request) {
-		writeAPIError(writer, http.StatusUnauthorized, "authentication_error", "Invalid or missing API key")
+
+	if strings.HasPrefix(path, "/v1/") {
+		if !server.authorized(request) {
+			writeAPIError(writer, http.StatusUnauthorized, "authentication_error", "Invalid or missing API key")
+			return
+		}
+		switch {
+		case path == "/v1/models" && request.Method == http.MethodGet:
+			server.models(writer, request)
+		case path == "/v1/usage" && request.Method == http.MethodGet:
+			server.usage(writer, request)
+		case path == "/v1/messages" && request.Method == http.MethodPost:
+			server.messages(writer, request)
+		case path == "/v1/messages/count_tokens" && request.Method == http.MethodPost:
+			writeAPIError(writer, http.StatusNotImplemented, "not_implemented", "Token counting is not implemented. Use /v1/messages with max_tokens or configure your client to skip token counting.")
+		default:
+			writeAPIError(writer, http.StatusNotFound, "not_found_error", fmt.Sprintf("Endpoint %s %s not found", request.Method, request.URL.Path))
+		}
 		return
 	}
-	switch {
-	case path == "/v1/models" && request.Method == http.MethodGet:
-		server.models(writer, request)
-	case path == "/v1/usage" && request.Method == http.MethodGet:
-		server.usage(writer, request)
-	case path == "/v1/messages" && request.Method == http.MethodPost:
-		server.messages(writer, request)
-	case path == "/v1/messages/count_tokens" && request.Method == http.MethodPost:
-		writeAPIError(writer, http.StatusNotImplemented, "not_implemented", "Token counting is not implemented. Use /v1/messages with max_tokens or configure your client to skip token counting.")
-	default:
-		writeAPIError(writer, http.StatusNotFound, "not_found_error", fmt.Sprintf("Endpoint %s %s not found", request.Method, request.URL.Path))
+
+	// Web UI static assets fallback
+	if server.webUI != nil && (request.Method == http.MethodGet || request.Method == http.MethodHead) {
+		server.webUI.ServeHTTP(writer, request)
+		return
 	}
+
+	writeAPIError(writer, http.StatusNotFound, "not_found_error", fmt.Sprintf("Endpoint %s %s not found", request.Method, request.URL.Path))
 }
 
 func (server *Server) authorized(request *http.Request) bool {
