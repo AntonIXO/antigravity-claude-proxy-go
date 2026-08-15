@@ -14,6 +14,7 @@ import (
 	"antigravity-go-proxy/internal/auth"
 	"antigravity-go-proxy/internal/cloudcode"
 	proxyformat "antigravity-go-proxy/internal/format"
+	"antigravity-go-proxy/internal/logger"
 	"antigravity-go-proxy/internal/modelcatalog"
 )
 
@@ -134,6 +135,7 @@ func (dispatcher *Dispatcher) FetchAvailableModels(ctx context.Context) (cloudco
 		if err == nil {
 			dispatcher.manager.MarkSuccess(selection.Account, "")
 			dispatcher.cacheCatalog(response.Body)
+			dispatcher.updateAccountQuota(selection.Account, response.Body)
 			return response, nil
 		}
 		lastError = err
@@ -146,9 +148,15 @@ func (dispatcher *Dispatcher) FetchAvailableModels(ctx context.Context) (cloudco
 
 func (dispatcher *Dispatcher) StreamGenerateContent(ctx context.Context, request map[string]any, consume func(cloudcode.SSEEvent) error) (cloudcode.Response, error) {
 	requestedModel, _ := request["model"].(string)
+	stream, _ := request["stream"].(bool)
+	slog.Info(fmt.Sprintf("[API] Request for model: %s, stream: %v", requestedModel, stream))
+
 	modelDetails, err := dispatcher.resolveModel(ctx, requestedModel)
 	if err != nil {
 		return cloudcode.Response{}, err
+	}
+	if modelDetails.ID != requestedModel {
+		slog.Info(fmt.Sprintf("[Server] Mapping model %s -> %s", requestedModel, modelDetails.ID))
 	}
 	request = cloneRequest(request)
 	request["model"] = modelDetails.ID
@@ -164,6 +172,9 @@ func (dispatcher *Dispatcher) StreamGenerateContent(ctx context.Context, request
 			wait := selection.Wait
 			if wait == 0 {
 				wait = dispatcher.manager.MinWait(model)
+			}
+			if wait > 0 {
+				slog.Warn(fmt.Sprintf("[Server] All accounts rate-limited for %s. Wait %s", model, wait.Round(time.Second)))
 			}
 			if wait > 0 && wait <= dispatcher.maxWait {
 				if err := dispatcher.sleep(ctx, wait+500*time.Millisecond); err != nil {
@@ -216,6 +227,7 @@ func (dispatcher *Dispatcher) StreamGenerateContent(ctx context.Context, request
 			})
 			if requestErr == nil {
 				dispatcher.manager.MarkSuccess(account, model)
+				logger.LogSuccess(fmt.Sprintf("[API] Request succeeded using account %s for %s", account.Email, model))
 				return response, nil
 			}
 			lastError = requestErr
@@ -414,6 +426,42 @@ func (dispatcher *Dispatcher) rotateForError(account *Account, model string, err
 		}
 		return false
 	}
+}
+
+func (dispatcher *Dispatcher) updateAccountQuota(account *Account, body []byte) {
+	if account == nil || len(body) == 0 {
+		return
+	}
+	var doc struct {
+		Models map[string]struct {
+			QuotaInfo struct {
+				RemainingFraction *float64 `json:"remainingFraction"`
+				ResetTime         string   `json:"resetTime"`
+			} `json:"quotaInfo"`
+		} `json:"models"`
+	}
+	if err := json.Unmarshal(body, &doc); err != nil || len(doc.Models) == 0 {
+		return
+	}
+	modelsQuota := make(map[string]ModelQuota, len(doc.Models))
+	for mID, mData := range doc.Models {
+		fraction := mData.QuotaInfo.RemainingFraction
+		if fraction == nil && mData.QuotaInfo.ResetTime != "" {
+			zero := 0.0
+			fraction = &zero
+		}
+		if fraction != nil || mData.QuotaInfo.ResetTime != "" {
+			modelsQuota[mID] = ModelQuota{
+				RemainingFraction: fraction,
+				ResetTime:         mData.QuotaInfo.ResetTime,
+			}
+		}
+	}
+	quota := Quota{
+		Models:      modelsQuota,
+		LastChecked: dispatcher.now().UnixMilli(),
+	}
+	dispatcher.manager.UpdateAccountQuota(account.Email, quota, nil)
 }
 
 func findHTTPError(err error) *cloudcode.HTTPError {

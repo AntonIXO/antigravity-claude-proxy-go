@@ -15,10 +15,14 @@ import (
 	"sync"
 	"time"
 
+	"antigravity-go-proxy/internal/accounts"
 	"antigravity-go-proxy/internal/auth"
 	"antigravity-go-proxy/internal/cloudcode"
+	"antigravity-go-proxy/internal/config"
 	proxyformat "antigravity-go-proxy/internal/format"
+	"antigravity-go-proxy/internal/logger"
 	"antigravity-go-proxy/internal/modelcatalog"
+	"antigravity-go-proxy/internal/stats"
 )
 
 const maxRequestBody = 50 << 20
@@ -41,25 +45,35 @@ type Backend interface {
 }
 
 type Options struct {
-	APIKey      string
-	ProjectID   string
-	Credentials func(context.Context) (auth.Credentials, error)
-	NewUpstream func(string) Upstream
-	Backend     Backend
-	Builder     *proxyformat.Builder
-	Now         func() time.Time
-	Logger      *slog.Logger
+	APIKey         string
+	ProjectID      string
+	Credentials    func(context.Context) (auth.Credentials, error)
+	NewUpstream    func(string) Upstream
+	Backend        Backend
+	Builder        *proxyformat.Builder
+	Now            func() time.Time
+	Logger         *slog.Logger
+	AccountManager *accounts.Manager
+	Broadcaster    *logger.Broadcaster
+	WebUI          http.Handler
+	OAuthHandler   http.Handler
+	Tracker        *stats.Tracker
 }
 
 type Server struct {
-	apiKey      string
-	projectID   string
-	credentials func(context.Context) (auth.Credentials, error)
-	newUpstream func(string) Upstream
-	backend     Backend
-	builder     *proxyformat.Builder
-	now         func() time.Time
-	logger      *slog.Logger
+	apiKey         string
+	projectID      string
+	credentials    func(context.Context) (auth.Credentials, error)
+	newUpstream    func(string) Upstream
+	backend        Backend
+	builder        *proxyformat.Builder
+	now            func() time.Time
+	logger         *slog.Logger
+	accountManager *accounts.Manager
+	broadcaster    *logger.Broadcaster
+	webUI          http.Handler
+	oauthHandler   http.Handler
+	tracker        *stats.Tracker
 
 	mu                sync.Mutex
 	cachedCredentials auth.Credentials
@@ -69,9 +83,6 @@ type Server struct {
 }
 
 func New(options Options) (*Server, error) {
-	if options.APIKey == "" {
-		return nil, errors.New("local API key is required")
-	}
 	if options.Backend == nil && options.Credentials == nil {
 		return nil, errors.New("credential provider is required")
 	}
@@ -91,12 +102,83 @@ func New(options Options) (*Server, error) {
 		apiKey: options.APIKey, projectID: options.ProjectID,
 		credentials: options.Credentials, newUpstream: options.NewUpstream, backend: options.Backend,
 		builder: options.Builder, now: options.Now, logger: options.Logger,
+		accountManager: options.AccountManager, broadcaster: options.Broadcaster,
+		webUI: options.WebUI, oauthHandler: options.OAuthHandler, tracker: options.Tracker,
 		projects: make(map[string]string),
 	}, nil
 }
 
+type responseWriterRecorder struct {
+	http.ResponseWriter
+	statusCode   int
+	bytesWritten int64
+}
+
+func (r *responseWriterRecorder) WriteHeader(statusCode int) {
+	r.statusCode = statusCode
+	r.ResponseWriter.WriteHeader(statusCode)
+}
+
+func (r *responseWriterRecorder) Write(b []byte) (int, error) {
+	if r.statusCode == 0 {
+		r.statusCode = http.StatusOK
+	}
+	n, err := r.ResponseWriter.Write(b)
+	r.bytesWritten += int64(n)
+	return n, err
+}
+
+func (r *responseWriterRecorder) Flush() {
+	if flusher, ok := r.ResponseWriter.(http.Flusher); ok {
+		flusher.Flush()
+	}
+}
+
+func shouldSkipLogging(path string) bool {
+	if path == "/api/event_logging/batch" || path == "/v1/messages/count_tokens" {
+		return true
+	}
+	if strings.HasPrefix(path, "/.well-known/") {
+		return true
+	}
+	return false
+}
+
+func loggingMiddleware(next http.Handler, log *slog.Logger) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if shouldSkipLogging(r.URL.Path) {
+			next.ServeHTTP(w, r)
+			return
+		}
+
+		start := time.Now()
+		rec := &responseWriterRecorder{ResponseWriter: w}
+		next.ServeHTTP(rec, r)
+
+		status := rec.statusCode
+		if status == 0 {
+			status = http.StatusOK
+		}
+		duration := time.Since(start).Truncate(time.Millisecond)
+		logMsg := fmt.Sprintf("[%s] %s %d (%s)", r.Method, r.URL.Path, status, duration)
+
+		if log == nil {
+			log = slog.Default()
+		}
+
+		switch {
+		case status >= 500:
+			log.Error(logMsg)
+		case status >= 400:
+			log.Warn(logMsg)
+		default:
+			log.Info(logMsg)
+		}
+	})
+}
+
 func (server *Server) Handler() http.Handler {
-	return http.HandlerFunc(server.serveHTTP)
+	return loggingMiddleware(http.HandlerFunc(server.serveHTTP), server.logger)
 }
 
 func (server *Server) serveHTTP(writer http.ResponseWriter, request *http.Request) {
@@ -111,33 +193,50 @@ func (server *Server) serveHTTP(writer http.ResponseWriter, request *http.Reques
 		writer.WriteHeader(http.StatusNoContent)
 		return
 	}
-	if path == "/health" && request.Method == http.MethodGet {
-		server.health(writer)
+
+	// First try management handlers (/health, /account-limits, /api/*)
+	if server.handleManagement(writer, request, path) {
 		return
 	}
+
 	if path == "/" && request.Method == http.MethodPost {
 		writeJSON(writer, http.StatusOK, map[string]any{"status": "ok"})
 		return
 	}
-	if strings.HasPrefix(path, "/v1/") && !server.authorized(request) {
-		writeAPIError(writer, http.StatusUnauthorized, "authentication_error", "Invalid or missing API key")
+
+	if strings.HasPrefix(path, "/v1/") {
+		if !server.authorized(request) {
+			writeAPIError(writer, http.StatusUnauthorized, "authentication_error", "Invalid or missing API key")
+			return
+		}
+		switch {
+		case path == "/v1/models" && request.Method == http.MethodGet:
+			server.models(writer, request)
+		case path == "/v1/usage" && request.Method == http.MethodGet:
+			server.usage(writer, request)
+		case path == "/v1/messages" && request.Method == http.MethodPost:
+			server.messages(writer, request)
+		case path == "/v1/messages/count_tokens" && request.Method == http.MethodPost:
+			writeAPIError(writer, http.StatusNotImplemented, "not_implemented", "Token counting is not implemented. Use /v1/messages with max_tokens or configure your client to skip token counting.")
+		default:
+			writeAPIError(writer, http.StatusNotFound, "not_found_error", fmt.Sprintf("Endpoint %s %s not found", request.Method, request.URL.Path))
+		}
 		return
 	}
-	switch {
-	case path == "/v1/models" && request.Method == http.MethodGet:
-		server.models(writer, request)
-	case path == "/v1/usage" && request.Method == http.MethodGet:
-		server.usage(writer, request)
-	case path == "/v1/messages" && request.Method == http.MethodPost:
-		server.messages(writer, request)
-	case path == "/v1/messages/count_tokens" && request.Method == http.MethodPost:
-		writeAPIError(writer, http.StatusNotImplemented, "not_implemented", "Token counting is not implemented. Use /v1/messages with max_tokens or configure your client to skip token counting.")
-	default:
-		writeAPIError(writer, http.StatusNotFound, "not_found_error", fmt.Sprintf("Endpoint %s %s not found", request.Method, request.URL.Path))
+
+	// Web UI static assets fallback
+	if server.webUI != nil && (request.Method == http.MethodGet || request.Method == http.MethodHead) {
+		server.webUI.ServeHTTP(writer, request)
+		return
 	}
+
+	writeAPIError(writer, http.StatusNotFound, "not_found_error", fmt.Sprintf("Endpoint %s %s not found", request.Method, request.URL.Path))
 }
 
 func (server *Server) authorized(request *http.Request) bool {
+	if server.apiKey == "" {
+		return true
+	}
 	provided := request.Header.Get("x-api-key")
 	if provided == "" {
 		if authorization := request.Header.Get("Authorization"); strings.HasPrefix(authorization, "Bearer ") {
@@ -321,6 +420,23 @@ func (server *Server) messages(writer http.ResponseWriter, request *http.Request
 	if model, _ := anthropicRequest["model"].(string); model == "" {
 		anthropicRequest["model"] = "gemini-3.5-flash-low"
 	}
+	cfg := config.Get()
+	if cfg.ModelMapping != nil {
+		reqModel := stringFrom(anthropicRequest["model"])
+		if mappingVal, exists := cfg.ModelMapping[reqModel]; exists {
+			var mappedModel string
+			switch v := mappingVal.(type) {
+			case string:
+				mappedModel = v
+			case map[string]any:
+				mappedModel, _ = v["mapping"].(string)
+			}
+			if mappedModel != "" {
+				slog.Info(fmt.Sprintf("[Server] Mapping model %s -> %s", reqModel, mappedModel))
+				anthropicRequest["model"] = mappedModel
+			}
+		}
+	}
 	if _, exists := anthropicRequest["max_tokens"]; !exists {
 		anthropicRequest["max_tokens"] = 4096
 	}
@@ -377,6 +493,9 @@ func (server *Server) unaryMessage(writer http.ResponseWriter, request *http.Req
 	if err != nil {
 		server.writeError(writer, err)
 		return
+	}
+	if server.tracker != nil {
+		server.tracker.Track(model)
 	}
 	response := accumulator.Response(model, server.builder.Cache, "")
 	writeJSON(writer, http.StatusOK, response)
@@ -438,6 +557,9 @@ func (server *Server) streamMessage(writer http.ResponseWriter, request *http.Re
 		}
 	}
 	if err == nil {
+		if server.tracker != nil {
+			server.tracker.Track(model)
+		}
 		return
 	}
 	if !started {

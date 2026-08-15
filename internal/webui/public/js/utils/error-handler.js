@@ -1,0 +1,96 @@
+/**
+ * Error Handling Utilities
+ * Provides standardized error handling with toast notifications
+ */
+window.ErrorHandler = window.ErrorHandler || {};
+
+/**
+ * Safely execute an async function with error handling
+ * @param {Function} fn - Async function to execute
+ * @param {string} errorMessage - User-friendly error message prefix
+ * @param {object} options - Additional options
+ * @param {boolean} options.rethrow - Whether to rethrow the error after handling (default: false)
+ * @param {Function} options.onError - Custom error handler callback
+ * @returns {Promise<any>} Result of the function or undefined on error
+ */
+window.ErrorHandler.safeAsync = async function(fn, errorMessage = null, options = {}) {
+    const { rethrow = false, onError = null } = options;
+    const store = Alpine.store('global');
+    const defaultErrorMessage = errorMessage || store.t('operationFailed');
+
+    try {
+        return await fn();
+    } catch (error) {
+        // Log error for debugging
+        console.error(`[ErrorHandler] ${defaultErrorMessage}:`, error);
+
+        // Show toast notification
+        const fullMessage = `${defaultErrorMessage}: ${error.message || store.t('unknownError')}`;
+        store.showToast(fullMessage, 'error');
+
+        // Call custom error handler if provided
+        if (onError && typeof onError === 'function') {
+            try {
+                onError(error);
+            } catch (handlerError) {
+                console.error('[ErrorHandler] Custom error handler failed:', handlerError);
+            }
+        }
+
+        // Rethrow if requested
+        if (rethrow) {
+            throw error;
+        }
+
+        return undefined;
+    }
+};
+
+/**
+ * Show an error toast notification
+ * @param {string} message - Error message
+ * @param {Error} error - Optional error object
+ */
+window.ErrorHandler.showError = function(message, error = null) {
+    const store = Alpine.store('global');
+    const fullMessage = error ? `${message}: ${error.message}` : message;
+    store.showToast(fullMessage, 'error');
+};
+
+/**
+ * Execute an async function with automatic loading state management
+ * @param {Function} asyncFn - Async function to execute
+ * @param {object} context - Component context (this) that contains the loading state
+ * @param {string} loadingKey - Name of the loading state property (default: 'loading')
+ * @param {object} options - Additional options (same as safeAsync)
+ * @returns {Promise<any>} Result of the function or undefined on error
+ *
+ * @example
+ * // In your Alpine component:
+ * async refreshAccount(email) {
+ *   return await window.ErrorHandler.withLoading(async () => {
+ *     const response = await window.utils.request(`/api/accounts/${email}/refresh`, { method: 'POST' });
+ *     this.$store.global.showToast('Account refreshed', 'success');
+ *     return response;
+ *   }, this, 'refreshing');
+ * }
+ *
+ * // In HTML:
+ * // <button @click="refreshAccount(email)" :disabled="refreshing">
+ * //   <i class="fas fa-sync-alt" :class="{ 'fa-spin': refreshing }"></i>
+ * //   Refresh
+ * // </button>
+ */
+window.ErrorHandler.withLoading = async function(asyncFn, context, loadingKey = 'loading', options = {}) {
+    // Set loading state to true
+    context[loadingKey] = true;
+
+    try {
+        // Execute the async function with error handling
+        const result = await window.ErrorHandler.safeAsync(asyncFn, options.errorMessage, options);
+        return result;
+    } finally {
+        // Always reset loading state, even if there was an error
+        context[loadingKey] = false;
+    }
+};

@@ -80,7 +80,7 @@ func TestLoadCodeAssistMetadata(t *testing.T) {
 		if err := json.NewDecoder(request.Body).Decode(&body); err != nil {
 			t.Error(err)
 		}
-		if body.Mode != 1 || body.Metadata.IdeType != 9 || body.Metadata.Platform != 3 || body.Metadata.PluginType != 2 || body.Metadata.DuetProject != "project" {
+		if body.Mode != 1 || body.Metadata.IdeType != 9 || body.Metadata.Platform != platformEnum() || body.Metadata.PluginType != 2 || body.Metadata.DuetProject != "project" {
 			t.Errorf("body = %#v", body)
 		}
 		_, _ = writer.Write([]byte(`{}`))
