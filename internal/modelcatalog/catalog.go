@@ -129,6 +129,11 @@ func Parse(body []byte) (*Catalog, error) {
 		if !exists || details.Disabled {
 			continue
 		}
+		remaining := details.QuotaInfo.RemainingFraction
+		if remaining == nil && details.QuotaInfo.ResetTime != "" {
+			zero := 0.0
+			remaining = &zero
+		}
 		model := Model{
 			ID: id, DisplayName: details.DisplayName, Description: details.Description,
 			Disabled: details.Disabled, Recommended: details.Recommended,
@@ -136,7 +141,7 @@ func Parse(body []byte) (*Catalog, error) {
 			SupportsAdaptiveThinking: details.SupportsAdaptiveThinking,
 			ThinkingBudget:           details.ThinkingBudget, MinThinkingBudget: details.MinThinkingBudget,
 			MaxTokens: details.MaxTokens, MaxOutputTokens: details.MaxOutputTokens,
-			QuotaRemainingFraction: details.QuotaInfo.RemainingFraction,
+			QuotaRemainingFraction: remaining,
 			QuotaResetTime:         details.QuotaInfo.ResetTime,
 		}
 		if model.DisplayName == "" {

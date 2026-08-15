@@ -3,7 +3,6 @@ package api
 import (
 	"context"
 	"encoding/json"
-	"errors"
 	"io"
 	"log/slog"
 	"net/http"
@@ -244,14 +243,67 @@ func TestInitialUpstreamErrorStaysJSON(t *testing.T) {
 	}
 }
 
-func TestNewRejectsMissingAPIKey(t *testing.T) {
+func TestAPIKeyOptionalAndEnforcedWhenConfigured(t *testing.T) {
 	t.Parallel()
-	_, err := New(Options{
-		Credentials: func(context.Context) (auth.Credentials, error) { return auth.Credentials{}, errors.New("unused") },
-		NewUpstream: func(string) Upstream { return &fakeUpstream{} },
+	upstream := &fakeUpstream{streamData: standardStream()}
+
+	// Test 1: When APIKey is empty, requests without auth header succeed
+	now := time.Date(2026, 7, 14, 12, 0, 0, 0, time.UTC)
+	serverOpen, err := New(Options{
+		APIKey:    "",
+		ProjectID: "test-proj",
+		Now:       func() time.Time { return now },
+		Credentials: func(context.Context) (auth.Credentials, error) {
+			return auth.Credentials{AccessToken: "access-token", Email: "user@example.com", Expiry: now.Add(time.Hour)}, nil
+		},
+		NewUpstream: func(string) Upstream { return upstream },
+		Logger:      slog.New(slog.NewTextHandler(io.Discard, nil)),
 	})
-	if err == nil {
-		t.Fatal("New accepted an empty API key")
+	if err != nil {
+		t.Fatalf("failed to create server with empty APIKey: %v", err)
+	}
+
+	reqNoKey := httptest.NewRequest(http.MethodPost, "/v1/messages", strings.NewReader(`{
+		"model":"claude-sonnet-4-6","max_tokens":128,
+		"messages":[{"role":"user","content":"hello"}]
+	}`))
+	recNoKey := httptest.NewRecorder()
+	serverOpen.Handler().ServeHTTP(recNoKey, reqNoKey)
+	if recNoKey.Code != http.StatusOK {
+		t.Fatalf("expected 200 for open proxy, got %d: %s", recNoKey.Code, recNoKey.Body.String())
+	}
+
+	// Test 2: When APIKey is configured, unauthorized requests are rejected
+	serverAuth, err := New(Options{
+		APIKey:    "secret-123",
+		ProjectID: "test-proj",
+		Now:       func() time.Time { return now },
+		Credentials: func(context.Context) (auth.Credentials, error) {
+			return auth.Credentials{AccessToken: "access-token", Email: "user@example.com", Expiry: now.Add(time.Hour)}, nil
+		},
+		NewUpstream: func(string) Upstream { return upstream },
+		Logger:      slog.New(slog.NewTextHandler(io.Discard, nil)),
+	})
+	if err != nil {
+		t.Fatalf("failed to create server with APIKey: %v", err)
+	}
+
+	recUnauth := httptest.NewRecorder()
+	serverAuth.Handler().ServeHTTP(recUnauth, reqNoKey)
+	if recUnauth.Code != http.StatusUnauthorized {
+		t.Fatalf("expected 401 for unauthorized request, got %d", recUnauth.Code)
+	}
+
+	// Request with correct x-api-key succeeds
+	reqWithKey := httptest.NewRequest(http.MethodPost, "/v1/messages", strings.NewReader(`{
+		"model":"claude-sonnet-4-6","max_tokens":128,
+		"messages":[{"role":"user","content":"hello"}]
+	}`))
+	reqWithKey.Header.Set("x-api-key", "secret-123")
+	recAuth := httptest.NewRecorder()
+	serverAuth.Handler().ServeHTTP(recAuth, reqWithKey)
+	if recAuth.Code != http.StatusOK {
+		t.Fatalf("expected 200 with valid key, got %d: %s", recAuth.Code, recAuth.Body.String())
 	}
 }
 

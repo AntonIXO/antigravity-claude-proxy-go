@@ -46,3 +46,30 @@ func TestParseUsesAgyAgentModelOrderAndResolvesRoutingAlias(t *testing.T) {
 		t.Fatal("image-only model was accepted as an agent model")
 	}
 }
+
+func TestParseHandlesExhaustedQuotaWithNullRemainingFraction(t *testing.T) {
+	t.Parallel()
+	catalog, err := Parse([]byte(`{
+		"defaultAgentModelId":"gemini-3.5-flash-low",
+		"agentModelSorts":[{"displayName":"Recommended","groups":[{"modelIds":["gemini-3.5-flash-low"]}]}],
+		"models":{
+			"gemini-3.5-flash-low":{"displayName":"Gemini 3.5 Flash (Low)","quotaInfo":{"resetTime":"2026-08-14T12:00:00Z"}}
+		}
+	}`))
+	if err != nil {
+		t.Fatal(err)
+	}
+	models := catalog.Selectable()
+	if len(models) != 1 {
+		t.Fatalf("expected 1 model, got %d", len(models))
+	}
+	if models[0].QuotaRemainingFraction == nil {
+		t.Fatal("expected non-nil QuotaRemainingFraction for exhausted quota")
+	}
+	if *models[0].QuotaRemainingFraction != 0.0 {
+		t.Fatalf("expected 0.0 remaining fraction, got %f", *models[0].QuotaRemainingFraction)
+	}
+	if models[0].QuotaResetTime != "2026-08-14T12:00:00Z" {
+		t.Fatalf("unexpected reset time: %s", models[0].QuotaResetTime)
+	}
+}

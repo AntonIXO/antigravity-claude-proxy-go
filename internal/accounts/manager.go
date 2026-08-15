@@ -941,6 +941,20 @@ func (manager *Manager) UpdateThresholds(email string, quotaThreshold *float64, 
 	return manager.SaveToDisk()
 }
 
+func (manager *Manager) UpdateAccountQuota(email string, quota Quota, subscription *Subscription) {
+	manager.mu.Lock()
+	defer manager.mu.Unlock()
+	for _, acc := range manager.accounts {
+		if acc.Email == email {
+			acc.Quota = quota
+			if subscription != nil {
+				acc.Subscription = *subscription
+			}
+			break
+		}
+	}
+}
+
 func (manager *Manager) Reload(path string) error {
 	if path == "" {
 		path = manager.ConfigPath()
@@ -987,6 +1001,19 @@ func (manager *Manager) GetStatus() map[string]any {
 			rateLimitedCount++
 		}
 
+		limits := make(map[string]any)
+		for mID, q := range acc.Quota.Models {
+			remStr := "N/A"
+			if q.RemainingFraction != nil {
+				remStr = fmt.Sprintf("%d%%", int(*q.RemainingFraction*100))
+			}
+			limits[mID] = map[string]any{
+				"remaining":         remStr,
+				"remainingFraction": q.RemainingFraction,
+				"resetTime":         q.ResetTime,
+			}
+		}
+
 		item := map[string]any{
 			"email":                acc.Email,
 			"source":               acc.Source,
@@ -999,6 +1026,7 @@ func (manager *Manager) GetStatus() map[string]any {
 			"lastUsed":             acc.LastUsedMS,
 			"subscription":         acc.Subscription,
 			"quota":                acc.Quota,
+			"limits":               limits,
 			"quotaThreshold":       acc.QuotaThreshold,
 			"modelQuotaThresholds": acc.ModelThreshold,
 		}

@@ -96,6 +96,20 @@ func TestManagement_HealthAndLimits(t *testing.T) {
 		if res["status"] != "ok" {
 			t.Errorf("expected status ok")
 		}
+		if res["totalAccounts"].(float64) != 1 {
+			t.Errorf("expected totalAccounts 1, got %v", res["totalAccounts"])
+		}
+		accounts, ok := res["accounts"].([]any)
+		if !ok || len(accounts) == 0 {
+			t.Fatal("expected accounts array in response")
+		}
+		firstAcc, ok := accounts[0].(map[string]any)
+		if !ok {
+			t.Fatal("expected account map")
+		}
+		if _, hasLimits := firstAcc["limits"]; !hasLimits {
+			t.Error("expected 'limits' key on account object")
+		}
 	})
 
 	t.Run("GET /account-limits table", func(t *testing.T) {
@@ -107,7 +121,17 @@ func TestManagement_HealthAndLimits(t *testing.T) {
 			t.Fatalf("expected 200, got %d", rec.Code)
 		}
 		if !strings.Contains(rec.Body.String(), "test@example.com") {
-			t.Errorf("expected table to contain test email")
+			t.Errorf("expected table to contain test email: %s", rec.Body.String())
+		}
+	})
+
+	t.Run("POST /refresh-token", func(t *testing.T) {
+		req := httptest.NewRequest(http.MethodPost, "/refresh-token", nil)
+		rec := httptest.NewRecorder()
+		handler.ServeHTTP(rec, req)
+
+		if rec.Code != http.StatusOK {
+			t.Fatalf("expected 200, got %d", rec.Code)
 		}
 	})
 }

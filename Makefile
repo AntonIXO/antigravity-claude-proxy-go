@@ -44,7 +44,5 @@ dist:
 	@echo "All binaries built in $(BIN_DIR)/:"
 	@ls -la $(BIN_DIR)/
 
-install: build
-	@echo "Installing $(BINARY_NAME) to /usr/local/bin (or GOPATH/bin)..."
-	@cp $(BIN_DIR)/$(BINARY_NAME) $(shell go env GOPATH)/bin/$(BINARY_NAME)
-	@echo "Installed $(BINARY_NAME) to $(shell go env GOPATH)/bin/$(BINARY_NAME)"
+install:
+	@./scripts/install.sh

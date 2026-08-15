@@ -140,20 +140,12 @@ func (om *OAuthManager) StartFlow() (string, string, error) {
 	om.mu.Lock()
 	defer om.mu.Unlock()
 
-	// Clean up old flows (> 10 mins)
-	now := time.Now()
+	// Clean up any existing active flows and close any open listeners
 	for state, f := range om.flows {
-		if now.Sub(f.CreatedAt) > 10*time.Minute {
-			if f.Server != nil {
-				_ = f.Server.Close()
-			}
-			delete(om.flows, state)
+		if f.Server != nil {
+			_ = f.Server.Close()
 		}
-	}
-
-	authURL, verifier, state, err := GetAuthorizationURL("")
-	if err != nil {
-		return "", "", err
+		delete(om.flows, state)
 	}
 
 	portsToTry := []int{DefaultCallbackPort, 51122, 51123, 51124, 51125, 51126}
@@ -169,6 +161,13 @@ func (om *OAuthManager) StartFlow() (string, string, error) {
 	}
 	if listener == nil {
 		return "", "", errors.New("could not bind to any OAuth callback port (51121-51126)")
+	}
+
+	redirectURI := fmt.Sprintf("http://localhost:%d/oauth-callback", boundPort)
+	authURL, verifier, state, err := GetAuthorizationURL(redirectURI)
+	if err != nil {
+		_ = listener.Close()
+		return "", "", err
 	}
 
 	mux := http.NewServeMux()
@@ -197,13 +196,19 @@ func (om *OAuthManager) StartFlow() (string, string, error) {
 			return
 		}
 
-		if cbState != state {
+		om.mu.Lock()
+		activeFlow, exists := om.flows[cbState]
+		if !exists {
+			om.mu.Unlock()
 			w.Header().Set("Content-Type", "text/html; charset=utf-8")
 			w.WriteHeader(http.StatusBadRequest)
 			fmt.Fprintf(w, "<html><body><h1>❌ State Mismatch</h1><p>CSRF check failed.</p></body></html>")
 			go func() { _ = srv.Close() }()
 			return
 		}
+		flowVerifier := activeFlow.Verifier
+		delete(om.flows, cbState)
+		om.mu.Unlock()
 
 		if code == "" {
 			w.Header().Set("Content-Type", "text/html; charset=utf-8")
@@ -216,7 +221,7 @@ func (om *OAuthManager) StartFlow() (string, string, error) {
 		// Complete flow in background
 		go func() {
 			defer func() { _ = srv.Close() }()
-			_, _ = om.CompleteFlow(code, verifier)
+			_, _ = om.CompleteFlow(code, flowVerifier)
 		}()
 
 		w.Header().Set("Content-Type", "text/html; charset=utf-8")
