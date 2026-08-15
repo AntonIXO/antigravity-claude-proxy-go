@@ -68,7 +68,7 @@
                       :class="$store.data.accounts.length >= $store.data.maxAccounts ? 'text-yellow-400' : 'text-gray-400'"
                       x-text="$store.data.accounts.length + '/' + $store.data.maxAccounts"></span>
             </div>
-            <button class="btn bg-neon-purple hover:bg-purple-600 border-none text-white btn-xs gap-2 shadow-lg shadow-neon-purple/20 h-8"
+            <button class="btn bg-blue-600 hover:bg-blue-700 border-none text-white btn-xs gap-2 h-8"
                 :class="{ 'opacity-50 cursor-not-allowed': $store.data.accounts.length >= $store.data.maxAccounts }"
                 :disabled="$store.data.accounts.length >= $store.data.maxAccounts"
                 @click="$store.data.accounts.length < $store.data.maxAccounts && document.getElementById('add_account_modal').showModal()">
@@ -244,7 +244,7 @@
                                 </button>
                                 <button
                                     class="p-2 rounded transition-colors"
-                                    :class="acc.source === 'database' ? 'text-gray-700 cursor-not-allowed' : 'hover:bg-red-500/10 text-gray-500 hover:text-red-400'"
+                                    :class="acc.source === 'database' ? 'opacity-40 cursor-not-allowed text-zinc-500' : 'text-zinc-400 hover:text-red-400'"
                                     :disabled="acc.source === 'database'"
                                     @click="acc.source !== 'database' && confirmDeleteAccount(acc.email)"
                                     :title="acc.source === 'database' ? $store.global.t('cannotDeleteDatabase') : $store.global.t('delete')">

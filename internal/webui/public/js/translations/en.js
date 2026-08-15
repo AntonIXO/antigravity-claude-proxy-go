@@ -171,8 +171,8 @@ window.translations.en = {
     saveConfig: "Save to Claude CLI settings",
     envVar: "Env",
     // New Keys
-    systemName: "ANTIGRAVITY",
-    systemDesc: "CLAUDE PROXY SYSTEM",
+    systemName: "antigravity-claude-proxy-go",
+    systemDesc: "GO PROXY FOR CLAUDE & GEMINI",
     connectGoogleDesc: "Connect a Google Workspace account to increase your API quota limit. The account will be used to proxy Claude requests via Antigravity.",
     useCliCommand: "Use CLI Command",
     close: "Close",

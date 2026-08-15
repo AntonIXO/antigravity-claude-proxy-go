@@ -163,6 +163,10 @@ func Save(updates map[string]any) (Config, error) {
 
 	// Merge updates
 	for k, v := range updates {
+		if k == "modelMapping" {
+			currentMap[k] = v
+			continue
+		}
 		if vMap, ok := v.(map[string]any); ok {
 			if existingMap, ok := currentMap[k].(map[string]any); ok {
 				for vk, vv := range vMap {

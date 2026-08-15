@@ -214,9 +214,9 @@ window.DashboardCharts.updateCharts = function (component) {
     : 0;
 
   const familyColors = {
-    claude: getThemeColor("--color-neon-purple") || "#a855f7",
-    gemini: getThemeColor("--color-neon-green") || "#22c55e",
-    unknown: getThemeColor("--color-neon-cyan") || "#06b6d4",
+    claude: getThemeColor("--color-neon-purple") || "#3b82f6",
+    gemini: getThemeColor("--color-neon-green") || "#10b981",
+    unknown: getThemeColor("--color-neon-cyan") || "#0ea5e9",
   };
 
   const data = [];
