@@ -47,6 +47,7 @@ func TestParseUsesAgyAgentModelOrderAndResolvesRoutingAlias(t *testing.T) {
 	}
 }
 
+<<<<<<< HEAD
 func TestSynthetic37AndReasoningResolution(t *testing.T) {
 	t.Parallel()
 	catalog, err := Parse([]byte(`{
@@ -58,11 +59,21 @@ func TestSynthetic37AndReasoningResolution(t *testing.T) {
 			"gemini-3.6-flash-high":{"displayName":"Gemini 3.6 Flash (High)","supportsThinking":true,"thinkingBudget":16000},
 			"gemini-3.6-flash-medium":{"displayName":"Gemini 3.6 Flash (Medium)","supportsThinking":true,"thinkingBudget":8000},
 			"gemini-3.6-flash-low":{"displayName":"Gemini 3.6 Flash (Low)","supportsThinking":true,"thinkingBudget":1024}
+=======
+func TestParseHandlesExhaustedQuotaWithNullRemainingFraction(t *testing.T) {
+	t.Parallel()
+	catalog, err := Parse([]byte(`{
+		"defaultAgentModelId":"gemini-3.5-flash-low",
+		"agentModelSorts":[{"displayName":"Recommended","groups":[{"modelIds":["gemini-3.5-flash-low"]}]}],
+		"models":{
+			"gemini-3.5-flash-low":{"displayName":"Gemini 3.5 Flash (Low)","quotaInfo":{"resetTime":"2026-08-14T12:00:00Z"}}
+>>>>>>> 5e81ffa (fix(proxy): fix account limits parsing, oauth CSRF check, and endpoint auth)
 		}
 	}`))
 	if err != nil {
 		t.Fatal(err)
 	}
+<<<<<<< HEAD
 
 	// 1. Verify synthetic gemini-3.7-flash-high has UpstreamID pointing to gemini-3.6-flash-high
 	m37High, err := catalog.Resolve("gemini-3.7-flash-high")
@@ -115,5 +126,19 @@ func TestSynthetic37AndReasoningResolution(t *testing.T) {
 	}
 	if max37.ID != "gemini-3.7-flash-high" || max37.GetUpstreamID() != "gemini-3.6-flash-high" {
 		t.Fatalf("reasoning_effort max mapping failed: ID=%q UpstreamID=%q", max37.ID, max37.GetUpstreamID())
+=======
+	models := catalog.Selectable()
+	if len(models) != 1 {
+		t.Fatalf("expected 1 model, got %d", len(models))
+	}
+	if models[0].QuotaRemainingFraction == nil {
+		t.Fatal("expected non-nil QuotaRemainingFraction for exhausted quota")
+	}
+	if *models[0].QuotaRemainingFraction != 0.0 {
+		t.Fatalf("expected 0.0 remaining fraction, got %f", *models[0].QuotaRemainingFraction)
+	}
+	if models[0].QuotaResetTime != "2026-08-14T12:00:00Z" {
+		t.Fatalf("unexpected reset time: %s", models[0].QuotaResetTime)
+>>>>>>> 5e81ffa (fix(proxy): fix account limits parsing, oauth CSRF check, and endpoint auth)
 	}
 }

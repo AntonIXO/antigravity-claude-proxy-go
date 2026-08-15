@@ -80,4 +80,38 @@ func TestOAuthManager_HTTPHandler(t *testing.T) {
 			t.Fatalf("expected 400, got %d", rec.Code)
 		}
 	})
+
+	t.Run("Multiple StartFlow calls reuse port and replace active state", func(t *testing.T) {
+		url1, state1, err := om.StartFlow()
+		if err != nil {
+			t.Fatalf("first StartFlow failed: %v", err)
+		}
+		if url1 == "" || state1 == "" {
+			t.Fatal("empty url1 or state1")
+		}
+
+		// Immediately start a second flow
+		url2, state2, err := om.StartFlow()
+		if err != nil {
+			t.Fatalf("second StartFlow failed: %v", err)
+		}
+		if url2 == "" || state2 == "" {
+			t.Fatal("empty url2 or state2")
+		}
+		if state1 == state2 {
+			t.Fatal("expected different states for consecutive flows")
+		}
+
+		om.mu.Lock()
+		_, oldExists := om.flows[state1]
+		newFlow, newExists := om.flows[state2]
+		om.mu.Unlock()
+
+		if oldExists {
+			t.Error("old flow was not cleaned up when starting new flow")
+		}
+		if !newExists || newFlow == nil {
+			t.Error("new flow missing in active flows registry")
+		}
+	})
 }

@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"sort"
 	"strings"
 	"text/tabwriter"
 	"time"
@@ -76,7 +77,7 @@ func (server *Server) handleManagement(writer http.ResponseWriter, request *http
 		email := strings.TrimPrefix(path, "/api/accounts/")
 		server.handleAccountPatch(writer, request, email)
 		return true
-	case path == "/api/accounts/reload" && method == http.MethodPost:
+	case (path == "/api/accounts/reload" || path == "/refresh-token") && method == http.MethodPost:
 		server.handleAccountsReload(writer, request)
 		return true
 	case path == "/api/accounts/export" && method == http.MethodGet:
@@ -173,8 +174,21 @@ func (server *Server) handleHealth(writer http.ResponseWriter, request *http.Req
 }
 
 func (server *Server) handleAccountLimits(writer http.ResponseWriter, request *http.Request) {
+	cfg := config.Get()
 	if server.accountManager == nil {
-		writeJSON(writer, http.StatusOK, map[string]any{"status": "ok", "accounts": []any{}})
+		modelMapping := cfg.ModelMapping
+		if modelMapping == nil {
+			modelMapping = make(map[string]any)
+		}
+		writeJSON(writer, http.StatusOK, map[string]any{
+			"status":               "ok",
+			"timestamp":            server.now().UTC().Format(time.RFC3339Nano),
+			"totalAccounts":        0,
+			"models":               []string{},
+			"modelConfig":          modelMapping,
+			"globalQuotaThreshold": cfg.GlobalQuotaThreshold,
+			"accounts":             []any{},
+		})
 		return
 	}
 
@@ -220,6 +234,26 @@ func (server *Server) handleAccountLimits(writer http.ResponseWriter, request *h
 		return
 	}
 
+	modelSet := make(map[string]bool)
+	if catalog, err := server.fetchModelCatalog(request.Context()); err == nil && catalog != nil {
+		for _, m := range catalog.Selectable() {
+			modelSet[m.ID] = true
+		}
+	}
+	for _, acc := range accountsList {
+		for m := range acc.Quota.Models {
+			modelSet[m] = true
+		}
+		for m := range acc.ModelRateLimits {
+			modelSet[m] = true
+		}
+	}
+	sortedModels := make([]string, 0, len(modelSet))
+	for m := range modelSet {
+		sortedModels = append(sortedModels, m)
+	}
+	sort.Strings(sortedModels)
+
 	result := make([]map[string]any, 0, len(accountsList))
 	now := server.now().UnixMilli()
 	for _, acc := range accountsList {
@@ -233,23 +267,66 @@ func (server *Server) handleAccountLimits(writer http.ResponseWriter, request *h
 				}
 			}
 		}
+
+		limits := make(map[string]any, len(sortedModels))
+		for _, modelId := range sortedModels {
+			q, exists := acc.Quota.Models[modelId]
+			if !exists {
+				limits[modelId] = nil
+				continue
+			}
+			remStr := "N/A"
+			if q.RemainingFraction != nil {
+				remStr = fmt.Sprintf("%d%%", int(*q.RemainingFraction*100))
+			}
+			limits[modelId] = map[string]any{
+				"remaining":         remStr,
+				"remainingFraction": q.RemainingFraction,
+				"resetTime":         q.ResetTime,
+			}
+		}
+
+		status := "ok"
+		if !acc.Enabled {
+			status = "disabled"
+		} else if acc.IsInvalid {
+			status = "invalid"
+		}
+
 		result = append(result, map[string]any{
-			"email":          acc.Email,
-			"enabled":        acc.Enabled,
-			"isInvalid":      acc.IsInvalid,
-			"invalidReason":  acc.InvalidReason,
-			"verifyUrl":      acc.VerifyURL,
-			"subscription":   acc.Subscription,
-			"quota":          acc.Quota,
-			"rateLimits":     rateLimits,
-			"quotaThreshold": acc.QuotaThreshold,
+			"email":                acc.Email,
+			"status":               status,
+			"error":                acc.InvalidReason,
+			"source":               acc.Source,
+			"enabled":              acc.Enabled,
+			"projectId":            acc.ProjectID,
+			"isInvalid":            acc.IsInvalid,
+			"invalidReason":        acc.InvalidReason,
+			"verifyUrl":            acc.VerifyURL,
+			"lastUsed":             acc.LastUsedMS,
+			"subscription":         acc.Subscription,
+			"quota":                acc.Quota,
+			"rateLimits":           rateLimits,
+			"modelRateLimits":      acc.ModelRateLimits,
+			"limits":               limits,
+			"quotaThreshold":       acc.QuotaThreshold,
+			"modelQuotaThresholds": acc.ModelThreshold,
 		})
 	}
 
+	modelMapping := cfg.ModelMapping
+	if modelMapping == nil {
+		modelMapping = make(map[string]any)
+	}
+
 	writeJSON(writer, http.StatusOK, map[string]any{
-		"status":    "ok",
-		"timestamp": server.now().UTC().Format(time.RFC3339Nano),
-		"accounts":  result,
+		"status":               "ok",
+		"timestamp":            server.now().UTC().Format(time.RFC3339Nano),
+		"totalAccounts":        len(accountsList),
+		"models":               sortedModels,
+		"modelConfig":          modelMapping,
+		"globalQuotaThreshold": cfg.GlobalQuotaThreshold,
+		"accounts":             result,
 	})
 }
 

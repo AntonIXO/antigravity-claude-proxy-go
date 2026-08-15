@@ -92,9 +92,6 @@ func runServer(args []string) {
 	if *apiKey == "" && cfg.APIKey != "" {
 		*apiKey = cfg.APIKey
 	}
-	if *apiKey == "" {
-		*apiKey = "sk-antigravity" // sensible default for local dev if unset
-	}
 	if *port > 0 {
 		*listen = fmt.Sprintf("127.0.0.1:%d", *port)
 	}

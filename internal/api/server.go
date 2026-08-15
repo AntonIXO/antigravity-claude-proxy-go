@@ -79,9 +79,6 @@ type Server struct {
 }
 
 func New(options Options) (*Server, error) {
-	if options.APIKey == "" {
-		return nil, errors.New("local API key is required")
-	}
 	if options.Backend == nil && options.Credentials == nil {
 		return nil, errors.New("credential provider is required")
 	}
@@ -164,6 +161,9 @@ func (server *Server) serveHTTP(writer http.ResponseWriter, request *http.Reques
 }
 
 func (server *Server) authorized(request *http.Request) bool {
+	if server.apiKey == "" {
+		return true
+	}
 	provided := request.Header.Get("x-api-key")
 	if provided == "" {
 		if authorization := request.Header.Get("Authorization"); strings.HasPrefix(authorization, "Bearer ") {
