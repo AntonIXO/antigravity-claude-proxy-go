@@ -195,8 +195,8 @@ window.translations.id = {
     envVar: "Env",
 
     // System
-    systemName: "ANTIGRAVITY",
-    systemDesc: "CLAUDE PROXY SYSTEM",
+    systemName: "antigravity-claude-proxy-go",
+    systemDesc: "PROXY GO UNTUK CLAUDE & GEMINI",
     connectGoogleDesc: "Hubungkan akun Google Workspace untuk meningkatkan kuota API. Akun akan digunakan untuk meneruskan request Claude via Antigravity.",
     useCliCommand: "Gunakan Perintah CLI",
     close: "Tutup",

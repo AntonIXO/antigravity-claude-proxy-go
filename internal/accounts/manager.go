@@ -751,11 +751,43 @@ func (manager *Manager) SaveOAuthAccount(email, refreshToken string) error {
 	return manager.AddOrUpdateAccount(acc)
 }
 
+func cloneAccount(acc *Account) *Account {
+	if acc == nil {
+		return nil
+	}
+	cloned := *acc
+	if acc.ModelRateLimits != nil {
+		cloned.ModelRateLimits = make(map[string]*RateLimit, len(acc.ModelRateLimits))
+		for k, v := range acc.ModelRateLimits {
+			if v != nil {
+				val := *v
+				cloned.ModelRateLimits[k] = &val
+			}
+		}
+	}
+	if acc.ModelThreshold != nil {
+		cloned.ModelThreshold = make(map[string]float64, len(acc.ModelThreshold))
+		for k, v := range acc.ModelThreshold {
+			cloned.ModelThreshold[k] = v
+		}
+	}
+	if acc.Quota.Models != nil {
+		clonedModels := make(map[string]ModelQuota, len(acc.Quota.Models))
+		for k, v := range acc.Quota.Models {
+			clonedModels[k] = v
+		}
+		cloned.Quota.Models = clonedModels
+	}
+	return &cloned
+}
+
 func (manager *Manager) SaveToDisk() error {
 	manager.mu.RLock()
 	path := manager.configPath
 	accounts := make([]*Account, len(manager.accounts))
-	copy(accounts, manager.accounts)
+	for i, acc := range manager.accounts {
+		accounts[i] = cloneAccount(acc)
+	}
 	settings := manager.settings
 	activeIndex := manager.currentIndex
 	manager.mu.RUnlock()
@@ -779,7 +811,9 @@ func (manager *Manager) GetAllAccounts() []*Account {
 	manager.mu.RLock()
 	defer manager.mu.RUnlock()
 	result := make([]*Account, len(manager.accounts))
-	copy(result, manager.accounts)
+	for i, acc := range manager.accounts {
+		result[i] = cloneAccount(acc)
+	}
 	return result
 }
 

@@ -149,6 +149,68 @@ func TestMarkFailureDoesNotRateLimitEmptyModel(t *testing.T) {
 	}
 }
 
+func TestAccountCloningAndConcurrency(t *testing.T) {
+	t.Parallel()
+	account := testAccount("concurrent@example.com")
+	account.ModelRateLimits = make(map[string]*RateLimit)
+	account.ModelThreshold = make(map[string]float64)
+	account.Quota.Models = make(map[string]ModelQuota)
+	account.ModelRateLimits["claude"] = &RateLimit{IsRateLimited: true, ResetTimeMS: 1234}
+	account.ModelThreshold["claude"] = 0.1
+	quarter := 0.25
+	account.Quota.Models["claude"] = ModelQuota{RemainingFraction: &quarter}
+
+	manager, err := New(Options{Accounts: []*Account{account}, Strategy: StrategyHybrid})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Verify GetAllAccounts returns cloned objects
+	list := manager.GetAllAccounts()
+	if len(list) != 1 {
+		t.Fatalf("expected 1 account, got %d", len(list))
+	}
+	if list[0] == account {
+		t.Error("GetAllAccounts returned pointer to internal account struct, expected cloned pointer")
+	}
+	if list[0].ModelRateLimits["claude"] == account.ModelRateLimits["claude"] {
+		t.Error("GetAllAccounts did not clone ModelRateLimits map values")
+	}
+
+	// Concurrent mutation and GetAllAccounts read should not trigger race detector
+	done := make(chan bool)
+	go func() {
+		for i := 0; i < 100; i++ {
+			manager.MarkRateLimited(account, "claude", time.Second)
+			manager.MarkSuccess(account, "claude")
+		}
+		done <- true
+	}()
+
+	go func() {
+		for i := 0; i < 100; i++ {
+			accs := manager.GetAllAccounts()
+			for _, a := range accs {
+				_ = a.ModelRateLimits["claude"]
+				_ = a.Quota.Models["claude"]
+			}
+		}
+		done <- true
+	}()
+
+	<-done
+	<-done
+}
+
 func testAccount(email string) *Account {
-	return &Account{Email: email, Source: "manual", Enabled: true, APIKey: "token-" + email, ProjectID: "project-" + email}
+	return &Account{
+		Email:           email,
+		Source:          "manual",
+		Enabled:         true,
+		APIKey:          "token-" + email,
+		ProjectID:       "project-" + email,
+		ModelRateLimits: make(map[string]*RateLimit),
+		ModelThreshold:  make(map[string]float64),
+		Quota:           Quota{Models: make(map[string]ModelQuota)},
+	}
 }

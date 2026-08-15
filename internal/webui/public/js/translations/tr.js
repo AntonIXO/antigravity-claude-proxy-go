@@ -150,8 +150,8 @@ window.translations.tr = {
     saveConfig: "Claude CLI ayarlarına kaydet",
     envVar: "Ortam Değişkeni",
     // New Keys
-    systemName: "ANTIGRAVITY",
-    systemDesc: "CLAUDE PROXY SİSTEMİ",
+    systemName: "antigravity-claude-proxy-go",
+    systemDesc: "CLAUDE & GEMINI İÇİN GO PROXY",
     connectGoogleDesc: "API kota limitinizi artırmak için bir Google Workspace hesabı bağlayın. Bu hesap, Claude isteklerini Antigravity üzerinden vekil sunucu olarak kullanmak için kullanılacaktır.",
     useCliCommand: "CLI Komutunu Kullan",
     close: "Kapat",

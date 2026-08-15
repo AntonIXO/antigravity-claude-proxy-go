@@ -467,11 +467,10 @@ func TestTrackerIntegration(t *testing.T) {
 }
 
 func TestModelMappingRedirection(t *testing.T) {
-	t.Parallel()
-	// Setup configuration with a mapping from claude-sonnet-4-6 (object) and gemini-test (string)
+	// Setup configuration with a mapping from custom-object-source (object) and gemini-custom-source (string)
 	cfg := config.DefaultConfig()
 	cfg.ModelMapping = map[string]any{
-		"claude-sonnet-4-6": map[string]any{
+		"custom-object-source": map[string]any{
 			"mapping": "gpt-oss",
 		},
 		"gemini-custom-source": "gemini-3.5-flash-low",
@@ -491,7 +490,7 @@ func TestModelMappingRedirection(t *testing.T) {
 
 	// Test 1: Object mapping
 	request1 := httptest.NewRequest(http.MethodPost, "/v1/messages", strings.NewReader(`{
-		"model":"claude-sonnet-4-6","messages":[{"role":"user","content":"hello"}]
+		"model":"custom-object-source","messages":[{"role":"user","content":"hello"}]
 	}`))
 	request1.Header.Set("x-api-key", "local-key")
 	response1 := httptest.NewRecorder()

@@ -147,8 +147,8 @@ window.translations.pt = {
     saveConfig: "Salvar nas configurações do Claude CLI",
     envVar: "Env",
     // New Keys
-    systemName: "ANTIGRAVITY",
-    systemDesc: "SISTEMA DE PROXY CLAUDE",
+    systemName: "antigravity-claude-proxy-go",
+    systemDesc: "PROXY GO PARA CLAUDE & GEMINI",
     connectGoogleDesc: "Conecte uma conta Google Workspace para aumentar seu limite de cota da API. A conta será usada para fazer proxy das requisições Claude via Antigravity.",
     useCliCommand: "Usar Comando CLI",
     close: "Fechar",

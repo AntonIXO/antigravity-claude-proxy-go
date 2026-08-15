@@ -33,6 +33,10 @@ func cmdStatus(listenAddr string) error {
 	defer resp.Body.Close()
 
 	body, _ := io.ReadAll(resp.Body)
+	if resp.StatusCode == http.StatusUnauthorized {
+		fmt.Println("\nAccount Pool Status: Protected (WebUI password required)")
+		return nil
+	}
 	fmt.Println("\nAccount Pool Status:")
 	fmt.Println(string(body))
 	return nil

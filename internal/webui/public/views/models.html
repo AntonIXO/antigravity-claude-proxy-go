@@ -47,7 +47,7 @@
             <!-- Custom Select -->
             <div class="relative w-full md:w-64 h-9">
                 <select
-                    class="w-full h-full bg-space-800 border border-space-border text-gray-300 rounded-lg pl-4 pr-10 focus:outline-none focus:border-neon-purple focus:ring-1 focus:ring-neon-purple transition-all truncate text-xs cursor-pointer"
+                    class="w-full h-full bg-space-800 border border-space-border text-gray-300 rounded pl-4 pr-10 focus:outline-none focus:border-blue-500 transition-all truncate text-xs cursor-pointer"
                     style="appearance: none; -webkit-appearance: none; -moz-appearance: none; background-image: none;"
                     x-model="$store.data.filters.account" @change="$store.data.computeQuotaRows()">
                     <option value="all" x-text="$store.global.t('allAccounts')">All Accounts</option>
@@ -65,32 +65,32 @@
             <!-- Filter Buttons -->
             <div class="join h-9 w-full md:w-auto overflow-x-auto">
                 <button
-                    class="join-item btn btn-xs h-full flex-1 md:flex-none px-6 border-space-border/50 bg-space-800 transition-all font-medium text-[10px] tracking-wide"
+                    class="join-item btn btn-xs h-full flex-1 md:flex-none px-6 border-space-border bg-space-800 transition-colors font-medium text-[10px] tracking-wide"
                     :class="$store.data.filters.family === 'all'
-                        ? 'bg-neon-purple/20 text-neon-purple border-neon-purple/60 shadow-lg shadow-neon-purple/10'
-                        : 'text-gray-400 hover:text-white hover:bg-space-700 hover:border-space-border'"
+                        ? 'bg-blue-600 text-white border-blue-600'
+                        : 'text-gray-400 hover:text-white hover:bg-space-700'"
                     @click="$store.data.filters.family = 'all'; $store.data.computeQuotaRows()"
                     x-text="$store.global.t('allCaps')">ALL</button>
                 <button
-                    class="join-item btn btn-xs h-full flex-1 md:flex-none px-6 border-space-border/50 bg-space-800 transition-all font-medium text-[10px] tracking-wide"
+                    class="join-item btn btn-xs h-full flex-1 md:flex-none px-6 border-space-border bg-space-800 transition-colors font-medium text-[10px] tracking-wide"
                     :class="$store.data.filters.family === 'claude'
-                        ? 'bg-neon-purple/20 text-neon-purple border-neon-purple/60 shadow-lg shadow-neon-purple/10'
-                        : 'text-gray-400 hover:text-white hover:bg-space-700 hover:border-space-border'"
+                        ? 'bg-blue-600 text-white border-blue-600'
+                        : 'text-gray-400 hover:text-white hover:bg-space-700'"
                     @click="$store.data.filters.family = 'claude'; $store.data.computeQuotaRows()"
                     x-text="$store.global.t('claudeCaps')">CLAUDE</button>
                 <button
-                    class="join-item btn btn-xs h-full flex-1 md:flex-none px-6 border-space-border/50 bg-space-800 transition-all font-medium text-[10px] tracking-wide"
+                    class="join-item btn btn-xs h-full flex-1 md:flex-none px-6 border-space-border bg-space-800 transition-colors font-medium text-[10px] tracking-wide"
                     :class="$store.data.filters.family === 'gemini'
-                        ? 'bg-neon-green/20 text-neon-green border-neon-green/60 shadow-lg shadow-neon-green/10'
-                        : 'text-gray-400 hover:text-white hover:bg-space-700 hover:border-space-border'"
+                        ? 'bg-emerald-600 text-white border-emerald-600'
+                        : 'text-gray-400 hover:text-white hover:bg-space-700'"
                     @click="$store.data.filters.family = 'gemini'; $store.data.computeQuotaRows()"
                     x-text="$store.global.t('geminiCaps')">GEMINI</button>
             </div>
 
             <!-- Show Hidden Toggle -->
             <button
-                class="btn h-9 px-4 ml-2 border border-space-border/50 bg-space-800 hover:bg-space-700 hover:border-space-border hover:text-white transition-all gap-2 min-h-0"
-                :class="$store.settings.showHiddenModels ? 'text-neon-purple border-neon-purple/50 bg-neon-purple/10' : 'text-gray-400'"
+                class="btn h-9 px-4 ml-2 border border-space-border bg-space-800 hover:bg-space-700 hover:text-white transition-colors gap-2 min-h-0"
+                :class="$store.settings.showHiddenModels ? 'text-blue-400 border-blue-500/50 bg-space-900' : 'text-zinc-400'"
                 @click="$store.settings.toggle('showHiddenModels'); $store.data.computeQuotaRows()"
                 :title="$store.settings.showHiddenModels ? $store.global.t('hideHidden') : $store.global.t('showHidden')">
                 <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -367,7 +367,7 @@
                                 </button>
                                 <!-- Hide Toggle -->
                                 <button class="btn btn-xs btn-circle transition-colors"
-                                    :class="row.hidden ? 'bg-red-500/20 text-red-400 border-red-500/50 hover:bg-red-500/30' : 'btn-ghost text-gray-400 hover:text-white'"
+                                    :class="row.hidden ? 'bg-space-900 text-red-400 border border-red-500/50 hover:bg-space-800' : 'btn-ghost text-zinc-400 hover:text-white'"
                                     @click="await updateModelConfig(row.modelId, { hidden: !row.hidden })"
                                     @keydown.enter="await updateModelConfig(row.modelId, { hidden: !row.hidden })"
                                     @keydown.space.prevent="await updateModelConfig(row.modelId, { hidden: !row.hidden })"

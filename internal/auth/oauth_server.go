@@ -106,11 +106,12 @@ func GetAuthorizationURL(customRedirectURI string) (authURL, verifier, state str
 
 // PendingFlow tracks active OAuth session.
 type PendingFlow struct {
-	Verifier  string
-	State     string
-	Port      int
-	Server    *http.Server
-	CreatedAt time.Time
+	Verifier    string
+	State       string
+	Port        int
+	RedirectURI string
+	Server      *http.Server
+	CreatedAt   time.Time
 }
 
 // AuthResult holds the returned tokens and user identity from OAuth flow.
@@ -174,11 +175,12 @@ func (om *OAuthManager) StartFlow() (string, string, error) {
 	srv := &http.Server{Handler: mux}
 
 	flow := &PendingFlow{
-		Verifier:  verifier,
-		State:     state,
-		Port:      boundPort,
-		Server:    srv,
-		CreatedAt: time.Now(),
+		Verifier:    verifier,
+		State:       state,
+		Port:        boundPort,
+		RedirectURI: redirectURI,
+		Server:      srv,
+		CreatedAt:   time.Now(),
 	}
 	om.flows[state] = flow
 
@@ -207,6 +209,10 @@ func (om *OAuthManager) StartFlow() (string, string, error) {
 			return
 		}
 		flowVerifier := activeFlow.Verifier
+		flowRedirectURI := activeFlow.RedirectURI
+		if flowRedirectURI == "" && activeFlow.Port > 0 {
+			flowRedirectURI = fmt.Sprintf("http://localhost:%d/oauth-callback", activeFlow.Port)
+		}
 		delete(om.flows, cbState)
 		om.mu.Unlock()
 
@@ -221,7 +227,7 @@ func (om *OAuthManager) StartFlow() (string, string, error) {
 		// Complete flow in background
 		go func() {
 			defer func() { _ = srv.Close() }()
-			_, _ = om.CompleteFlow(code, flowVerifier)
+			_, _ = om.CompleteFlow(code, flowVerifier, flowRedirectURI)
 		}()
 
 		w.Header().Set("Content-Type", "text/html; charset=utf-8")
@@ -237,13 +243,15 @@ func (om *OAuthManager) StartFlow() (string, string, error) {
 }
 
 // CompleteFlow exchanges code for tokens, gets user info, and saves account.
-func (om *OAuthManager) CompleteFlow(code, verifier string) (*AuthResult, error) {
+func (om *OAuthManager) CompleteFlow(code, verifier, redirectURI string) (*AuthResult, error) {
 	clientID, clientSecret, err := resolveOAuthCredentials()
 	if err != nil || clientID == "" || clientSecret == "" {
 		return nil, fmt.Errorf("resolve OAuth client credentials: %w", err)
 	}
 
-	redirectURI := fmt.Sprintf("http://localhost:%d/oauth-callback", DefaultCallbackPort)
+	if redirectURI == "" {
+		redirectURI = fmt.Sprintf("http://localhost:%d/oauth-callback", DefaultCallbackPort)
+	}
 
 	// Token exchange
 	form := url.Values{}
@@ -385,7 +393,11 @@ func (om *OAuthManager) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 
-		acc, err := om.CompleteFlow(code, flow.Verifier)
+		flowRedirectURI := flow.RedirectURI
+		if flowRedirectURI == "" && flow.Port > 0 {
+			flowRedirectURI = fmt.Sprintf("http://localhost:%d/oauth-callback", flow.Port)
+		}
+		acc, err := om.CompleteFlow(code, flow.Verifier, flowRedirectURI)
 		if err != nil {
 			w.WriteHeader(http.StatusInternalServerError)
 			_ = json.NewEncoder(w).Encode(map[string]any{"status": "error", "error": err.Error()})

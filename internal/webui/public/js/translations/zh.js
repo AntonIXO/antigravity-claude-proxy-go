@@ -171,8 +171,8 @@ window.translations.zh = {
     saveConfig: "保存到 Claude CLI 设置",
     envVar: "环境变量",
     // New Keys
-    systemName: "ANTIGRAVITY",
-    systemDesc: "CLAUDE 代理系统",
+    systemName: "antigravity-claude-proxy-go",
+    systemDesc: "GO 语言 CLAUDE 与 GEMINI 代理系统",
     connectGoogleDesc: "连接 Google Workspace 账号以增加 API 配额。该账号将用于通过 Antigravity 代理 Claude 请求。",
     useCliCommand: "使用命令行",
     close: "关闭",
@@ -356,7 +356,7 @@ window.translations.zh = {
     importFailed: "导入失败",
 
     // TODO: Missing translations - Hardcoded strings from HTML
-    // pageTitle: "Antigravity Console",
+    pageTitle: "Antigravity Console",
     // live: "Live",
     // tier: "Tier",
     // quota: "Quota",

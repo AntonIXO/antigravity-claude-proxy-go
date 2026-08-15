@@ -112,6 +112,16 @@ func TestOAuthManager_HTTPHandler(t *testing.T) {
 		}
 		if !newExists || newFlow == nil {
 			t.Error("new flow missing in active flows registry")
+		} else if newFlow.RedirectURI == "" {
+			t.Error("new flow missing RedirectURI")
+		}
+	})
+
+	t.Run("CompleteFlow with custom redirect URI", func(t *testing.T) {
+		// CompleteFlow with invalid code should fail gracefully but use redirectURI
+		_, err := om.CompleteFlow("invalid_code", "verifier", "http://localhost:51125/oauth-callback")
+		if err == nil {
+			t.Error("expected error for invalid_code, got nil")
 		}
 	})
 }

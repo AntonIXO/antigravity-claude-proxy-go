@@ -15,12 +15,11 @@
         </div>
 
         <!-- Compact Status Indicator -->
-        <div class="flex items-center gap-2 px-2.5 py-1.5 rounded-lg bg-space-900/60 border border-space-border/40 whitespace-nowrap flex-shrink-0">
+        <div class="flex items-center gap-2 px-2.5 py-1.5 rounded bg-space-900 border border-space-border whitespace-nowrap flex-shrink-0">
             <div class="relative flex items-center justify-center">
-                <span class="absolute w-1.5 h-1.5 bg-neon-green rounded-full animate-ping opacity-75"></span>
-                <span class="relative w-1.5 h-1.5 bg-neon-green rounded-full"></span>
+                <span class="w-1.5 h-1.5 bg-emerald-400 rounded-full"></span>
             </div>
-            <span class="text-[10px] font-mono text-gray-500 uppercase tracking-wider" x-text="$store.global.t('live')">Live</span>
+            <span class="text-[10px] font-mono text-gray-400 uppercase tracking-wider" x-text="$store.global.t('live')">Live</span>
             <span class="text-gray-700">•</span>
             <span class="text-[10px] font-mono text-gray-400 tabular-nums"
                   x-text="new Date().toLocaleTimeString([], {hour: '2-digit', minute: '2-digit', second: '2-digit'})">
