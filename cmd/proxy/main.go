@@ -19,7 +19,9 @@ import (
 	"antigravity-go-proxy/internal/config"
 	proxyformat "antigravity-go-proxy/internal/format"
 	"antigravity-go-proxy/internal/logger"
+	"antigravity-go-proxy/internal/stats"
 	"antigravity-go-proxy/internal/webui"
+	"path/filepath"
 )
 
 var startPprof func(*slog.Logger)
@@ -113,9 +115,24 @@ func runServer(args []string) {
 
 	// Broadcaster and logger
 	broadcaster := logger.NewBroadcaster(500)
-	baseHandler := slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{Level: slog.LevelInfo})
+	logLevel := slog.LevelInfo
+	if cfg.Debug || cfg.DevMode || os.Getenv("DEBUG") != "" || os.Getenv("ANTIGRAVITY_DEV_MODE") == "true" {
+		logLevel = slog.LevelDebug
+	}
+	baseHandler := slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{Level: logLevel})
 	streamHandler := logger.NewStreamHandler(baseHandler, broadcaster)
 	slogger := slog.New(streamHandler)
+	slog.SetDefault(slogger)
+
+	// Usage statistics tracker
+	statsPath := filepath.Join(config.GetConfigDir(), "usage-history.json")
+	tracker, err := stats.NewTracker(statsPath)
+	if err != nil {
+		slogger.Warn("initialize stats tracker failed", "error", err)
+	} else {
+		tracker.StartAutoSave(1 * time.Minute)
+		defer tracker.Close()
+	}
 
 	if *pprof && startPprof != nil {
 		startPprof(slogger)
@@ -154,6 +171,7 @@ func runServer(args []string) {
 		Broadcaster:    broadcaster,
 		WebUI:          uiHandler,
 		OAuthHandler:   oauthMgr,
+		Tracker:        tracker,
 	})
 	if err != nil {
 		slogger.Error("invalid proxy configuration", "error", err)
@@ -173,6 +191,9 @@ func runServer(args []string) {
 	go func() {
 		<-shutdownSignals
 		slogger.Info("shutting down proxy server...")
+		if tracker != nil {
+			_ = tracker.Close()
+		}
 		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 		defer cancel()
 		if err := httpServer.Shutdown(ctx); err != nil {

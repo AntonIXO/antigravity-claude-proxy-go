@@ -143,6 +143,9 @@ func (server *Server) handleManagement(writer http.ResponseWriter, request *http
 	case path == "/api/strategy/health" && method == http.MethodGet:
 		server.handleStrategyHealthGet(writer, request)
 		return true
+	case path == "/api/stats/history" && method == http.MethodGet:
+		server.handleStatsHistory(writer, request)
+		return true
 	case path == "/api/logs" && method == http.MethodGet:
 		server.handleLogsGet(writer, request)
 		return true
@@ -175,12 +178,13 @@ func (server *Server) handleHealth(writer http.ResponseWriter, request *http.Req
 
 func (server *Server) handleAccountLimits(writer http.ResponseWriter, request *http.Request) {
 	cfg := config.Get()
+	includeHistory := request.URL.Query().Get("includeHistory") == "true"
 	if server.accountManager == nil {
 		modelMapping := cfg.ModelMapping
 		if modelMapping == nil {
 			modelMapping = make(map[string]any)
 		}
-		writeJSON(writer, http.StatusOK, map[string]any{
+		res := map[string]any{
 			"status":               "ok",
 			"timestamp":            server.now().UTC().Format(time.RFC3339Nano),
 			"totalAccounts":        0,
@@ -188,7 +192,11 @@ func (server *Server) handleAccountLimits(writer http.ResponseWriter, request *h
 			"modelConfig":          modelMapping,
 			"globalQuotaThreshold": cfg.GlobalQuotaThreshold,
 			"accounts":             []any{},
-		})
+		}
+		if includeHistory && server.tracker != nil {
+			res["history"] = server.tracker.GetHistory()
+		}
+		writeJSON(writer, http.StatusOK, res)
 		return
 	}
 
@@ -319,7 +327,7 @@ func (server *Server) handleAccountLimits(writer http.ResponseWriter, request *h
 		modelMapping = make(map[string]any)
 	}
 
-	writeJSON(writer, http.StatusOK, map[string]any{
+	res := map[string]any{
 		"status":               "ok",
 		"timestamp":            server.now().UTC().Format(time.RFC3339Nano),
 		"totalAccounts":        len(accountsList),
@@ -327,7 +335,12 @@ func (server *Server) handleAccountLimits(writer http.ResponseWriter, request *h
 		"modelConfig":          modelMapping,
 		"globalQuotaThreshold": cfg.GlobalQuotaThreshold,
 		"accounts":             result,
-	})
+	}
+	if includeHistory && server.tracker != nil {
+		res["history"] = server.tracker.GetHistory()
+	}
+
+	writeJSON(writer, http.StatusOK, res)
 }
 
 func (server *Server) handleAccountsList(writer http.ResponseWriter, request *http.Request) {
@@ -958,5 +971,19 @@ func (server *Server) handleAuthCompletePost(writer http.ResponseWriter, request
 	writeJSON(writer, http.StatusBadRequest, map[string]any{
 		"status": "error",
 		"error":  "OAuth callback handler not configured",
+	})
+}
+
+func (server *Server) handleStatsHistory(writer http.ResponseWriter, request *http.Request) {
+	if server.tracker == nil {
+		writeJSON(writer, http.StatusOK, map[string]any{
+			"status":  "ok",
+			"history": map[string]any{},
+		})
+		return
+	}
+	writeJSON(writer, http.StatusOK, map[string]any{
+		"status":  "ok",
+		"history": server.tracker.GetHistory(),
 	})
 }

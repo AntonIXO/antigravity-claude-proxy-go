@@ -85,3 +85,46 @@ func TestStreamHandler(t *testing.T) {
 		t.Errorf("expected underlying text handler to receive message")
 	}
 }
+
+func TestStreamHandler_Success(t *testing.T) {
+	broadcaster := NewBroadcaster(10)
+	handler := NewStreamHandler(nil, broadcaster)
+	log := slog.New(handler)
+
+	Success(log, "operation succeeded", "account", "test@example.com")
+
+	history := broadcaster.GetHistory()
+	if len(history) != 1 {
+		t.Fatalf("expected 1 log entry, got %d", len(history))
+	}
+	if history[0].Level != "SUCCESS" {
+		t.Errorf("expected level SUCCESS, got %s", history[0].Level)
+	}
+	if strings.Contains(history[0].Message, "level_tag=") {
+		t.Errorf("expected level_tag attribute to be stripped from message, got %s", history[0].Message)
+	}
+	if !strings.Contains(history[0].Message, "operation succeeded") || !strings.Contains(history[0].Message, "account=test@example.com") {
+		t.Errorf("unexpected message: %s", history[0].Message)
+	}
+}
+
+func TestLogSuccess(t *testing.T) {
+	broadcaster := NewBroadcaster(10)
+	handler := NewStreamHandler(nil, broadcaster)
+	oldDefault := slog.Default()
+	slog.SetDefault(slog.New(handler))
+	defer slog.SetDefault(oldDefault)
+
+	LogSuccess("global success", "detail", "ok")
+
+	history := broadcaster.GetHistory()
+	if len(history) != 1 {
+		t.Fatalf("expected 1 log entry, got %d", len(history))
+	}
+	if history[0].Level != "SUCCESS" {
+		t.Errorf("expected level SUCCESS, got %s", history[0].Level)
+	}
+	if strings.Contains(history[0].Message, "level_tag=") {
+		t.Errorf("expected level_tag attribute to be stripped from message, got %s", history[0].Message)
+	}
+}

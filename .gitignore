@@ -2,4 +2,6 @@
 *.log
 *.pid
 /proxy
+.DS_Store
+*.DS_Store
 

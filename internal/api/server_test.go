@@ -14,6 +14,8 @@ import (
 
 	"antigravity-go-proxy/internal/auth"
 	"antigravity-go-proxy/internal/cloudcode"
+	"antigravity-go-proxy/internal/logger"
+	"antigravity-go-proxy/internal/stats"
 )
 
 type fakeUpstream struct {
@@ -339,5 +341,126 @@ func decodeBody(t *testing.T, reader io.Reader, destination any) {
 	t.Helper()
 	if err := json.NewDecoder(reader).Decode(destination); err != nil {
 		t.Fatal(err)
+	}
+}
+
+func TestLoggingMiddleware(t *testing.T) {
+	broadcaster := logger.NewBroadcaster(10)
+	streamHandler := logger.NewStreamHandler(nil, broadcaster)
+	testLogger := slog.New(streamHandler)
+
+	handler := loggingMiddleware(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/error" {
+			http.Error(w, "server error", http.StatusInternalServerError)
+			return
+		}
+		if r.URL.Path == "/not-found" {
+			http.Error(w, "not found", http.StatusNotFound)
+			return
+		}
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write([]byte("ok"))
+	}), testLogger)
+
+	// 1. Success request
+	req := httptest.NewRequest(http.MethodGet, "/test", nil)
+	rec := httptest.NewRecorder()
+	handler.ServeHTTP(rec, req)
+
+	// 2. Warn request
+	reqWarn := httptest.NewRequest(http.MethodGet, "/not-found", nil)
+	recWarn := httptest.NewRecorder()
+	handler.ServeHTTP(recWarn, reqWarn)
+
+	// 3. Error request
+	reqErr := httptest.NewRequest(http.MethodGet, "/error", nil)
+	recErr := httptest.NewRecorder()
+	handler.ServeHTTP(recErr, reqErr)
+
+	// 4. Skipped request
+	reqSkip := httptest.NewRequest(http.MethodPost, "/v1/messages/count_tokens", nil)
+	recSkip := httptest.NewRecorder()
+	handler.ServeHTTP(recSkip, reqSkip)
+
+	history := broadcaster.GetHistory()
+	if len(history) != 3 {
+		t.Fatalf("expected 3 logged requests (skipped count_tokens), got %d", len(history))
+	}
+	if history[0].Level != "INFO" || !strings.Contains(history[0].Message, "[GET] /test 200") {
+		t.Errorf("expected INFO log for /test 200, got %+v", history[0])
+	}
+	if history[1].Level != "WARN" || !strings.Contains(history[1].Message, "[GET] /not-found 404") {
+		t.Errorf("expected WARN log for /not-found 404, got %+v", history[1])
+	}
+	if history[2].Level != "ERROR" || !strings.Contains(history[2].Message, "[GET] /error 500") {
+		t.Errorf("expected ERROR log for /error 500, got %+v", history[2])
+	}
+}
+
+func TestTrackerIntegration(t *testing.T) {
+	tracker, err := stats.NewTracker("")
+	if err != nil {
+		t.Fatalf("NewTracker failed: %v", err)
+	}
+
+	upstream := &fakeUpstream{streamData: standardStream()}
+	now := time.Date(2026, 7, 14, 12, 0, 0, 0, time.UTC)
+	server, err := New(Options{
+		APIKey:    "local-key",
+		ProjectID: "test-proj",
+		Now:       func() time.Time { return now },
+		Credentials: func(context.Context) (auth.Credentials, error) {
+			return auth.Credentials{AccessToken: "access-token", Email: "user@example.com", Expiry: now.Add(time.Hour)}, nil
+		},
+		NewUpstream: func(string) Upstream { return upstream },
+		Logger:      slog.New(slog.NewTextHandler(io.Discard, nil)),
+		Tracker:     tracker,
+	})
+	if err != nil {
+		t.Fatalf("failed to create server: %v", err)
+	}
+
+	// 1. Unary message
+	reqUnary := httptest.NewRequest(http.MethodPost, "/v1/messages", strings.NewReader(`{
+		"model":"claude-3-5-sonnet-20241022","max_tokens":128,
+		"messages":[{"role":"user","content":"hello"}]
+	}`))
+	reqUnary.Header.Set("x-api-key", "local-key")
+	recUnary := httptest.NewRecorder()
+	server.Handler().ServeHTTP(recUnary, reqUnary)
+	if recUnary.Code != http.StatusOK {
+		t.Fatalf("unary request failed: %d", recUnary.Code)
+	}
+
+	// 2. Stream message
+	reqStream := httptest.NewRequest(http.MethodPost, "/v1/messages", strings.NewReader(`{
+		"model":"gemini-2.5-flash","stream":true,"max_tokens":128,
+		"messages":[{"role":"user","content":"hello"}]
+	}`))
+	reqStream.Header.Set("x-api-key", "local-key")
+	recStream := httptest.NewRecorder()
+	server.Handler().ServeHTTP(recStream, reqStream)
+	if recStream.Code != http.StatusOK {
+		t.Fatalf("stream request failed: %d", recStream.Code)
+	}
+
+	history := tracker.GetHistory()
+	if len(history) != 1 {
+		t.Fatalf("expected 1 hour bucket in stats tracker, got %d", len(history))
+	}
+	var hourMap map[string]any
+	for _, v := range history {
+		hourMap = v.(map[string]any)
+	}
+	if hourMap["_total"] != 2 {
+		t.Errorf("expected total requests 2, got %v", hourMap["_total"])
+	}
+	claudeMap := hourMap["claude"].(map[string]int)
+	if claudeMap["3-5-sonnet-20241022"] != 1 {
+		t.Errorf("expected claude count 1, got %d", claudeMap["3-5-sonnet-20241022"])
+	}
+	geminiMap := hourMap["gemini"].(map[string]int)
+	if geminiMap["2.5-flash"] != 1 {
+		t.Errorf("expected gemini count 1, got %d", geminiMap["2.5-flash"])
 	}
 }

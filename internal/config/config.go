@@ -86,13 +86,18 @@ func DefaultConfig() Config {
 	}
 }
 
-// ConfigFilePath returns path to ~/.config/antigravity-proxy/config.json.
-func ConfigFilePath() (string, error) {
+// GetConfigDir returns path to ~/.config/antigravity-proxy directory.
+func GetConfigDir() string {
 	home, err := os.UserHomeDir()
 	if err != nil {
-		return "", err
+		return filepath.Join(".", ".config", "antigravity-proxy")
 	}
-	return filepath.Join(home, ".config", "antigravity-proxy", "config.json"), nil
+	return filepath.Join(home, ".config", "antigravity-proxy")
+}
+
+// ConfigFilePath returns path to ~/.config/antigravity-proxy/config.json.
+func ConfigFilePath() (string, error) {
+	return filepath.Join(GetConfigDir(), "config.json"), nil
 }
 
 // Load reads and parses config.json, falling back to defaults if not found.
