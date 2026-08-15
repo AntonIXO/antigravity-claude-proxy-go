@@ -206,6 +206,63 @@ func TestAccountCloningAndConcurrency(t *testing.T) {
 	<-done
 }
 
+func TestExtractSubscriptionAndTierDetection(t *testing.T) {
+	t.Parallel()
+	now := time.Date(2026, 8, 15, 12, 0, 0, 0, time.UTC)
+
+	tests := []struct {
+		name          string
+		jsonBody      string
+		wantTier      string
+		wantProjectID string
+	}{
+		{
+			name:          "Pro account from paidTier and currentTier",
+			jsonBody:      `{"cloudaicompanionProject":"proj-pro","currentTier":{"id":"tier-pro","name":"Google One AI Premium"},"paidTier":{"id":"tier-pro"}}`,
+			wantTier:      "pro",
+			wantProjectID: "proj-pro",
+		},
+		{
+			name:          "Pro account from g1Tier PRO",
+			jsonBody:      `{"cloudaicompanionProject":"proj-g1","currentTier":{"id":"tier-1"},"g1Tier":"PRO"}`,
+			wantTier:      "pro",
+			wantProjectID: "proj-g1",
+		},
+		{
+			name:          "Ultra account from currentTier name and g1Tier",
+			jsonBody:      `{"cloudaicompanionProject":"proj-ultra","currentTier":{"id":"tier-ultra","name":"Gemini Ultra"},"g1Tier":"ULTRA"}`,
+			wantTier:      "ultra",
+			wantProjectID: "proj-ultra",
+		},
+		{
+			name:          "Free account from currentTier free",
+			jsonBody:      `{"cloudaicompanionProject":"proj-free","currentTier":{"id":"tier-free","name":"Free Tier"}}`,
+			wantTier:      "free",
+			wantProjectID: "proj-free",
+		},
+		{
+			name:          "Project object format",
+			jsonBody:      `{"cloudaicompanionProject":{"id":"proj-obj"},"currentTier":{"id":"tier-pro"}}`,
+			wantTier:      "pro",
+			wantProjectID: "proj-obj",
+		},
+	}
+
+	for _, tc := range tests {
+		tc := tc
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			sub := ExtractSubscription([]byte(tc.jsonBody), now)
+			if sub.Tier != tc.wantTier {
+				t.Errorf("got Tier = %q, want %q", sub.Tier, tc.wantTier)
+			}
+			if sub.ProjectID != tc.wantProjectID {
+				t.Errorf("got ProjectID = %q, want %q", sub.ProjectID, tc.wantProjectID)
+			}
+		})
+	}
+}
+
 func testAccount(email string) *Account {
 	return &Account{
 		Email:           email,

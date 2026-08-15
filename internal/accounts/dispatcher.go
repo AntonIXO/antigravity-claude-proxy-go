@@ -336,19 +336,79 @@ func (dispatcher *Dispatcher) resolveProject(ctx context.Context, account *Accou
 	if err != nil {
 		return "", fmt.Errorf("discover project for %s: %w", account.Email, err)
 	}
-	var document map[string]any
-	if err := json.Unmarshal(response.Body, &document); err != nil {
-		return "", err
-	}
-	project := textValue(document["cloudaicompanionProject"])
-	if object, ok := document["cloudaicompanionProject"].(map[string]any); ok && project == "" {
-		project = textValue(object["id"])
+	sub := ExtractSubscription(response.Body, dispatcher.now())
+	project := sub.ProjectID
+	if project == "" {
+		var document map[string]any
+		if err := json.Unmarshal(response.Body, &document); err == nil {
+			project = textValue(document["cloudaicompanionProject"])
+			if object, ok := document["cloudaicompanionProject"].(map[string]any); ok && project == "" {
+				project = textValue(object["id"])
+			}
+		}
 	}
 	if project == "" {
 		return "", fmt.Errorf("loadCodeAssist response for %s did not include a Cloud Code project", account.Email)
 	}
+	sub.ProjectID = project
+	_ = dispatcher.manager.UpdateSubscription(account.Email, sub)
 	dispatcher.manager.CacheProject(account, project)
 	return project, nil
+}
+
+func (dispatcher *Dispatcher) RefreshAccount(ctx context.Context, email string) (*Account, error) {
+	dispatcher.manager.ClearTokenCache(email)
+	dispatcher.manager.ClearProjectCache(email)
+	dispatcher.resolver.Invalidate(email)
+
+	var targetAccount *Account
+	for _, acc := range dispatcher.manager.GetAllAccounts() {
+		if acc.Email == email {
+			targetAccount = acc
+			break
+		}
+	}
+	if targetAccount == nil {
+		return nil, fmt.Errorf("account %s not found", email)
+	}
+
+	credentials, err := dispatcher.resolver.Resolve(ctx, targetAccount)
+	if err != nil {
+		return nil, fmt.Errorf("resolve credentials for %s: %w", email, err)
+	}
+
+	client := dispatcher.client(targetAccount, credentials.AccessToken)
+	response, err := client.LoadCodeAssist(ctx, "")
+	if err != nil {
+		return nil, fmt.Errorf("load code assist for %s: %w", email, err)
+	}
+
+	sub := ExtractSubscription(response.Body, dispatcher.now())
+	if sub.ProjectID != "" {
+		dispatcher.manager.CacheProject(targetAccount, sub.ProjectID)
+	}
+	_ = dispatcher.manager.UpdateSubscription(email, sub)
+
+	project := sub.ProjectID
+	if project == "" {
+		project = dispatcher.project(targetAccount)
+	}
+
+	quotaResponse, err := client.FetchAvailableModels(ctx, project)
+	if err == nil && len(quotaResponse.Body) > 0 {
+		dispatcher.updateAccountQuota(targetAccount, quotaResponse.Body)
+	}
+
+	if targetAccount.IsInvalid && targetAccount.VerifyURL != "" {
+		dispatcher.manager.ClearInvalid(email)
+	}
+
+	for _, acc := range dispatcher.manager.GetAllAccounts() {
+		if acc.Email == email {
+			return acc, nil
+		}
+	}
+	return targetAccount, nil
 }
 
 func (dispatcher *Dispatcher) client(account *Account, token string) CloudClient {

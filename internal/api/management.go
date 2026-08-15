@@ -383,6 +383,24 @@ func (server *Server) handleAccountRefresh(writer http.ResponseWriter, request *
 		}
 	}
 
+	if refresher, ok := server.backend.(AccountRefresher); ok {
+		acc, err := refresher.RefreshAccount(request.Context(), email)
+		if err != nil {
+			server.logger.Warn("refresh account upstream failed", "email", email, "error", err)
+			writeJSON(writer, http.StatusOK, map[string]any{
+				"status":  "ok",
+				"message": fmt.Sprintf("Token cache cleared for %s (upstream refresh failed: %v)", email, err),
+			})
+			return
+		}
+		writeJSON(writer, http.StatusOK, map[string]any{
+			"status":  "ok",
+			"message": fmt.Sprintf("Account %s refreshed successfully", email),
+			"account": acc,
+		})
+		return
+	}
+
 	writeJSON(writer, http.StatusOK, map[string]any{
 		"status":  "ok",
 		"message": fmt.Sprintf("Token cache cleared for %s", email),
