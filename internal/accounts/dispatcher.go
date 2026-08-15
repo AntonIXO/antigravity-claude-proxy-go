@@ -14,6 +14,7 @@ import (
 	"antigravity-go-proxy/internal/auth"
 	"antigravity-go-proxy/internal/cloudcode"
 	proxyformat "antigravity-go-proxy/internal/format"
+	"antigravity-go-proxy/internal/logger"
 	"antigravity-go-proxy/internal/modelcatalog"
 )
 
@@ -147,9 +148,19 @@ func (dispatcher *Dispatcher) FetchAvailableModels(ctx context.Context) (cloudco
 
 func (dispatcher *Dispatcher) StreamGenerateContent(ctx context.Context, request map[string]any, consume func(cloudcode.SSEEvent) error) (cloudcode.Response, error) {
 	requestedModel, _ := request["model"].(string)
+<<<<<<< HEAD
 	modelDetails, err := dispatcher.resolveModel(ctx, requestedModel, request)
+=======
+	stream, _ := request["stream"].(bool)
+	slog.Info(fmt.Sprintf("[API] Request for model: %s, stream: %v", requestedModel, stream))
+
+	modelDetails, err := dispatcher.resolveModel(ctx, requestedModel)
+>>>>>>> a0a37ee (feat(proxy): fix logging infrastructure and add request volume tracking)
 	if err != nil {
 		return cloudcode.Response{}, err
+	}
+	if modelDetails.ID != requestedModel {
+		slog.Info(fmt.Sprintf("[Server] Mapping model %s -> %s", requestedModel, modelDetails.ID))
 	}
 	request = cloneRequest(request)
 	request["model"] = modelDetails.GetUpstreamID()
@@ -165,6 +176,9 @@ func (dispatcher *Dispatcher) StreamGenerateContent(ctx context.Context, request
 			wait := selection.Wait
 			if wait == 0 {
 				wait = dispatcher.manager.MinWait(model)
+			}
+			if wait > 0 {
+				slog.Warn(fmt.Sprintf("[Server] All accounts rate-limited for %s. Wait %s", model, wait.Round(time.Second)))
 			}
 			if wait > 0 && wait <= dispatcher.maxWait {
 				if err := dispatcher.sleep(ctx, wait+500*time.Millisecond); err != nil {
@@ -217,6 +231,7 @@ func (dispatcher *Dispatcher) StreamGenerateContent(ctx context.Context, request
 			})
 			if requestErr == nil {
 				dispatcher.manager.MarkSuccess(account, model)
+				logger.LogSuccess(fmt.Sprintf("[API] Request succeeded using account %s for %s", account.Email, model))
 				return response, nil
 			}
 			lastError = requestErr

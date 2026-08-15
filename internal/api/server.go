@@ -21,6 +21,7 @@ import (
 	proxyformat "antigravity-go-proxy/internal/format"
 	"antigravity-go-proxy/internal/logger"
 	"antigravity-go-proxy/internal/modelcatalog"
+	"antigravity-go-proxy/internal/stats"
 )
 
 const maxRequestBody = 50 << 20
@@ -55,6 +56,7 @@ type Options struct {
 	Broadcaster    *logger.Broadcaster
 	WebUI          http.Handler
 	OAuthHandler   http.Handler
+	Tracker        *stats.Tracker
 }
 
 type Server struct {
@@ -70,6 +72,7 @@ type Server struct {
 	broadcaster    *logger.Broadcaster
 	webUI          http.Handler
 	oauthHandler   http.Handler
+	tracker        *stats.Tracker
 
 	mu                sync.Mutex
 	cachedCredentials auth.Credentials
@@ -99,13 +102,82 @@ func New(options Options) (*Server, error) {
 		credentials: options.Credentials, newUpstream: options.NewUpstream, backend: options.Backend,
 		builder: options.Builder, now: options.Now, logger: options.Logger,
 		accountManager: options.AccountManager, broadcaster: options.Broadcaster,
-		webUI: options.WebUI, oauthHandler: options.OAuthHandler,
+		webUI: options.WebUI, oauthHandler: options.OAuthHandler, tracker: options.Tracker,
 		projects: make(map[string]string),
 	}, nil
 }
 
+type responseWriterRecorder struct {
+	http.ResponseWriter
+	statusCode   int
+	bytesWritten int64
+}
+
+func (r *responseWriterRecorder) WriteHeader(statusCode int) {
+	r.statusCode = statusCode
+	r.ResponseWriter.WriteHeader(statusCode)
+}
+
+func (r *responseWriterRecorder) Write(b []byte) (int, error) {
+	if r.statusCode == 0 {
+		r.statusCode = http.StatusOK
+	}
+	n, err := r.ResponseWriter.Write(b)
+	r.bytesWritten += int64(n)
+	return n, err
+}
+
+func (r *responseWriterRecorder) Flush() {
+	if flusher, ok := r.ResponseWriter.(http.Flusher); ok {
+		flusher.Flush()
+	}
+}
+
+func shouldSkipLogging(path string) bool {
+	if path == "/api/event_logging/batch" || path == "/v1/messages/count_tokens" {
+		return true
+	}
+	if strings.HasPrefix(path, "/.well-known/") {
+		return true
+	}
+	return false
+}
+
+func loggingMiddleware(next http.Handler, log *slog.Logger) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if shouldSkipLogging(r.URL.Path) {
+			next.ServeHTTP(w, r)
+			return
+		}
+
+		start := time.Now()
+		rec := &responseWriterRecorder{ResponseWriter: w}
+		next.ServeHTTP(rec, r)
+
+		status := rec.statusCode
+		if status == 0 {
+			status = http.StatusOK
+		}
+		duration := time.Since(start).Truncate(time.Millisecond)
+		logMsg := fmt.Sprintf("[%s] %s %d (%s)", r.Method, r.URL.Path, status, duration)
+
+		if log == nil {
+			log = slog.Default()
+		}
+
+		switch {
+		case status >= 500:
+			log.Error(logMsg)
+		case status >= 400:
+			log.Warn(logMsg)
+		default:
+			log.Info(logMsg)
+		}
+	})
+}
+
 func (server *Server) Handler() http.Handler {
-	return http.HandlerFunc(server.serveHTTP)
+	return loggingMiddleware(http.HandlerFunc(server.serveHTTP), server.logger)
 }
 
 func (server *Server) serveHTTP(writer http.ResponseWriter, request *http.Request) {
@@ -404,6 +476,9 @@ func (server *Server) unaryMessage(writer http.ResponseWriter, request *http.Req
 		server.writeError(writer, err)
 		return
 	}
+	if server.tracker != nil {
+		server.tracker.Track(model)
+	}
 	response := accumulator.Response(model, server.builder.Cache, "")
 	writeJSON(writer, http.StatusOK, response)
 }
@@ -464,6 +539,9 @@ func (server *Server) streamMessage(writer http.ResponseWriter, request *http.Re
 		}
 	}
 	if err == nil {
+		if server.tracker != nil {
+			server.tracker.Track(model)
+		}
 		return
 	}
 	if !started {

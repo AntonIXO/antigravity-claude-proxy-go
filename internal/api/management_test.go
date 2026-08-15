@@ -13,6 +13,7 @@ import (
 	"antigravity-go-proxy/internal/auth"
 	"antigravity-go-proxy/internal/cloudcode"
 	"antigravity-go-proxy/internal/logger"
+	"antigravity-go-proxy/internal/stats"
 )
 
 func newTestServerWithManager(t *testing.T) (*Server, *accounts.Manager, *logger.Broadcaster) {
@@ -275,6 +276,82 @@ func TestManagement_ConfigAndClaude(t *testing.T) {
 
 		if rec.Code != http.StatusOK {
 			t.Fatalf("expected 200, got %d", rec.Code)
+		}
+	})
+}
+
+func TestManagement_StatsHistory(t *testing.T) {
+	tracker, err := stats.NewTracker("")
+	if err != nil {
+		t.Fatalf("NewTracker failed: %v", err)
+	}
+	tracker.Track("claude-opus-4-6")
+
+	acc := &accounts.Account{
+		Email:   "test@example.com",
+		Source:  "manual",
+		Enabled: true,
+		APIKey:  "key-123",
+	}
+	now := func() time.Time { return time.Date(2026, 8, 14, 12, 0, 0, 0, time.UTC) }
+	mgr, err := accounts.New(accounts.Options{
+		Accounts: []*accounts.Account{acc},
+		Strategy: accounts.StrategyHybrid,
+		Now:      now,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	server, err := New(Options{
+		APIKey:      "test-api-key",
+		Credentials: func(context.Context) (auth.Credentials, error) { return auth.Credentials{AccessToken: "token"}, nil },
+		NewUpstream: func(string) Upstream { return &mockUpstream{} },
+		Now:         now,
+		AccountManager: mgr,
+		Tracker:     tracker,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	handler := server.Handler()
+
+	t.Run("GET /account-limits?includeHistory=true", func(t *testing.T) {
+		req := httptest.NewRequest(http.MethodGet, "/account-limits?includeHistory=true", nil)
+		rec := httptest.NewRecorder()
+		handler.ServeHTTP(rec, req)
+
+		if rec.Code != http.StatusOK {
+			t.Fatalf("expected 200, got %d: %s", rec.Code, rec.Body.String())
+		}
+		var res map[string]any
+		if err := json.Unmarshal(rec.Body.Bytes(), &res); err != nil {
+			t.Fatal(err)
+		}
+		history, ok := res["history"].(map[string]any)
+		if !ok || len(history) == 0 {
+			t.Fatalf("expected history in response, got %v", res["history"])
+		}
+	})
+
+	t.Run("GET /api/stats/history", func(t *testing.T) {
+		req := httptest.NewRequest(http.MethodGet, "/api/stats/history", nil)
+		rec := httptest.NewRecorder()
+		handler.ServeHTTP(rec, req)
+
+		if rec.Code != http.StatusOK {
+			t.Fatalf("expected 200, got %d: %s", rec.Code, rec.Body.String())
+		}
+		var res map[string]any
+		if err := json.Unmarshal(rec.Body.Bytes(), &res); err != nil {
+			t.Fatal(err)
+		}
+		if res["status"] != "ok" {
+			t.Errorf("expected status ok, got %v", res["status"])
+		}
+		history, ok := res["history"].(map[string]any)
+		if !ok || len(history) == 0 {
+			t.Fatalf("expected history in response, got %v", res["history"])
 		}
 	})
 }

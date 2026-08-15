@@ -38,6 +38,19 @@ func NewBroadcaster(capacity int) *Broadcaster {
 	}
 }
 
+// Success logs a message at Info level with level_tag=SUCCESS on the given logger.
+func Success(logger *slog.Logger, msg string, args ...any) {
+	if logger == nil {
+		logger = slog.Default()
+	}
+	logger.Info(msg, append(args, slog.String("level_tag", "SUCCESS"))...)
+}
+
+// LogSuccess logs a message at Info level with level_tag=SUCCESS using the default slog logger.
+func LogSuccess(msg string, args ...any) {
+	slog.Default().Info(msg, append(args, slog.String("level_tag", "SUCCESS"))...)
+}
+
 // Add appends a new entry to the ring buffer and dispatches it to subscribers.
 func (b *Broadcaster) Add(entry LogEntry) {
 	b.mu.Lock()
@@ -164,6 +177,10 @@ func (h *StreamHandler) Handle(ctx context.Context, record slog.Record) error {
 			return true
 		})
 		for _, a := range h.attrs {
+			if a.Key == "level_tag" && a.Value.String() == "SUCCESS" {
+				levelStr = "SUCCESS"
+				continue
+			}
 			attrs = append(attrs, fmt.Sprintf("%s=%v", a.Key, a.Value.Any()))
 		}
 
