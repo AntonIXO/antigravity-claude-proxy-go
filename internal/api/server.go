@@ -18,6 +18,7 @@ import (
 	"antigravity-go-proxy/internal/accounts"
 	"antigravity-go-proxy/internal/auth"
 	"antigravity-go-proxy/internal/cloudcode"
+	"antigravity-go-proxy/internal/config"
 	proxyformat "antigravity-go-proxy/internal/format"
 	"antigravity-go-proxy/internal/logger"
 	"antigravity-go-proxy/internal/modelcatalog"
@@ -418,6 +419,23 @@ func (server *Server) messages(writer http.ResponseWriter, request *http.Request
 	}
 	if model, _ := anthropicRequest["model"].(string); model == "" {
 		anthropicRequest["model"] = "gemini-3.5-flash-low"
+	}
+	cfg := config.Get()
+	if cfg.ModelMapping != nil {
+		reqModel := stringFrom(anthropicRequest["model"])
+		if mappingVal, exists := cfg.ModelMapping[reqModel]; exists {
+			var mappedModel string
+			switch v := mappingVal.(type) {
+			case string:
+				mappedModel = v
+			case map[string]any:
+				mappedModel, _ = v["mapping"].(string)
+			}
+			if mappedModel != "" {
+				slog.Info(fmt.Sprintf("[Server] Mapping model %s -> %s", reqModel, mappedModel))
+				anthropicRequest["model"] = mappedModel
+			}
+		}
 	}
 	if _, exists := anthropicRequest["max_tokens"]; !exists {
 		anthropicRequest["max_tokens"] = 4096
