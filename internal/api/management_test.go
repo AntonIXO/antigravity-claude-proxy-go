@@ -61,6 +61,21 @@ func (m *mockUpstream) StreamGenerateContent(context.Context, any, cloudcode.Req
 	return cloudcode.Response{}, nil
 }
 
+type mockRefresherBackend struct {
+	acc *accounts.Account
+}
+
+func (m *mockRefresherBackend) FetchAvailableModels(context.Context) (cloudcode.Response, error) {
+	return cloudcode.Response{Body: []byte(`{"models":[]}`)}, nil
+}
+func (m *mockRefresherBackend) StreamGenerateContent(context.Context, map[string]any, func(cloudcode.SSEEvent) error) (cloudcode.Response, error) {
+	return cloudcode.Response{}, nil
+}
+func (m *mockRefresherBackend) RefreshAccount(ctx context.Context, email string) (*accounts.Account, error) {
+	m.acc.Subscription = accounts.Subscription{Tier: "pro", ProjectID: "proj-123"}
+	return m.acc, nil
+}
+
 func TestManagement_HealthAndLimits(t *testing.T) {
 	server, _, _ := newTestServerWithManager(t)
 	handler := server.Handler()
@@ -176,6 +191,31 @@ func TestManagement_AccountsCRUD(t *testing.T) {
 
 		if rec.Code != http.StatusOK {
 			t.Fatalf("expected 200, got %d", rec.Code)
+		}
+	})
+
+	t.Run("POST /api/accounts/test@example.com/refresh with refresher", func(t *testing.T) {
+		acc := &accounts.Account{Email: "test@example.com", Enabled: true, Source: "manual"}
+		mgr, _ := accounts.New(accounts.Options{Accounts: []*accounts.Account{acc}})
+		refresherServer, _ := New(Options{
+			APIKey:         "test-api-key",
+			AccountManager: mgr,
+			Backend:        &mockRefresherBackend{acc: acc},
+		})
+
+		req := httptest.NewRequest(http.MethodPost, "/api/accounts/test@example.com/refresh", nil)
+		rec := httptest.NewRecorder()
+		refresherServer.Handler().ServeHTTP(rec, req)
+
+		if rec.Code != http.StatusOK {
+			t.Fatalf("expected 200, got %d: %s", rec.Code, rec.Body.String())
+		}
+		var res map[string]any
+		if err := json.Unmarshal(rec.Body.Bytes(), &res); err != nil {
+			t.Fatal(err)
+		}
+		if res["status"] != "ok" {
+			t.Errorf("expected status ok, got %v", res["status"])
 		}
 	})
 
