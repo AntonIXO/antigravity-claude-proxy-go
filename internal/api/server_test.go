@@ -14,6 +14,7 @@ import (
 
 	"antigravity-go-proxy/internal/auth"
 	"antigravity-go-proxy/internal/cloudcode"
+	"antigravity-go-proxy/internal/config"
 	"antigravity-go-proxy/internal/logger"
 	"antigravity-go-proxy/internal/stats"
 )
@@ -462,5 +463,67 @@ func TestTrackerIntegration(t *testing.T) {
 	geminiMap := hourMap["gemini"].(map[string]int)
 	if geminiMap["2.5-flash"] != 1 {
 		t.Errorf("expected gemini count 1, got %d", geminiMap["2.5-flash"])
+	}
+}
+
+func TestModelMappingRedirection(t *testing.T) {
+	t.Parallel()
+	// Setup configuration with a mapping from claude-sonnet-4-6 (object) and gemini-test (string)
+	cfg := config.DefaultConfig()
+	cfg.ModelMapping = map[string]any{
+		"claude-sonnet-4-6": map[string]any{
+			"mapping": "gpt-oss",
+		},
+		"gemini-custom-source": "gemini-3.5-flash-low",
+	}
+	// Save/Apply config
+	config.Save(map[string]any{"modelMapping": cfg.ModelMapping})
+	defer func() {
+		// Cleanup config mapping
+		config.Save(map[string]any{"modelMapping": make(map[string]any)})
+	}()
+
+	upstream := &fakeUpstream{
+		loadBody:   []byte(`{"cloudaicompanionProject":{"id":"discovered-project"}}`),
+		streamData: standardStream(),
+	}
+	handler := newTestHandler(t, upstream, "test-proj")
+
+	// Test 1: Object mapping
+	request1 := httptest.NewRequest(http.MethodPost, "/v1/messages", strings.NewReader(`{
+		"model":"claude-sonnet-4-6","messages":[{"role":"user","content":"hello"}]
+	}`))
+	request1.Header.Set("x-api-key", "local-key")
+	response1 := httptest.NewRecorder()
+	handler.ServeHTTP(response1, request1)
+
+	if response1.Code != http.StatusOK {
+		t.Fatalf("status=%d body=%s", response1.Code, response1.Body.String())
+	}
+	if len(upstream.payloads) == 0 {
+		t.Fatal("no payload sent to upstream")
+	}
+	sentModel1 := upstream.payloads[0]["model"]
+	if sentModel1 != "gpt-oss" {
+		t.Fatalf("expected model to be mapped to gpt-oss, got %v", sentModel1)
+	}
+
+	// Test 2: String mapping
+	request2 := httptest.NewRequest(http.MethodPost, "/v1/messages", strings.NewReader(`{
+		"model":"gemini-custom-source","messages":[{"role":"user","content":"hello"}]
+	}`))
+	request2.Header.Set("x-api-key", "local-key")
+	response2 := httptest.NewRecorder()
+	handler.ServeHTTP(response2, request2)
+
+	if response2.Code != http.StatusOK {
+		t.Fatalf("status=%d body=%s", response2.Code, response2.Body.String())
+	}
+	if len(upstream.payloads) < 2 {
+		t.Fatal("second payload not sent to upstream")
+	}
+	sentModel2 := upstream.payloads[1]["model"]
+	if sentModel2 != "gemini-3.5-flash-low" {
+		t.Fatalf("expected model to be mapped to gemini-3.5-flash-low, got %v", sentModel2)
 	}
 }
