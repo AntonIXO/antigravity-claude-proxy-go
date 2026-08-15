@@ -44,6 +44,10 @@ type Backend interface {
 	StreamGenerateContent(context.Context, map[string]any, func(cloudcode.SSEEvent) error) (cloudcode.Response, error)
 }
 
+type AccountRefresher interface {
+	RefreshAccount(context.Context, string) (*accounts.Account, error)
+}
+
 type Options struct {
 	APIKey         string
 	ProjectID      string

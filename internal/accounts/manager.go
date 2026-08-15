@@ -436,10 +436,139 @@ func (manager *Manager) Project(account *Account) string {
 	return account.Subscription.ProjectID
 }
 
+type rawTier struct {
+	ID          string `json:"id"`
+	Name        string `json:"name"`
+	Description string `json:"description"`
+}
+
+func ExtractSubscription(body []byte, now time.Time) Subscription {
+	if now.IsZero() {
+		now = time.Now()
+	}
+	sub := Subscription{
+		Tier:       "free",
+		DetectedAt: now.UTC().Format(time.RFC3339),
+	}
+	if len(body) == 0 {
+		return sub
+	}
+
+	var document map[string]json.RawMessage
+	if err := json.Unmarshal(body, &document); err != nil {
+		return sub
+	}
+
+	if raw, exists := document["cloudaicompanionProject"]; exists && len(raw) > 0 {
+		var projectStr string
+		if err := json.Unmarshal(raw, &projectStr); err == nil && projectStr != "" {
+			sub.ProjectID = projectStr
+		} else {
+			var projectObj struct {
+				ID string `json:"id"`
+			}
+			if err := json.Unmarshal(raw, &projectObj); err == nil && projectObj.ID != "" {
+				sub.ProjectID = projectObj.ID
+			}
+		}
+	}
+
+	var g1Tier string
+	if raw, exists := document["g1Tier"]; exists && len(raw) > 0 {
+		_ = json.Unmarshal(raw, &g1Tier)
+	}
+
+	var currentTier rawTier
+	if raw, exists := document["currentTier"]; exists && len(raw) > 0 {
+		_ = json.Unmarshal(raw, &currentTier)
+	}
+
+	var paidTier *rawTier
+	if raw, exists := document["paidTier"]; exists && len(raw) > 0 && string(raw) != "null" {
+		var t rawTier
+		if err := json.Unmarshal(raw, &t); err == nil {
+			paidTier = &t
+		}
+	}
+
+	sub.Tier = normalizeTier(currentTier, paidTier, g1Tier)
+	return sub
+}
+
+func normalizeTier(current rawTier, paid *rawTier, g1Tier string) string {
+	g1Upper := strings.ToUpper(g1Tier)
+	currIDLower := strings.ToLower(current.ID)
+	currNameLower := strings.ToLower(current.Name)
+
+	paidIDLower := ""
+	paidNameLower := ""
+	if paid != nil {
+		paidIDLower = strings.ToLower(paid.ID)
+		paidNameLower = strings.ToLower(paid.Name)
+	}
+
+	if g1Upper == "ULTRA" ||
+		strings.Contains(currIDLower, "ultra") || strings.Contains(currNameLower, "ultra") ||
+		strings.Contains(paidIDLower, "ultra") || strings.Contains(paidNameLower, "ultra") {
+		return "ultra"
+	}
+
+	if paid != nil && (paid.ID != "" || paid.Name != "") {
+		return "pro"
+	}
+	if g1Upper == "PRO" || g1Upper == "PREMIUM" || g1Upper == "GOOGLE_ONE_AI_PREMIUM" {
+		return "pro"
+	}
+	for _, term := range []string{"pro", "paid", "gdp", "g1", "individual", "premium", "enterprise", "business"} {
+		if strings.Contains(currIDLower, term) || strings.Contains(currNameLower, term) {
+			return "pro"
+		}
+	}
+	if currIDLower != "" && currIDLower != "tier-free" && currIDLower != "free" && currIDLower != "free-tier" && currIDLower != "tier_free" {
+		return "pro"
+	}
+
+	return "free"
+}
+
 func (manager *Manager) CacheProject(account *Account, project string) {
 	manager.mu.Lock()
-	defer manager.mu.Unlock()
 	manager.projects[account.Email] = project
+	for _, acc := range manager.accounts {
+		if acc.Email == account.Email {
+			acc.ProjectID = project
+			acc.Subscription.ProjectID = project
+			break
+		}
+	}
+	manager.mu.Unlock()
+	_ = manager.SaveToDisk()
+}
+
+func (manager *Manager) UpdateSubscription(email string, subscription Subscription) error {
+	manager.mu.Lock()
+	found := false
+	for _, acc := range manager.accounts {
+		if acc.Email == email {
+			if subscription.Tier != "" {
+				acc.Subscription.Tier = subscription.Tier
+			}
+			if subscription.ProjectID != "" {
+				acc.Subscription.ProjectID = subscription.ProjectID
+				acc.ProjectID = subscription.ProjectID
+			}
+			if subscription.DetectedAt != "" {
+				acc.Subscription.DetectedAt = subscription.DetectedAt
+			}
+			found = true
+			break
+		}
+	}
+	manager.mu.Unlock()
+	if !found {
+		return fmt.Errorf("account %s not found", email)
+	}
+	return manager.SaveToDisk()
 }
 
 type Snapshot struct {
