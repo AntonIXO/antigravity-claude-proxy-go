@@ -203,7 +203,10 @@ func (converter *StreamConverter) closeCurrent() []map[string]any {
 }
 
 func (converter *StreamConverter) InputTokens() int {
-	return converter.inputTokens
+	if converter.inputTokens > converter.cacheReadTokens {
+		return converter.inputTokens - converter.cacheReadTokens
+	}
+	return 0
 }
 
 func (converter *StreamConverter) OutputTokens() int {

@@ -164,7 +164,12 @@ func (accumulator *ThinkingAccumulator) Response(model string, cache *SignatureC
 }
 
 func (accumulator *ThinkingAccumulator) InputTokens() int {
-	return intValue(accumulator.usage["promptTokenCount"], 0)
+	promptTokens := intValue(accumulator.usage["promptTokenCount"], 0)
+	cachedTokens := intValue(accumulator.usage["cachedContentTokenCount"], 0)
+	if promptTokens > cachedTokens {
+		return promptTokens - cachedTokens
+	}
+	return 0
 }
 
 func (accumulator *ThinkingAccumulator) OutputTokens() int {

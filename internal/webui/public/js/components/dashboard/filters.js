@@ -323,10 +323,11 @@ window.DashboardFilters.autoSelectTopN = function(component, n = 5) {
 
         Object.entries(hourData).forEach(([family, familyData]) => {
             if (typeof familyData === 'object' && family !== '_total') {
-                Object.entries(familyData).forEach(([model, count]) => {
+                Object.entries(familyData).forEach(([model, val]) => {
                     if (model !== '_subtotal') {
                         const key = `${family}:${model}`;
-                        usage[key] = (usage[key] || 0) + count;
+                        const reqs = typeof val === 'object' && val !== null ? (val.requests || 0) : (val || 0);
+                        usage[key] = (usage[key] || 0) + reqs;
                     }
                 });
             }

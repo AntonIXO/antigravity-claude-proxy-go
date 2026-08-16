@@ -496,7 +496,9 @@ window.DashboardCharts.updateTrendChart = function (component) {
         const familyData = hourData[family] || {};
         (component.selectedModels[family] || []).forEach((model) => {
           const key = `${family}:${model}`;
-          dataByModel[key].push(familyData[model] || 0);
+          const val = familyData[model];
+          const count = typeof val === 'object' && val !== null ? (val.requests || 0) : (val || 0);
+          dataByModel[key].push(count);
         });
       });
     });
