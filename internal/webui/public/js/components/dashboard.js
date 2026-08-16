@@ -12,6 +12,7 @@ window.Components.dashboard = () => ({
     charts: { quotaDistribution: null, usageTrend: null },
     usageStats: { total: 0, today: 0, thisHour: 0 },
     historyData: {},
+    modelPerformance: { rows: [], overall: { avgLatencyFormatted: '-', tps: '0.0', cacheHitRate: '0.0' } },
     modelTree: {},
     families: [],
 
@@ -154,6 +155,11 @@ window.Components.dashboard = () => ({
             this.modelTree[family] = Array.from(models).sort();
         });
         this.families = Object.keys(this.modelTree).sort();
+
+        // Compute per-model performance metrics (Latency, TPS, Cache Hit Rate)
+        if (window.DashboardStats && window.DashboardStats.computeModelMetrics) {
+            this.modelPerformance = window.DashboardStats.computeModelMetrics(history);
+        }
 
         // Auto-select new families/models that haven't been configured
         this.autoSelectNew();
