@@ -513,5 +513,75 @@
             </div>
         </div>
     </div>
+
+    <!-- Model Performance & Efficiency Table & Cards -->
+    <div class="view-card mt-6" x-show="modelPerformance && modelPerformance.rows && modelPerformance.rows.length > 0">
+        <div class="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-5">
+            <div class="flex items-center gap-2.5">
+                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor"
+                    class="w-4 h-4 text-neon-cyan">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                        d="M13 10V3L4 14h7v7l9-11h-7z"></path>
+                </svg>
+                <h3 class="text-xs font-mono text-gray-400 uppercase tracking-widest whitespace-nowrap"
+                    x-text="$store.global.t('modelPerformance')">Model Performance & Efficiency</h3>
+            </div>
+
+            <!-- Global Performance Summary Pills -->
+            <div class="flex flex-wrap gap-2.5 text-[10px] font-mono">
+                <div class="px-2.5 py-1 rounded bg-space-850 border border-space-border/60 whitespace-nowrap">
+                    <span class="text-gray-500" x-text="($store.global.t('avgLatency') || 'Avg Latency') + ':'">Avg Latency:</span>
+                    <span class="text-neon-cyan ml-1 font-bold" x-text="modelPerformance.overall?.avgLatencyFormatted || '-'"></span>
+                </div>
+                <div class="px-2.5 py-1 rounded bg-space-850 border border-space-border/60 whitespace-nowrap">
+                    <span class="text-gray-500" x-text="($store.global.t('generationSpeed') || 'Speed (TPS)') + ':'">Speed (TPS):</span>
+                    <span class="text-neon-green ml-1 font-bold" x-text="(modelPerformance.overall?.tps || '0.0') + ' tok/s'"></span>
+                </div>
+                <div class="px-2.5 py-1 rounded bg-space-850 border border-space-border/60 whitespace-nowrap">
+                    <span class="text-gray-500" x-text="($store.global.t('cacheHitRate') || 'Cache Hit Rate') + ':'">Cache Hit Rate:</span>
+                    <span class="text-neon-purple ml-1 font-bold" x-text="(modelPerformance.overall?.cacheHitRate || '0.0') + '%'"></span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Performance Table -->
+        <div class="overflow-x-auto">
+            <table class="table table-compact w-full text-xs font-mono">
+                <thead>
+                    <tr class="border-b border-space-border/60 text-[10px] text-gray-500 uppercase tracking-wider">
+                        <th class="bg-transparent font-normal" x-text="$store.global.t('modelIdentity')">MODEL</th>
+                        <th class="bg-transparent font-normal text-right" x-text="$store.global.t('requestsHeader')">REQUESTS</th>
+                        <th class="bg-transparent font-normal text-right" x-text="$store.global.t('latencyHeader')">AVG LATENCY</th>
+                        <th class="bg-transparent font-normal text-right" x-text="$store.global.t('speedHeader')">SPEED (TPS)</th>
+                        <th class="bg-transparent font-normal text-right" x-text="$store.global.t('cacheHitHeader')">CACHE HIT %</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-space-border/30">
+                    <template x-for="row in modelPerformance.rows" :key="row.family + ':' + row.modelName">
+                        <tr class="hover:bg-space-850/50 transition-colors">
+                            <td class="py-2.5">
+                                <div class="flex items-center gap-2">
+                                    <div class="w-2 h-2 rounded-full flex-shrink-0"
+                                        :style="'background-color:' + getFamilyColor(row.family)"></div>
+                                    <span class="text-white font-medium" x-text="row.fullModelName"></span>
+                                </div>
+                            </td>
+                            <td class="py-2.5 text-right text-gray-300 font-bold" x-text="row.requests"></td>
+                            <td class="py-2.5 text-right text-neon-cyan" x-text="row.avgLatencyFormatted"></td>
+                            <td class="py-2.5 text-right text-neon-green" x-text="row.tps + ' tok/s'"></td>
+                            <td class="py-2.5 text-right">
+                                <div class="flex items-center justify-end gap-2">
+                                    <span class="text-neon-purple font-bold" x-text="row.cacheHitRate + '%'"></span>
+                                    <div class="w-12 bg-space-800 rounded-full h-1.5 overflow-hidden">
+                                        <div class="bg-neon-purple h-full rounded-full" :style="'width: ' + Math.min(100, row.cacheHitRate) + '%'"></div>
+                                    </div>
+                                </div>
+                            </td>
+                        </tr>
+                    </template>
+                </tbody>
+            </table>
+        </div>
+    </div>
     </div> <!-- End of x-show="!$store.data.loading" -->
 </div>
