@@ -70,7 +70,7 @@ func TestTracker_TrackAndGetHistory(t *testing.T) {
 		t.Errorf("Expected _total 3, got %v", hourMap["_total"])
 	}
 
-	claudeMap, ok := hourMap["claude"].(map[string]int)
+	claudeMap, ok := hourMap["claude"].(map[string]any)
 	if !ok {
 		t.Fatalf("Expected claude family map, got %v", hourMap["claude"])
 	}
@@ -78,19 +78,21 @@ func TestTracker_TrackAndGetHistory(t *testing.T) {
 	if claudeMap["_subtotal"] != 2 {
 		t.Errorf("Expected claude _subtotal 2, got %d", claudeMap["_subtotal"])
 	}
-	if claudeMap["3-5-sonnet-20241022"] != 2 {
-		t.Errorf("Expected claude model count 2, got %d", claudeMap["3-5-sonnet-20241022"])
+	claudeMetrics, ok := claudeMap["3-5-sonnet-20241022"].(ModelMetrics)
+	if !ok || claudeMetrics.Requests != 2 {
+		t.Errorf("Expected claude model count 2, got %v", claudeMap["3-5-sonnet-20241022"])
 	}
 
-	geminiMap, ok := hourMap["gemini"].(map[string]int)
+	geminiMap, ok := hourMap["gemini"].(map[string]any)
 	if !ok {
 		t.Fatalf("Expected gemini family map, got %v", hourMap["gemini"])
 	}
 	if geminiMap["_subtotal"] != 1 {
 		t.Errorf("Expected gemini _subtotal 1, got %d", geminiMap["_subtotal"])
 	}
-	if geminiMap["2.5-flash"] != 1 {
-		t.Errorf("Expected gemini model count 1, got %d", geminiMap["2.5-flash"])
+	geminiMetrics, ok := geminiMap["2.5-flash"].(ModelMetrics)
+	if !ok || geminiMetrics.Requests != 1 {
+		t.Errorf("Expected gemini model count 1, got %v", geminiMap["2.5-flash"])
 	}
 }
 
@@ -206,5 +208,33 @@ func TestTracker_Prune(t *testing.T) {
 	}
 	if _, exists := history[oldHourKey]; exists {
 		t.Errorf("Expected old hour key %s to be pruned", oldHourKey)
+	}
+}
+
+func TestTracker_TrackRequest(t *testing.T) {
+	tr, err := NewTracker("")
+	if err != nil {
+		t.Fatalf("failed to create tracker: %v", err)
+	}
+	tr.TrackRequest("claude-3-5-sonnet", 500*time.Millisecond, 100, 50, 20)
+	history := tr.GetHistory()
+	if len(history) == 0 {
+		t.Fatalf("expected non-empty history")
+	}
+
+	var hourMap map[string]any
+	for _, v := range history {
+		hourMap = v.(map[string]any)
+	}
+	claudeMap, ok := hourMap["claude"].(map[string]any)
+	if !ok {
+		t.Fatalf("expected claude family map, got %T", hourMap["claude"])
+	}
+	metrics, ok := claudeMap["3-5-sonnet"].(ModelMetrics)
+	if !ok {
+		t.Fatalf("expected ModelMetrics for 3-5-sonnet, got %T", claudeMap["3-5-sonnet"])
+	}
+	if metrics.Requests != 1 || metrics.LatencyMS != 500 || metrics.InputTokens != 100 || metrics.OutputTokens != 50 || metrics.CacheReadTokens != 20 {
+		t.Errorf("unexpected metrics values: %+v", metrics)
 	}
 }
