@@ -490,6 +490,7 @@ func (server *Server) messages(writer http.ResponseWriter, request *http.Request
 type streamSender func(context.Context, func(cloudcode.SSEEvent) error) (cloudcode.Response, error)
 
 func (server *Server) unaryMessage(writer http.ResponseWriter, request *http.Request, send streamSender, model string) {
+	startTime := server.now()
 	accumulator := proxyformat.NewThinkingAccumulator()
 	_, err := send(request.Context(), func(event cloudcode.SSEEvent) error {
 		return accumulator.Consume(event.Data)
@@ -498,14 +499,16 @@ func (server *Server) unaryMessage(writer http.ResponseWriter, request *http.Req
 		server.writeError(writer, err)
 		return
 	}
+	latency := server.now().Sub(startTime)
 	if server.tracker != nil {
-		server.tracker.Track(model)
+		server.tracker.TrackRequest(model, latency, accumulator.InputTokens(), accumulator.OutputTokens(), accumulator.CacheReadTokens())
 	}
 	response := accumulator.Response(model, server.builder.Cache, "")
 	writeJSON(writer, http.StatusOK, response)
 }
 
 func (server *Server) streamMessage(writer http.ResponseWriter, request *http.Request, send streamSender, model string) {
+	startTime := server.now()
 	converter := proxyformat.NewStreamConverter(model, server.builder.Cache, "")
 	started := false
 	flusher, hasFlusher := writer.(http.Flusher)
@@ -562,7 +565,8 @@ func (server *Server) streamMessage(writer http.ResponseWriter, request *http.Re
 	}
 	if err == nil {
 		if server.tracker != nil {
-			server.tracker.Track(model)
+			latency := server.now().Sub(startTime)
+			server.tracker.TrackRequest(model, latency, converter.InputTokens(), converter.OutputTokens(), converter.CacheReadTokens())
 		}
 		return
 	}

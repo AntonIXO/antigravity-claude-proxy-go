@@ -202,6 +202,18 @@ func (converter *StreamConverter) closeCurrent() []map[string]any {
 	return events
 }
 
+func (converter *StreamConverter) InputTokens() int {
+	return converter.inputTokens
+}
+
+func (converter *StreamConverter) OutputTokens() int {
+	return converter.outputTokens
+}
+
+func (converter *StreamConverter) CacheReadTokens() int {
+	return converter.cacheReadTokens
+}
+
 func decodeCloudCodeEvent(data []byte) (map[string]any, error) {
 	if string(data) == "[DONE]" || len(data) == 0 {
 		return nil, nil

@@ -456,13 +456,64 @@ func TestTrackerIntegration(t *testing.T) {
 	if hourMap["_total"] != 2 {
 		t.Errorf("expected total requests 2, got %v", hourMap["_total"])
 	}
-	claudeMap := hourMap["claude"].(map[string]int)
-	if claudeMap["3-5-sonnet-20241022"] != 1 {
-		t.Errorf("expected claude count 1, got %d", claudeMap["3-5-sonnet-20241022"])
+	claudeMap := hourMap["claude"].(map[string]any)
+	claudeMetrics := claudeMap["3-5-sonnet-20241022"].(stats.ModelMetrics)
+	if claudeMetrics.Requests != 1 {
+		t.Errorf("expected claude count 1, got %d", claudeMetrics.Requests)
 	}
-	geminiMap := hourMap["gemini"].(map[string]int)
-	if geminiMap["2.5-flash"] != 1 {
-		t.Errorf("expected gemini count 1, got %d", geminiMap["2.5-flash"])
+	geminiMap := hourMap["gemini"].(map[string]any)
+	geminiMetrics := geminiMap["2.5-flash"].(stats.ModelMetrics)
+	if geminiMetrics.Requests != 1 {
+		t.Errorf("expected gemini count 1, got %d", geminiMetrics.Requests)
+	}
+}
+
+func TestServer_TrackMetrics(t *testing.T) {
+	t.Parallel()
+	upstream := &fakeUpstream{streamData: standardStream()}
+	tracker, err := stats.NewTracker("")
+	if err != nil {
+		t.Fatalf("failed to create tracker: %v", err)
+	}
+
+	server, err := New(Options{
+		APIKey:    "local-key",
+		ProjectID: "test-proj",
+		Now:       time.Now,
+		Credentials: func(context.Context) (auth.Credentials, error) {
+			return auth.Credentials{AccessToken: "access-token", Email: "user@example.com", Expiry: time.Now().Add(time.Hour)}, nil
+		},
+		NewUpstream: func(string) Upstream { return upstream },
+		Logger:      slog.New(slog.NewTextHandler(io.Discard, nil)),
+		Tracker:     tracker,
+	})
+	if err != nil {
+		t.Fatalf("failed to create server: %v", err)
+	}
+
+	reqUnary := httptest.NewRequest(http.MethodPost, "/v1/messages", strings.NewReader(`{
+		"model":"claude-3-5-sonnet-20241022","max_tokens":128,
+		"messages":[{"role":"user","content":"hello"}]
+	}`))
+	reqUnary.Header.Set("x-api-key", "local-key")
+	recUnary := httptest.NewRecorder()
+	server.Handler().ServeHTTP(recUnary, reqUnary)
+	if recUnary.Code != http.StatusOK {
+		t.Fatalf("unary request failed: %d", recUnary.Code)
+	}
+
+	history := tracker.GetHistory()
+	var hourMap map[string]any
+	for _, v := range history {
+		hourMap = v.(map[string]any)
+	}
+	claudeMap := hourMap["claude"].(map[string]any)
+	claudeMetrics := claudeMap["3-5-sonnet-20241022"].(stats.ModelMetrics)
+	if claudeMetrics.Requests != 1 {
+		t.Errorf("expected claude requests 1, got %d", claudeMetrics.Requests)
+	}
+	if claudeMetrics.LatencyMS < 0 {
+		t.Errorf("unexpected negative latency_ms: %d", claudeMetrics.LatencyMS)
 	}
 }
 
