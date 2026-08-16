@@ -9,6 +9,15 @@ import (
 	"time"
 )
 
+// ModelMetrics tracks request count, total latency, and token metrics for a model.
+type ModelMetrics struct {
+	Requests        int   `json:"requests"`
+	LatencyMS       int64 `json:"latency_ms"`
+	InputTokens     int   `json:"input_tokens"`
+	OutputTokens    int   `json:"output_tokens"`
+	CacheReadTokens int   `json:"cache_read_tokens"`
+}
+
 // Tracker manages hourly request volume statistics by model and family with disk persistence.
 type Tracker struct {
 	mu           sync.RWMutex
@@ -63,6 +72,42 @@ func NewTracker(filePath string) (*Tracker, error) {
 	return t, nil
 }
 
+func parseModelMetrics(m map[string]any) ModelMetrics {
+	var metrics ModelMetrics
+	if r, ok := m["requests"].(float64); ok {
+		metrics.Requests = int(r)
+	} else if r, ok := m["requests"].(int); ok {
+		metrics.Requests = r
+	}
+
+	if l, ok := m["latency_ms"].(float64); ok {
+		metrics.LatencyMS = int64(l)
+	} else if l, ok := m["latency_ms"].(int64); ok {
+		metrics.LatencyMS = l
+	} else if l, ok := m["latency_ms"].(int); ok {
+		metrics.LatencyMS = int64(l)
+	}
+
+	if it, ok := m["input_tokens"].(float64); ok {
+		metrics.InputTokens = int(it)
+	} else if it, ok := m["input_tokens"].(int); ok {
+		metrics.InputTokens = it
+	}
+
+	if ot, ok := m["output_tokens"].(float64); ok {
+		metrics.OutputTokens = int(ot)
+	} else if ot, ok := m["output_tokens"].(int); ok {
+		metrics.OutputTokens = ot
+	}
+
+	if cr, ok := m["cache_read_tokens"].(float64); ok {
+		metrics.CacheReadTokens = int(cr)
+	} else if cr, ok := m["cache_read_tokens"].(int); ok {
+		metrics.CacheReadTokens = cr
+	}
+	return metrics
+}
+
 func normalizeHistory(raw map[string]any) map[string]map[string]any {
 	result := make(map[string]map[string]any)
 	for hourKey, hourVal := range raw {
@@ -80,14 +125,28 @@ func normalizeHistory(raw map[string]any) map[string]map[string]any {
 					normHour["_total"] = val
 				}
 			} else if famMap, ok := v.(map[string]any); ok {
-				normFam := make(map[string]int)
+				normFam := make(map[string]any)
 				for mk, mv := range famMap {
-					switch val := mv.(type) {
-					case float64:
-						normFam[mk] = int(val)
-					case int:
-						normFam[mk] = val
+					if mk == "_subtotal" {
+						switch val := mv.(type) {
+						case float64:
+							normFam[mk] = int(val)
+						case int:
+							normFam[mk] = val
+						}
+					} else {
+						switch val := mv.(type) {
+						case float64:
+							normFam[mk] = ModelMetrics{Requests: int(val)}
+						case int:
+							normFam[mk] = ModelMetrics{Requests: val}
+						case map[string]any:
+							normFam[mk] = parseModelMetrics(val)
+						}
 					}
+				}
+				if _, hasSub := normFam["_subtotal"]; !hasSub {
+					normFam["_subtotal"] = 0
 				}
 				normHour[k] = normFam
 			}
@@ -102,6 +161,11 @@ func normalizeHistory(raw map[string]any) map[string]map[string]any {
 
 // Track records a request completion for the given model ID.
 func (t *Tracker) Track(modelID string) {
+	t.TrackRequest(modelID, 0, 0, 0, 0)
+}
+
+// TrackRequest records a request completion with latency and token metrics for the given model ID.
+func (t *Tracker) TrackRequest(modelID string, latency time.Duration, inputTokens, outputTokens, cacheReadTokens int) {
 	if modelID == "" {
 		return
 	}
@@ -119,18 +183,40 @@ func (t *Tracker) Track(modelID string) {
 	}
 
 	famRaw, famExists := hourMap[family]
-	var famMap map[string]int
+	var famMap map[string]any
 	if famExists {
-		famMap, _ = famRaw.(map[string]int)
+		famMap, _ = famRaw.(map[string]any)
 	}
 	if famMap == nil {
-		famMap = make(map[string]int)
+		famMap = make(map[string]any)
 		famMap["_subtotal"] = 0
 		hourMap[family] = famMap
 	}
 
-	famMap[shortName]++
-	famMap["_subtotal"]++
+	var metrics ModelMetrics
+	if existing, ok := famMap[shortName]; ok {
+		switch m := existing.(type) {
+		case ModelMetrics:
+			metrics = m
+		case map[string]any:
+			metrics = parseModelMetrics(m)
+		case int:
+			metrics.Requests = m
+		case float64:
+			metrics.Requests = int(m)
+		}
+	}
+	metrics.Requests++
+	metrics.LatencyMS += latency.Milliseconds()
+	metrics.InputTokens += inputTokens
+	metrics.OutputTokens += outputTokens
+	metrics.CacheReadTokens += cacheReadTokens
+
+	famMap[shortName] = metrics
+
+	subtotal, _ := famMap["_subtotal"].(int)
+	famMap["_subtotal"] = subtotal + 1
+
 	if total, ok := hourMap["_total"].(int); ok {
 		hourMap["_total"] = total + 1
 	} else {
@@ -154,8 +240,8 @@ func (t *Tracker) getHistoryLocked() map[string]any {
 		for k, v := range hourMap {
 			if k == "_total" {
 				hourCopy[k] = v
-			} else if famMap, ok := v.(map[string]int); ok {
-				famCopy := make(map[string]int, len(famMap))
+			} else if famMap, ok := v.(map[string]any); ok {
+				famCopy := make(map[string]any, len(famMap))
 				for mk, mv := range famMap {
 					famCopy[mk] = mv
 				}

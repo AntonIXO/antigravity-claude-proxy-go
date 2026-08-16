@@ -163,6 +163,23 @@ func (accumulator *ThinkingAccumulator) Response(model string, cache *SignatureC
 	return ConvertGoogleToAnthropicWithID(inner, model, cache, messageID)
 }
 
+func (accumulator *ThinkingAccumulator) InputTokens() int {
+	promptTokens := intValue(accumulator.usage["promptTokenCount"], 0)
+	cachedTokens := intValue(accumulator.usage["cachedContentTokenCount"], 0)
+	if promptTokens > cachedTokens {
+		return promptTokens - cachedTokens
+	}
+	return 0
+}
+
+func (accumulator *ThinkingAccumulator) OutputTokens() int {
+	return intValue(accumulator.usage["candidatesTokenCount"], 0)
+}
+
+func (accumulator *ThinkingAccumulator) CacheReadTokens() int {
+	return intValue(accumulator.usage["cachedContentTokenCount"], 0)
+}
+
 func (accumulator *ThinkingAccumulator) flushThinking() {
 	if accumulator.thinkingText == "" {
 		return
