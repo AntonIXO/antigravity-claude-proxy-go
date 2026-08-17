@@ -99,4 +99,21 @@ func TestSynthetic37AndReasoningResolution(t *testing.T) {
 	if dis37.SupportsThinking {
 		t.Fatal("expected SupportsThinking=false when thinking type is disabled")
 	}
+
+	// 5. reasoning_effort="xhigh" or "max" maps to "high"
+	xhigh37, err := catalog.ResolveWithRequest("gemini-3.7-flash", map[string]any{"reasoning_effort": "xhigh"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if xhigh37.ID != "gemini-3.7-flash-high" || xhigh37.GetUpstreamID() != "gemini-3.6-flash-high" {
+		t.Fatalf("reasoning_effort xhigh mapping failed: ID=%q UpstreamID=%q", xhigh37.ID, xhigh37.GetUpstreamID())
+	}
+
+	max37, err := catalog.ResolveWithRequest("gemini-3.7-flash", map[string]any{"reasoning_effort": "max"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if max37.ID != "gemini-3.7-flash-high" || max37.GetUpstreamID() != "gemini-3.6-flash-high" {
+		t.Fatalf("reasoning_effort max mapping failed: ID=%q UpstreamID=%q", max37.ID, max37.GetUpstreamID())
+	}
 }

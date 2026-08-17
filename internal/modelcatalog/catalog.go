@@ -245,6 +245,15 @@ func ExtractReasoningParams(request map[string]any) (effort string, budget int, 
 			effort = strings.ToLower(fmt.Sprint(val))
 		}
 	}
+	switch effort {
+	case "xhigh", "extra-high", "very-high", "max", "maximum", "extreme":
+		effort = "high"
+	case "minimal":
+		effort = "low"
+	case "none", "disabled", "off", "false", "0":
+		effort = "disabled"
+		disabled = true
+	}
 	if thinking, ok := request["thinking"].(map[string]any); ok {
 		if tType, exists := thinking["type"]; exists && strings.ToLower(fmt.Sprint(tType)) == "disabled" {
 			disabled = true

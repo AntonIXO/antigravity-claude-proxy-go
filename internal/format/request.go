@@ -150,6 +150,14 @@ func convertAnthropicToGoogle(request map[string]any, cache *SignatureCache, opt
 	if reasoningEffort == "" {
 		reasoningEffort = strings.ToLower(stringValue(request["reasoning"]))
 	}
+	switch reasoningEffort {
+	case "xhigh", "extra-high", "very-high", "max", "maximum", "extreme":
+		reasoningEffort = "high"
+	case "minimal":
+		reasoningEffort = "low"
+	case "none", "disabled", "off", "false", "0":
+		reasoningEffort = "disabled"
+	}
 	isDisabled := false
 	if thinking != nil && stringValue(thinking["type"]) == "disabled" {
 		isDisabled = true
