@@ -94,6 +94,8 @@ var routingAliases = map[string]string{
 	"gemini-3.6-flash":           "Gemini 3.6 Flash (High)",
 	"gemini-3.7-flash":           "Gemini 3.7 Flash (High)",
 	"claude-sonnet-4-6-thinking": "Claude Sonnet 4.6 (Thinking)",
+	"claude-opus-4-6":            "Claude Opus 4.6 (Thinking)",
+	"gpt-oss-120b":               "GPT-OSS 120B (Medium)",
 	"gemini-3.7-flash-high":      "Gemini 3.7 Flash (High)",
 	"gemini-3.7-flash-medium":    "Gemini 3.7 Flash (Medium)",
 	"gemini-3.7-flash-low":       "Gemini 3.7 Flash (Low)",
@@ -349,6 +351,58 @@ func (catalog *Catalog) ResolveWithRequest(requested string, request map[string]
 		model.ThinkingBudget = budget
 	}
 	return model, nil
+}
+
+func CleanModelIDAndName(id, displayName string) (string, string) {
+	lowerID := strings.ToLower(id)
+	cleanID := id
+	cleanName := displayName
+
+	switch {
+	case strings.HasPrefix(lowerID, "gemini-3.7-flash"):
+		cleanID = "gemini-3.7-flash"
+		cleanName = "Gemini 3.7 Flash"
+	case strings.HasPrefix(lowerID, "gemini-3.6-flash"):
+		cleanID = "gemini-3.6-flash"
+		cleanName = "Gemini 3.6 Flash"
+	case lowerID == "gemini-3-flash-agent" || lowerID == "gemini-3.5-flash-low" || lowerID == "gemini-3.5-flash-extra-low" || lowerID == "gemini-3.5-flash-high" || lowerID == "gemini-3.5-flash-medium":
+		cleanID = "gemini-3.5-flash"
+		cleanName = "Gemini 3.5 Flash"
+	case lowerID == "gemini-pro-agent" || lowerID == "gemini-3.1-pro-high" || lowerID == "gemini-3.1-pro-low":
+		cleanID = "gemini-3.1-pro"
+		cleanName = "Gemini 3.1 Pro"
+	case lowerID == "claude-opus-4-6-thinking" || lowerID == "claude-opus-4-6":
+		cleanID = "claude-opus-4-6"
+		cleanName = "Claude Opus 4.6"
+	case lowerID == "gpt-oss-120b-medium" || lowerID == "gpt-oss-120b":
+		cleanID = "gpt-oss-120b"
+		cleanName = "GPT-OSS 120B"
+	default:
+		for _, suffix := range []string{" (High)", " (Medium)", " (Low)", " (Thinking)"} {
+			cleanName = strings.TrimSuffix(cleanName, suffix)
+		}
+	}
+	return cleanID, cleanName
+}
+
+func (catalog *Catalog) PublicModels() []Model {
+	if catalog == nil {
+		return nil
+	}
+	var result []Model
+	seen := make(map[string]bool)
+	for _, m := range catalog.selectable {
+		cleanID, cleanName := CleanModelIDAndName(m.ID, m.DisplayName)
+		if seen[cleanID] {
+			continue
+		}
+		seen[cleanID] = true
+		pubModel := m
+		pubModel.ID = cleanID
+		pubModel.DisplayName = cleanName
+		result = append(result, pubModel)
+	}
+	return result
 }
 
 func isAgentFamily(id string) bool {
