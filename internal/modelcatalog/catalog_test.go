@@ -46,3 +46,57 @@ func TestParseUsesAgyAgentModelOrderAndResolvesRoutingAlias(t *testing.T) {
 		t.Fatal("image-only model was accepted as an agent model")
 	}
 }
+
+func TestSynthetic37AndReasoningResolution(t *testing.T) {
+	t.Parallel()
+	catalog, err := Parse([]byte(`{
+		"defaultAgentModelId":"gemini-3.6-flash-high",
+		"agentModelSorts":[{"displayName":"Recommended","groups":[{"modelIds":[
+			"gemini-3.6-flash-high","gemini-3.6-flash-medium","gemini-3.6-flash-low"
+		]}]}],
+		"models":{
+			"gemini-3.6-flash-high":{"displayName":"Gemini 3.6 Flash (High)","supportsThinking":true,"thinkingBudget":16000},
+			"gemini-3.6-flash-medium":{"displayName":"Gemini 3.6 Flash (Medium)","supportsThinking":true,"thinkingBudget":8000},
+			"gemini-3.6-flash-low":{"displayName":"Gemini 3.6 Flash (Low)","supportsThinking":true,"thinkingBudget":1024}
+		}
+	}`))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// 1. Verify synthetic gemini-3.7-flash-high has UpstreamID pointing to gemini-3.6-flash-high
+	m37High, err := catalog.Resolve("gemini-3.7-flash-high")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if m37High.ID != "gemini-3.7-flash-high" || m37High.GetUpstreamID() != "gemini-3.6-flash-high" {
+		t.Fatalf("expected ID=gemini-3.7-flash-high UpstreamID=gemini-3.6-flash-high, got ID=%q UpstreamID=%q", m37High.ID, m37High.GetUpstreamID())
+	}
+
+	// 2. Base model gemini-3.7-flash resolves to gemini-3.7-flash-high by default
+	base37, err := catalog.ResolveWithRequest("gemini-3.7-flash", nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if base37.ID != "gemini-3.7-flash-high" || base37.GetUpstreamID() != "gemini-3.6-flash-high" {
+		t.Fatalf("base model default resolution failed: ID=%q UpstreamID=%q", base37.ID, base37.GetUpstreamID())
+	}
+
+	// 3. reasoning_effort="medium" resolves gemini-3.7-flash to gemini-3.7-flash-medium
+	med37, err := catalog.ResolveWithRequest("gemini-3.7-flash", map[string]any{"reasoning_effort": "medium"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if med37.ID != "gemini-3.7-flash-medium" || med37.GetUpstreamID() != "gemini-3.6-flash-medium" {
+		t.Fatalf("reasoning_effort medium failed: ID=%q UpstreamID=%q", med37.ID, med37.GetUpstreamID())
+	}
+
+	// 4. thinking={"type": "disabled"} turns off SupportsThinking
+	dis37, err := catalog.ResolveWithRequest("gemini-3.7-flash", map[string]any{"thinking": map[string]any{"type": "disabled"}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if dis37.SupportsThinking {
+		t.Fatal("expected SupportsThinking=false when thinking type is disabled")
+	}
+}

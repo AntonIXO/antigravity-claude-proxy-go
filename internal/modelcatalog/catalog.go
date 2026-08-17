@@ -12,6 +12,7 @@ import (
 // selection and request construction.
 type Model struct {
 	ID                       string
+	UpstreamID               string
 	DisplayName              string
 	Description              string
 	Disabled                 bool
@@ -24,6 +25,13 @@ type Model struct {
 	MaxOutputTokens          int
 	QuotaRemainingFraction   *float64
 	QuotaResetTime           string
+}
+
+func (m Model) GetUpstreamID() string {
+	if m.UpstreamID != "" {
+		return m.UpstreamID
+	}
+	return m.ID
 }
 
 type Catalog struct {
@@ -78,8 +86,13 @@ var routingAliases = map[string]string{
 	// Cloud Code publishes gemini-3.1-pro-high in models, but current agy
 	// selects the separate agent route for the same display model.
 	"gemini-3.1-pro-high":        "Gemini 3.1 Pro (High)",
+	"gemini-3.1-pro":             "Gemini 3.1 Pro (High)",
+	"gemini-pro":                 "Gemini 3.1 Pro (High)",
 	"gemini-3.5-flash-high":      "Gemini 3.5 Flash (High)",
+	"gemini-3.5-flash":           "Gemini 3.5 Flash (High)",
 	"gemini-3.5-flash-medium":    "Gemini 3.5 Flash (Medium)",
+	"gemini-3.6-flash":           "Gemini 3.6 Flash (High)",
+	"gemini-3.7-flash":           "Gemini 3.7 Flash (High)",
 	"claude-sonnet-4-6-thinking": "Claude Sonnet 4.6 (Thinking)",
 	"gemini-3.7-flash-high":      "Gemini 3.7 Flash (High)",
 	"gemini-3.7-flash-medium":    "Gemini 3.7 Flash (Medium)",
@@ -163,6 +176,7 @@ func Parse(body []byte) (*Catalog, error) {
 			if baseModel, exists := catalog.byID[synth.baseID]; exists {
 				synthModel := baseModel
 				synthModel.ID = synth.id
+				synthModel.UpstreamID = synth.baseID
 				synthModel.DisplayName = synth.displayName
 				catalog.byID[synth.id] = synthModel
 				catalog.byDisplay[strings.ToLower(synth.displayName)] = synthModel
@@ -217,6 +231,115 @@ func (catalog *Catalog) Resolve(requested string) (Model, error) {
 		}
 	}
 	return Model{}, &SelectionError{Model: requested}
+}
+
+func ExtractReasoningParams(request map[string]any) (effort string, budget int, hasBudget bool, disabled bool) {
+	if request == nil {
+		return "", 0, false, false
+	}
+	if val, ok := request["reasoning_effort"]; ok {
+		effort = strings.ToLower(fmt.Sprint(val))
+	}
+	if effort == "" {
+		if val, ok := request["reasoning"]; ok {
+			effort = strings.ToLower(fmt.Sprint(val))
+		}
+	}
+	if thinking, ok := request["thinking"].(map[string]any); ok {
+		if tType, exists := thinking["type"]; exists && strings.ToLower(fmt.Sprint(tType)) == "disabled" {
+			disabled = true
+		}
+		if b, exists := thinking["budget_tokens"]; exists {
+			switch v := b.(type) {
+			case float64:
+				budget = int(v)
+				hasBudget = true
+			case int:
+				budget = v
+				hasBudget = true
+			case int64:
+				budget = int(v)
+				hasBudget = true
+			}
+		}
+	}
+	if b, ok := request["thinking_budget"]; ok {
+		switch v := b.(type) {
+		case float64:
+			budget = int(v)
+			hasBudget = true
+		case int:
+			budget = v
+			hasBudget = true
+		case int64:
+			budget = int(v)
+			hasBudget = true
+		}
+	}
+	if effort == "none" || effort == "disabled" {
+		disabled = true
+	}
+	if hasBudget && budget <= 0 && !disabled {
+		thinking, _ := request["thinking"].(map[string]any)
+		if thinking == nil || strings.ToLower(fmt.Sprint(thinking["type"])) != "enabled" {
+			disabled = true
+		}
+	}
+	if !disabled && effort == "" && hasBudget && budget > 0 {
+		switch {
+		case budget <= 2048:
+			effort = "low"
+		case budget < 12000:
+			effort = "medium"
+		default:
+			effort = "high"
+		}
+	}
+	return effort, budget, hasBudget, disabled
+}
+
+func (catalog *Catalog) ResolveWithRequest(requested string, request map[string]any) (Model, error) {
+	model, err := catalog.Resolve(requested)
+	if err != nil {
+		return Model{}, err
+	}
+	if request == nil {
+		return model, nil
+	}
+
+	effort, budget, hasBudget, disabled := ExtractReasoningParams(request)
+
+	if disabled {
+		model.SupportsThinking = false
+		model.ThinkingBudget = 0
+		return model, nil
+	}
+
+	if effort != "" {
+		targetID := ""
+		lowerReq := strings.ToLower(strings.TrimSpace(requested))
+		switch {
+		case strings.HasPrefix(lowerReq, "gemini-3.7-flash"):
+			targetID = "gemini-3.7-flash-" + effort
+		case strings.HasPrefix(lowerReq, "gemini-3.6-flash"):
+			targetID = "gemini-3.6-flash-" + effort
+		case strings.HasPrefix(lowerReq, "gemini-3.5-flash"):
+			targetID = "gemini-3.5-flash-" + effort
+		}
+		if targetID != "" {
+			if variant, err := catalog.Resolve(targetID); err == nil {
+				if hasBudget && budget > 0 {
+					variant.ThinkingBudget = budget
+				}
+				return variant, nil
+			}
+		}
+	}
+
+	if hasBudget && budget > 0 {
+		model.ThinkingBudget = budget
+	}
+	return model, nil
 }
 
 func isAgentFamily(id string) bool {

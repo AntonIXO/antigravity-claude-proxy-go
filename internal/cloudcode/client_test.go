@@ -93,9 +93,12 @@ func TestLoadCodeAssistMetadata(t *testing.T) {
 	}
 }
 
-func TestProvisioningUsesDailyBeforeProduction(t *testing.T) {
+func TestContentAndProvisioningUseProductionBeforeDaily(t *testing.T) {
 	t.Parallel()
-	if len(ProvisioningEndpoints) != 2 || ProvisioningEndpoints[0] != DailyEndpoint || ProvisioningEndpoints[1] != ProdEndpoint {
+	if len(ContentEndpoints) != 2 || ContentEndpoints[0] != ProdEndpoint || ContentEndpoints[1] != DailyEndpoint {
+		t.Fatalf("content endpoint order = %#v", ContentEndpoints)
+	}
+	if len(ProvisioningEndpoints) != 2 || ProvisioningEndpoints[0] != ProdEndpoint || ProvisioningEndpoints[1] != DailyEndpoint {
 		t.Fatalf("provisioning endpoint order = %#v", ProvisioningEndpoints)
 	}
 }

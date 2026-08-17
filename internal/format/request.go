@@ -2,6 +2,7 @@ package format
 
 import (
 	"regexp"
+	"strings"
 )
 
 const interleavedThinkingHint = "Interleaved thinking is enabled. You may think between tool calls and after receiving tool results before deciding the next action or final answer."
@@ -145,7 +146,21 @@ func convertAnthropicToGoogle(request map[string]any, cache *SignatureCache, opt
 	}
 
 	thinking := asMap(request["thinking"])
-	if isThinking && family == FamilyClaude {
+	reasoningEffort := strings.ToLower(stringValue(request["reasoning_effort"]))
+	if reasoningEffort == "" {
+		reasoningEffort = strings.ToLower(stringValue(request["reasoning"]))
+	}
+	isDisabled := false
+	if thinking != nil && stringValue(thinking["type"]) == "disabled" {
+		isDisabled = true
+	}
+	if reasoningEffort == "none" || reasoningEffort == "disabled" {
+		isDisabled = true
+	}
+
+	if isDisabled {
+		delete(generation, "thinkingConfig")
+	} else if isThinking && family == FamilyClaude {
 		if defaultThinkingBudget <= 0 {
 			defaultThinkingBudget = DefaultClaudeThinkBudget
 		}
@@ -153,7 +168,17 @@ func convertAnthropicToGoogle(request map[string]any, cache *SignatureCache, opt
 		if budget == 0 {
 			budget = defaultThinkingBudget
 		}
-		if budget < minThinkingBudget {
+		if reasoningEffort != "" {
+			switch reasoningEffort {
+			case "low":
+				budget = 1024
+			case "medium":
+				budget = 8000
+			case "high":
+				budget = 32000
+			}
+		}
+		if minThinkingBudget > 0 && budget < minThinkingBudget {
 			budget = minThinkingBudget
 		}
 		generation["thinkingConfig"] = map[string]any{"include_thoughts": true, "thinking_budget": budget}
@@ -163,8 +188,23 @@ func convertAnthropicToGoogle(request map[string]any, cache *SignatureCache, opt
 		}
 	} else if isThinking {
 		budget := defaultThinkingBudget
-		if _, explicit := thinking["budget_tokens"]; explicit {
-			budget = intValue(thinking["budget_tokens"], budget)
+		if thinking != nil {
+			if _, explicit := thinking["budget_tokens"]; explicit {
+				budget = intValue(thinking["budget_tokens"], budget)
+			}
+		}
+		if _, explicit := request["thinking_budget"]; explicit {
+			budget = intValue(request["thinking_budget"], budget)
+		}
+		if reasoningEffort != "" {
+			switch reasoningEffort {
+			case "low":
+				budget = 1024
+			case "medium":
+				budget = 8000
+			case "high":
+				budget = 16000
+			}
 		}
 		if family == FamilyGemini && options == nil {
 			budget = clampGeminiThinkingBudget(model, thinking["budget_tokens"])
@@ -172,7 +212,7 @@ func convertAnthropicToGoogle(request map[string]any, cache *SignatureCache, opt
 		if budget <= 0 {
 			budget = DefaultGeminiThinkBudget
 		}
-		if budget < minThinkingBudget {
+		if minThinkingBudget > 0 && budget < minThinkingBudget {
 			budget = minThinkingBudget
 		}
 		generation["thinkingConfig"] = map[string]any{

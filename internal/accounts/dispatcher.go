@@ -146,12 +146,12 @@ func (dispatcher *Dispatcher) FetchAvailableModels(ctx context.Context) (cloudco
 
 func (dispatcher *Dispatcher) StreamGenerateContent(ctx context.Context, request map[string]any, consume func(cloudcode.SSEEvent) error) (cloudcode.Response, error) {
 	requestedModel, _ := request["model"].(string)
-	modelDetails, err := dispatcher.resolveModel(ctx, requestedModel)
+	modelDetails, err := dispatcher.resolveModel(ctx, requestedModel, request)
 	if err != nil {
 		return cloudcode.Response{}, err
 	}
 	request = cloneRequest(request)
-	request["model"] = modelDetails.ID
+	request["model"] = modelDetails.GetUpstreamID()
 	model := modelDetails.ID
 	maxAttempts := max(dispatcher.maxRetries, dispatcher.manager.Count()+1)
 	var lastError error
@@ -268,7 +268,7 @@ func (dispatcher *Dispatcher) StreamGenerateContent(ctx context.Context, request
 	return cloudcode.Response{}, fmt.Errorf("max retries exceeded: %w", lastError)
 }
 
-func (dispatcher *Dispatcher) resolveModel(ctx context.Context, requested string) (modelcatalog.Model, error) {
+func (dispatcher *Dispatcher) resolveModel(ctx context.Context, requested string, request map[string]any) (modelcatalog.Model, error) {
 	dispatcher.mu.RLock()
 	catalog := dispatcher.catalog
 	fresh := catalog != nil && dispatcher.now().Sub(dispatcher.catalogAt) < dispatcher.modelCacheTTL
@@ -284,7 +284,7 @@ func (dispatcher *Dispatcher) resolveModel(ctx context.Context, requested string
 		}
 		dispatcher.storeCatalog(catalog)
 	}
-	return catalog.Resolve(requested)
+	return catalog.ResolveWithRequest(requested, request)
 }
 
 func (dispatcher *Dispatcher) cacheCatalog(body []byte) {

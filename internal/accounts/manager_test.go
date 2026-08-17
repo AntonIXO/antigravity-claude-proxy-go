@@ -136,6 +136,8 @@ func TestMarkFailureDoesNotRateLimitEmptyModel(t *testing.T) {
 		t.Fatalf("empty-model MarkFailure created a rate limit or invalidation: IsInvalid=%v ModelRateLimits[\"\"]=%#v", account.IsInvalid, account.ModelRateLimits[""])
 	}
 
+	account.ConsecutiveFailure = 0
+
 	for i := 0; i < 2; i++ {
 		manager.MarkFailure(account, "claude")
 	}
