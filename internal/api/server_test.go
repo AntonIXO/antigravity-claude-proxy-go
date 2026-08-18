@@ -161,7 +161,7 @@ func TestModelsAndHealthAliases(t *testing.T) {
 		var list map[string]any
 		decodeBody(t, response.Body, &list)
 		models := list["data"].([]any)
-		if len(models) != 3 || models[0].(map[string]any)["id"] != "gemini-3.5-flash-low" || models[1].(map[string]any)["id"] != "gpt-oss" || models[2].(map[string]any)["id"] != "claude-sonnet-4-6" {
+		if len(models) != 3 || models[0].(map[string]any)["id"] != "gemini-3.5-flash" || models[1].(map[string]any)["id"] != "gpt-oss" || models[2].(map[string]any)["id"] != "claude-sonnet-4-6" {
 			t.Fatalf("models=%#v", models)
 		}
 	}

@@ -262,7 +262,7 @@ func (server *Server) models(writer http.ResponseWriter, request *http.Request) 
 		server.writeError(writer, err)
 		return
 	}
-	selectable := catalog.Selectable()
+	selectable := catalog.PublicModels()
 	models := make([]any, 0, len(selectable))
 	for _, details := range selectable {
 		description := details.DisplayName

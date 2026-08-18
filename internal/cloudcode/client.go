@@ -32,8 +32,8 @@ const (
 )
 
 var (
-	ContentEndpoints      = []string{DailyEndpoint, ProdEndpoint}
-	ProvisioningEndpoints = []string{DailyEndpoint, ProdEndpoint}
+	ContentEndpoints      = []string{ProdEndpoint, DailyEndpoint}
+	ProvisioningEndpoints = []string{ProdEndpoint, DailyEndpoint}
 )
 
 type Options struct {
