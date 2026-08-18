@@ -322,6 +322,42 @@ func TestSchemaCleanerHandlesNestedArraysUnionsAndNullable(t *testing.T) {
 	}
 }
 
+func TestConvertAnthropicToGoogleAudioSupport(t *testing.T) {
+	t.Parallel()
+	request := map[string]any{
+		"model": "gemini-3.7-flash-low",
+		"messages": []any{
+			map[string]any{
+				"role": "user",
+				"content": []any{
+					map[string]any{"type": "text", "text": "Transcribe this audio"},
+					map[string]any{
+						"type": "audio",
+						"source": map[string]any{
+							"type":       "base64",
+							"media_type": "audio/mp3",
+							"data":       "SUQzBAAAAA==",
+						},
+					},
+				},
+			},
+		},
+	}
+	got := ConvertAnthropicToGoogle(request, NewSignatureCache())
+	contents := asSlice(got["contents"])
+	if len(contents) != 1 {
+		t.Fatalf("expected 1 content item, got %d", len(contents))
+	}
+	parts := asSlice(asMap(contents[0])["parts"])
+	if len(parts) != 2 {
+		t.Fatalf("expected 2 parts (text + audio), got %d", len(parts))
+	}
+	inlineData := asMap(asMap(parts[1])["inlineData"])
+	if inlineData["mimeType"] != "audio/mp3" || inlineData["data"] != "SUQzBAAAAA==" {
+		t.Fatalf("audio inlineData mismatch = %#v", inlineData)
+	}
+}
+
 func readObjectFixture(t *testing.T, path string) map[string]any {
 	t.Helper()
 	contents, err := os.ReadFile(path)

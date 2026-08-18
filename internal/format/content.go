@@ -30,7 +30,7 @@ func convertContentToParts(content any, family ModelFamily, cache *SignatureCach
 			if strings.TrimSpace(text) != "" {
 				parts = append(parts, map[string]any{"text": text})
 			}
-		case "image", "document":
+		case "image", "document", "audio":
 			source := asMap(block["source"])
 			if source == nil {
 				continue
