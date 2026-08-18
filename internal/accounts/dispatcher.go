@@ -148,14 +148,10 @@ func (dispatcher *Dispatcher) FetchAvailableModels(ctx context.Context) (cloudco
 
 func (dispatcher *Dispatcher) StreamGenerateContent(ctx context.Context, request map[string]any, consume func(cloudcode.SSEEvent) error) (cloudcode.Response, error) {
 	requestedModel, _ := request["model"].(string)
-<<<<<<< HEAD
-	modelDetails, err := dispatcher.resolveModel(ctx, requestedModel, request)
-=======
 	stream, _ := request["stream"].(bool)
 	slog.Info(fmt.Sprintf("[API] Request for model: %s, stream: %v", requestedModel, stream))
 
-	modelDetails, err := dispatcher.resolveModel(ctx, requestedModel)
->>>>>>> a0a37ee (feat(proxy): fix logging infrastructure and add request volume tracking)
+	modelDetails, err := dispatcher.resolveModel(ctx, requestedModel, request)
 	if err != nil {
 		return cloudcode.Response{}, err
 	}
