@@ -1,6 +1,7 @@
 package cloudcode
 
 import (
+	"bytes"
 	"context"
 	"crypto/tls"
 	"encoding/json"
@@ -26,6 +27,19 @@ func TestTransportKeepsTLSZeroValueAndHTTP2Disabled(t *testing.T) {
 	}
 	if client.transport.TLSNextProto != nil {
 		t.Fatalf("TLSNextProto must remain nil: %#v", client.transport.TLSNextProto)
+	}
+}
+
+func TestSharedTransportConfiguration(t *testing.T) {
+	client := New(Options{AccessToken: "test-token"})
+	if client.transport == nil {
+		t.Fatal("expected non-nil transport")
+	}
+	if client.transport.MaxIdleConns < 1000 {
+		t.Errorf("expected MaxIdleConns >= 1000, got %d", client.transport.MaxIdleConns)
+	}
+	if client.transport.MaxIdleConnsPerHost < 500 {
+		t.Errorf("expected MaxIdleConnsPerHost >= 500, got %d", client.transport.MaxIdleConnsPerHost)
 	}
 }
 
@@ -122,6 +136,16 @@ func TestParseSSE(t *testing.T) {
 	}
 	if string(events[1].Data) != "[DONE]" || events[1].ID != "one" {
 		t.Fatalf("second event = %#v", events[1])
+	}
+}
+
+func BenchmarkParseSSE(b *testing.B) {
+	sseData := []byte("event: message\ndata: {\"candidates\":[{\"content\":{\"parts\":[{\"text\":\"hello\"}]}}]}\n\n")
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		_ = ParseSSE(bytes.NewReader(sseData), func(e SSEEvent) error {
+			return nil
+		})
 	}
 }
 

@@ -12,7 +12,10 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
+
+	"antigravity-go-proxy/internal/cloudcode"
 )
 
 const (
@@ -128,6 +131,39 @@ func (t Token) Fresh(now time.Time) bool {
 	return t.AccessToken != "" && !t.Expiry.IsZero() && t.Expiry.Sub(now) > freshnessSkew
 }
 
+type tokenCacheEntry struct {
+	creds   Credentials
+	modTime time.Time
+}
+
+var (
+	tokenCacheMu sync.RWMutex
+	tokenCache   = make(map[string]tokenCacheEntry)
+)
+
+func getCachedCredentials(path string, now time.Time) (Credentials, bool) {
+	tokenCacheMu.RLock()
+	entry, ok := tokenCache[path]
+	tokenCacheMu.RUnlock()
+	if !ok || entry.creds.AccessToken == "" || entry.creds.Expiry.Sub(now) <= freshnessSkew {
+		return Credentials{}, false
+	}
+	info, err := os.Stat(path)
+	if err != nil || !info.ModTime().Equal(entry.modTime) {
+		return Credentials{}, false
+	}
+	return entry.creds, true
+}
+
+func setCachedCredentials(path string, creds Credentials, modTime time.Time) {
+	tokenCacheMu.Lock()
+	defer tokenCacheMu.Unlock()
+	tokenCache[path] = tokenCacheEntry{
+		creds:   creds,
+		modTime: modTime,
+	}
+}
+
 // Get returns a fresh token and resolves its account email. Refresh and
 // optional write-back happen under an exclusive file lock so multiple proxy
 // processes cannot refresh or overwrite the agy token concurrently.
@@ -139,6 +175,13 @@ func (m Manager) Get(ctx context.Context) (Credentials, error) {
 		if err != nil {
 			return Credentials{}, err
 		}
+	}
+	now := time.Now
+	if m.Now != nil {
+		now = m.Now
+	}
+	if creds, ok := getCachedCredentials(path, now()); ok {
+		return creds, nil
 	}
 	flags := os.O_RDONLY
 	if m.WriteBack || os.Getenv("AGY_TOKEN_WRITEBACK") == "1" {
@@ -163,10 +206,6 @@ func (m Manager) Get(ctx context.Context) (Credentials, error) {
 		return Credentials{}, err
 	}
 
-	now := time.Now
-	if m.Now != nil {
-		now = m.Now
-	}
 	refreshed := false
 	if !token.Fresh(now()) {
 		if token.RefreshToken == "" {
@@ -197,12 +236,18 @@ func (m Manager) Get(ctx context.Context) (Credentials, error) {
 	if err != nil {
 		return Credentials{}, err
 	}
-	return Credentials{
+	creds := Credentials{
 		AccessToken: token.AccessToken,
 		Email:       email,
 		Expiry:      token.Expiry,
 		Refreshed:   refreshed,
-	}, nil
+	}
+	var modTime time.Time
+	if info, err := file.Stat(); err == nil {
+		modTime = info.ModTime()
+	}
+	setCachedCredentials(path, creds, modTime)
+	return creds, nil
 }
 
 func (m Manager) refresh(ctx context.Context, refreshToken string) (tokenResponse, error) {
@@ -330,7 +375,7 @@ func (m Manager) client() *http.Client {
 	if m.HTTPClient != nil {
 		return m.HTTPClient
 	}
-	return http.DefaultClient
+	return &http.Client{Transport: cloudcode.SharedTransport()}
 }
 
 func parseToken(raw []byte, path string) (Token, error) {
