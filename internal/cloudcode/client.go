@@ -13,6 +13,7 @@ import (
 	"runtime"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 )
 
@@ -307,24 +308,33 @@ func readResponse(endpoint string, response *http.Response) (Response, error) {
 	return result, nil
 }
 
+var sseBufferPool = sync.Pool{
+	New: func() any {
+		return new(bytes.Buffer)
+	},
+}
+
 // ParseSSE implements the event-stream field and multi-line data rules used by
 // agy. A final unterminated event is dispatched at EOF.
 func ParseSSE(reader io.Reader, consume func(SSEEvent) error) error {
+	buf := sseBufferPool.Get().(*bytes.Buffer)
+	buf.Reset()
+	defer sseBufferPool.Put(buf)
+
 	scanner := bufio.NewScanner(reader)
 	scanner.Buffer(make([]byte, 64<<10), 16<<20)
 	var event SSEEvent
-	var data []string
+	hasData := false
+
 	dispatch := func() error {
-		if len(data) == 0 {
+		if !hasData {
 			event.Event = ""
 			event.Retry = 0
 			return nil
 		}
-		if len(data) == 1 {
-			event.Data = []byte(data[0])
-		} else {
-			event.Data = []byte(strings.Join(data, "\n"))
-		}
+		event.Data = make([]byte, buf.Len())
+		copy(event.Data, buf.Bytes())
+
 		if consume != nil {
 			if err := consume(event); err != nil {
 				return err
@@ -333,35 +343,41 @@ func ParseSSE(reader io.Reader, consume func(SSEEvent) error) error {
 		event.Event = ""
 		event.Data = nil
 		event.Retry = 0
-		data = data[:0]
+		buf.Reset()
+		hasData = false
 		return nil
 	}
+
 	for scanner.Scan() {
-		line := strings.TrimSuffix(scanner.Text(), "\r")
-		if line == "" {
+		line := bytes.TrimSuffix(scanner.Bytes(), []byte("\r"))
+		if len(line) == 0 {
 			if err := dispatch(); err != nil {
 				return err
 			}
 			continue
 		}
-		if strings.HasPrefix(line, ":") {
+		if bytes.HasPrefix(line, []byte(":")) {
 			continue
 		}
-		field, value, found := strings.Cut(line, ":")
-		if found && strings.HasPrefix(value, " ") {
+		field, value, found := bytes.Cut(line, []byte(":"))
+		if found && bytes.HasPrefix(value, []byte(" ")) {
 			value = value[1:]
 		}
-		switch field {
+		switch string(field) {
 		case "event":
-			event.Event = value
+			event.Event = string(value)
 		case "data":
-			data = append(data, value)
+			if hasData {
+				buf.WriteByte('\n')
+			}
+			buf.Write(value)
+			hasData = true
 		case "id":
-			if !strings.ContainsRune(value, '\x00') {
-				event.ID = value
+			if !bytes.ContainsRune(value, '\x00') {
+				event.ID = string(value)
 			}
 		case "retry":
-			milliseconds, err := strconv.ParseInt(value, 10, 64)
+			milliseconds, err := strconv.ParseInt(string(value), 10, 64)
 			if err == nil && milliseconds >= 0 {
 				event.Retry = time.Duration(milliseconds) * time.Millisecond
 			}

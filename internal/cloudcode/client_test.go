@@ -1,6 +1,7 @@
 package cloudcode
 
 import (
+	"bytes"
 	"context"
 	"crypto/tls"
 	"encoding/json"
@@ -135,6 +136,16 @@ func TestParseSSE(t *testing.T) {
 	}
 	if string(events[1].Data) != "[DONE]" || events[1].ID != "one" {
 		t.Fatalf("second event = %#v", events[1])
+	}
+}
+
+func BenchmarkParseSSE(b *testing.B) {
+	sseData := []byte("event: message\ndata: {\"candidates\":[{\"content\":{\"parts\":[{\"text\":\"hello\"}]}}]}\n\n")
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		_ = ParseSSE(bytes.NewReader(sseData), func(e SSEEvent) error {
+			return nil
+		})
 	}
 }
 
