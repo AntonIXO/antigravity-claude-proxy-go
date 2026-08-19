@@ -131,28 +131,37 @@ func (t Token) Fresh(now time.Time) bool {
 	return t.AccessToken != "" && !t.Expiry.IsZero() && t.Expiry.Sub(now) > freshnessSkew
 }
 
+type tokenCacheEntry struct {
+	creds   Credentials
+	modTime time.Time
+}
+
 var (
-	cacheMu       sync.RWMutex
-	cachedCreds   Credentials
-	cachedPath    string
-	cachedModTime time.Time
+	tokenCacheMu sync.RWMutex
+	tokenCache   = make(map[string]tokenCacheEntry)
 )
 
 func getCachedCredentials(path string, now time.Time) (Credentials, bool) {
-	cacheMu.RLock()
-	defer cacheMu.RUnlock()
-	if cachedPath == path && cachedCreds.AccessToken != "" && cachedCreds.Expiry.Sub(now) > freshnessSkew {
-		return cachedCreds, true
+	tokenCacheMu.RLock()
+	entry, ok := tokenCache[path]
+	tokenCacheMu.RUnlock()
+	if !ok || entry.creds.AccessToken == "" || entry.creds.Expiry.Sub(now) <= freshnessSkew {
+		return Credentials{}, false
 	}
-	return Credentials{}, false
+	info, err := os.Stat(path)
+	if err != nil || !info.ModTime().Equal(entry.modTime) {
+		return Credentials{}, false
+	}
+	return entry.creds, true
 }
 
 func setCachedCredentials(path string, creds Credentials, modTime time.Time) {
-	cacheMu.Lock()
-	defer cacheMu.Unlock()
-	cachedPath = path
-	cachedCreds = creds
-	cachedModTime = modTime
+	tokenCacheMu.Lock()
+	defer tokenCacheMu.Unlock()
+	tokenCache[path] = tokenCacheEntry{
+		creds:   creds,
+		modTime: modTime,
+	}
 }
 
 // Get returns a fresh token and resolves its account email. Refresh and

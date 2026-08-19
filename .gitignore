@@ -4,4 +4,5 @@
 /proxy
 .DS_Store
 *.DS_Store
+benchmark_results.txt
 

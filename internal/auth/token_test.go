@@ -154,6 +154,53 @@ func TestManagerGetCached(t *testing.T) {
 	}
 }
 
+func TestTokenCacheMultiPathAndMtime(t *testing.T) {
+	dir := t.TempDir()
+	path1 := filepath.Join(dir, "token1.json")
+	path2 := filepath.Join(dir, "token2.json")
+	if err := os.WriteFile(path1, []byte("{}"), 0600); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(path2, []byte("{}"), 0600); err != nil {
+		t.Fatal(err)
+	}
+
+	info1, _ := os.Stat(path1)
+	info2, _ := os.Stat(path2)
+	now := time.Now()
+
+	cred1 := Credentials{AccessToken: "tok1", Expiry: now.Add(time.Hour)}
+	cred2 := Credentials{AccessToken: "tok2", Expiry: now.Add(time.Hour)}
+
+	setCachedCredentials(path1, cred1, info1.ModTime())
+	setCachedCredentials(path2, cred2, info2.ModTime())
+
+	// Verify both paths cached independently
+	got1, ok1 := getCachedCredentials(path1, now)
+	if !ok1 || got1.AccessToken != "tok1" {
+		t.Fatalf("path1 cache mismatch: got %#v, ok=%v", got1, ok1)
+	}
+	got2, ok2 := getCachedCredentials(path2, now)
+	if !ok2 || got2.AccessToken != "tok2" {
+		t.Fatalf("path2 cache mismatch: got %#v, ok=%v", got2, ok2)
+	}
+
+	// Invalidate path1 mtime by touching file
+	future := time.Now().Add(10 * time.Second)
+	_ = os.Chtimes(path1, future, future)
+
+	_, ok1After := getCachedCredentials(path1, now)
+	if ok1After {
+		t.Fatalf("expected cache miss after mtime change on path1")
+	}
+
+	// path2 remains cached
+	_, ok2Still := getCachedCredentials(path2, now)
+	if !ok2Still {
+		t.Fatalf("expected path2 cache hit")
+	}
+}
+
 func assertFormValue(t *testing.T, form url.Values, key, want string) {
 	t.Helper()
 	if got := form.Get(key); got != want {
