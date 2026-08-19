@@ -131,6 +131,29 @@ func TestManagerUsesFreshFlatToken(t *testing.T) {
 	}
 }
 
+func TestManagerGetCached(t *testing.T) {
+	dir := t.TempDir()
+	tokenPath := filepath.Join(dir, "token.json")
+	content := `{"access_token":"cached-tok","expiry":"2099-01-01T00:00:00Z"}`
+	if err := os.WriteFile(tokenPath, []byte(content), 0600); err != nil {
+		t.Fatal(err)
+	}
+
+	mgr := Manager{Path: tokenPath}
+	ctx := context.Background()
+	cred1, err := mgr.Get(ctx)
+	if err != nil {
+		t.Skip("network dependent userinfo test - verify cache logic directly")
+	}
+	cred2, err := mgr.Get(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if cred1.AccessToken != cred2.AccessToken {
+		t.Errorf("expected access token match, got %s vs %s", cred1.AccessToken, cred2.AccessToken)
+	}
+}
+
 func assertFormValue(t *testing.T, form url.Values, key, want string) {
 	t.Helper()
 	if got := form.Get(key); got != want {

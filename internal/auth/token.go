@@ -12,6 +12,7 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"antigravity-go-proxy/internal/cloudcode"
@@ -130,6 +131,30 @@ func (t Token) Fresh(now time.Time) bool {
 	return t.AccessToken != "" && !t.Expiry.IsZero() && t.Expiry.Sub(now) > freshnessSkew
 }
 
+var (
+	cacheMu       sync.RWMutex
+	cachedCreds   Credentials
+	cachedPath    string
+	cachedModTime time.Time
+)
+
+func getCachedCredentials(path string, now time.Time) (Credentials, bool) {
+	cacheMu.RLock()
+	defer cacheMu.RUnlock()
+	if cachedPath == path && cachedCreds.AccessToken != "" && cachedCreds.Expiry.Sub(now) > freshnessSkew {
+		return cachedCreds, true
+	}
+	return Credentials{}, false
+}
+
+func setCachedCredentials(path string, creds Credentials, modTime time.Time) {
+	cacheMu.Lock()
+	defer cacheMu.Unlock()
+	cachedPath = path
+	cachedCreds = creds
+	cachedModTime = modTime
+}
+
 // Get returns a fresh token and resolves its account email. Refresh and
 // optional write-back happen under an exclusive file lock so multiple proxy
 // processes cannot refresh or overwrite the agy token concurrently.
@@ -141,6 +166,13 @@ func (m Manager) Get(ctx context.Context) (Credentials, error) {
 		if err != nil {
 			return Credentials{}, err
 		}
+	}
+	now := time.Now
+	if m.Now != nil {
+		now = m.Now
+	}
+	if creds, ok := getCachedCredentials(path, now()); ok {
+		return creds, nil
 	}
 	flags := os.O_RDONLY
 	if m.WriteBack || os.Getenv("AGY_TOKEN_WRITEBACK") == "1" {
@@ -165,10 +197,6 @@ func (m Manager) Get(ctx context.Context) (Credentials, error) {
 		return Credentials{}, err
 	}
 
-	now := time.Now
-	if m.Now != nil {
-		now = m.Now
-	}
 	refreshed := false
 	if !token.Fresh(now()) {
 		if token.RefreshToken == "" {
@@ -199,12 +227,18 @@ func (m Manager) Get(ctx context.Context) (Credentials, error) {
 	if err != nil {
 		return Credentials{}, err
 	}
-	return Credentials{
+	creds := Credentials{
 		AccessToken: token.AccessToken,
 		Email:       email,
 		Expiry:      token.Expiry,
 		Refreshed:   refreshed,
-	}, nil
+	}
+	var modTime time.Time
+	if info, err := file.Stat(); err == nil {
+		modTime = info.ModTime()
+	}
+	setCachedCredentials(path, creds, modTime)
+	return creds, nil
 }
 
 func (m Manager) refresh(ctx context.Context, refreshToken string) (tokenResponse, error) {
