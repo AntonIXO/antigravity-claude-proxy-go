@@ -109,6 +109,17 @@ type SSEEvent struct {
 	Retry time.Duration
 }
 
+var defaultTransport = &http.Transport{
+	TLSClientConfig:     &tls.Config{},
+	MaxIdleConns:        1000,
+	MaxIdleConnsPerHost: 500,
+	IdleConnTimeout:     90 * time.Second,
+}
+
+func SharedTransport() *http.Transport {
+	return defaultTransport
+}
+
 func New(options Options) *Client {
 	if options.UserAgentVersion == "" {
 		options.UserAgentVersion = DefaultUserAgentVersion
@@ -120,15 +131,7 @@ func New(options Options) *Client {
 	var transport *http.Transport
 	client := options.HTTPClient
 	if client == nil {
-		// Current agy's Cloud Code ClientHello has no ALPN. A dedicated standard
-		// Transport with only an empty TLS config reproduces that behavior. Do
-		// not set ForceAttemptHTTP2 or any field inside tls.Config.
-		transport = &http.Transport{
-			TLSClientConfig:     &tls.Config{},
-			MaxIdleConnsPerHost: 10,
-			MaxIdleConns:        20,
-			IdleConnTimeout:     90 * time.Second,
-		}
+		transport = defaultTransport
 		client = &http.Client{Transport: transport, Timeout: options.Timeout}
 	}
 

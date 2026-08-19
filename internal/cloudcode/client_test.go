@@ -29,6 +29,19 @@ func TestTransportKeepsTLSZeroValueAndHTTP2Disabled(t *testing.T) {
 	}
 }
 
+func TestSharedTransportConfiguration(t *testing.T) {
+	client := New(Options{AccessToken: "test-token"})
+	if client.transport == nil {
+		t.Fatal("expected non-nil transport")
+	}
+	if client.transport.MaxIdleConns < 1000 {
+		t.Errorf("expected MaxIdleConns >= 1000, got %d", client.transport.MaxIdleConns)
+	}
+	if client.transport.MaxIdleConnsPerHost < 500 {
+		t.Errorf("expected MaxIdleConnsPerHost >= 500, got %d", client.transport.MaxIdleConnsPerHost)
+	}
+}
+
 func TestFetchAvailableModelsHeadersAndDailyFallback(t *testing.T) {
 	t.Parallel()
 	var dailyCalls, prodCalls int

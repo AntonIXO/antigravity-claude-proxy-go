@@ -13,6 +13,8 @@ import (
 	"strconv"
 	"strings"
 	"time"
+
+	"antigravity-go-proxy/internal/cloudcode"
 )
 
 const (
@@ -330,7 +332,7 @@ func (m Manager) client() *http.Client {
 	if m.HTTPClient != nil {
 		return m.HTTPClient
 	}
-	return http.DefaultClient
+	return &http.Client{Transport: cloudcode.SharedTransport()}
 }
 
 func parseToken(raw []byte, path string) (Token, error) {
