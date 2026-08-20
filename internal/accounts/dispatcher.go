@@ -257,6 +257,7 @@ func (dispatcher *Dispatcher) StreamGenerateContent(ctx context.Context, request
 						return cloudcode.Response{}, err
 					}
 				}
+				slog.Warn("upstream 429", "model", model, "reason", reason, "wait", wait.Round(time.Second), "serverReset", reset, "failures", failures)
 				dispatcher.manager.MarkRateLimited(account, model, wait)
 				break
 			}
@@ -377,6 +378,9 @@ func (dispatcher *Dispatcher) handleCredentialError(account *Account, err error)
 }
 
 func (dispatcher *Dispatcher) rotateForError(account *Account, model string, err error) bool {
+	if isCanceled(err) {
+		return false
+	}
 	upstreamError := findHTTPError(err)
 	if upstreamError == nil {
 		dispatcher.manager.MarkFailure(account, model)
@@ -423,6 +427,10 @@ func findHTTPError(err error) *cloudcode.HTTPError {
 		return upstreamError
 	}
 	return nil
+}
+
+func isCanceled(err error) bool {
+	return errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded)
 }
 
 func isCapacityHTTPError(err *cloudcode.HTTPError) bool {

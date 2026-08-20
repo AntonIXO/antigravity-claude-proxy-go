@@ -42,6 +42,13 @@ func TestParseResetTimeAndClassifiers(t *testing.T) {
 	if ClassifyError(`RESOURCE_EXHAUSTED quotaResetDelay`, 429) != ReasonQuota {
 		t.Fatal("quota response was not classified as quota")
 	}
+	bareRPM := `{"error":{"code":429,"message":"Resource has been exhausted (e.g. check quota).","status":"RESOURCE_EXHAUSTED"}}`
+	if ClassifyError(bareRPM, 429) != ReasonRateLimit {
+		t.Fatalf("bare RESOURCE_EXHAUSTED classified as %s, want RATE_LIMIT_EXCEEDED", ClassifyError(bareRPM, 429))
+	}
+	if wait := SmartBackoff(ReasonRateLimit, 0, 3); wait != 30*time.Second {
+		t.Fatalf("RPM backoff with failures=3 was %s, want 30s", wait)
+	}
 	if ClassifyError(`MODEL_CAPACITY_EXHAUSTED`, 429) != ReasonCapacity {
 		t.Fatal("capacity response was not classified as capacity")
 	}
