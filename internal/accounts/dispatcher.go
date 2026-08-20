@@ -152,7 +152,7 @@ func (dispatcher *Dispatcher) StreamGenerateContent(ctx context.Context, request
 	}
 	request = cloneRequest(request)
 	request["model"] = modelDetails.GetUpstreamID()
-	model := modelDetails.ID
+	model := modelDetails.GetUpstreamID()
 	maxAttempts := max(dispatcher.maxRetries, dispatcher.manager.Count()+1)
 	var lastError error
 	for attempt := 0; attempt < maxAttempts; attempt++ {
@@ -199,6 +199,7 @@ func (dispatcher *Dispatcher) StreamGenerateContent(ctx context.Context, request
 		payload := dispatcher.builder.BuildCloudCodeRequestWithModel(request, project, credentials.Email, proxyformat.ModelOptions{
 			SupportsThinking: modelDetails.SupportsThinking, ThinkingBudget: modelDetails.ThinkingBudget,
 			MinThinkingBudget: modelDetails.MinThinkingBudget, MaxOutputTokens: modelDetails.MaxOutputTokens,
+			ThinkingLevel: modelDetails.ThinkingLevel,
 		})
 		inner, _ := payload["request"].(map[string]any)
 		options := cloudcode.RequestOptions{SessionID: textValue(inner["sessionId"])}

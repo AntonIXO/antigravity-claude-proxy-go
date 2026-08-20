@@ -31,6 +31,7 @@ type ModelOptions struct {
 	SupportsThinking  bool
 	ThinkingBudget    int
 	MinThinkingBudget int
+	ThinkingLevel     string
 	MaxOutputTokens   int
 }
 

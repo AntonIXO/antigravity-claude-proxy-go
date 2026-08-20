@@ -21,6 +21,7 @@ type Model struct {
 	SupportsAdaptiveThinking bool
 	ThinkingBudget           int
 	MinThinkingBudget        int
+	ThinkingLevel            string
 	MaxTokens                int
 	MaxOutputTokens          int
 	QuotaRemainingFraction   *float64
@@ -101,6 +102,8 @@ var routingAliases = map[string]string{
 	"gemini-3.7-flash-low":       "Gemini 3.7 Flash (Low)",
 }
 
+const gemini37TieredID = "gemini-3.7-flash-tiered"
+
 func Parse(body []byte) (*Catalog, error) {
 	var document responseDocument
 	if err := json.Unmarshal(body, &document); err != nil {
@@ -162,33 +165,7 @@ func Parse(body []byte) (*Catalog, error) {
 		catalog.byDisplay[strings.ToLower(model.DisplayName)] = model
 	}
 
-	synthetic37 := []struct {
-		id          string
-		displayName string
-		baseID      string
-	}{
-		{"gemini-3.7-flash-high", "Gemini 3.7 Flash (High)", "gemini-3.6-flash-high"},
-		{"gemini-3.7-flash-medium", "Gemini 3.7 Flash (Medium)", "gemini-3.6-flash-medium"},
-		{"gemini-3.7-flash-low", "Gemini 3.7 Flash (Low)", "gemini-3.6-flash-low"},
-	}
-
-	var syntheticModels []Model
-	for _, synth := range synthetic37 {
-		if _, exists := catalog.byID[synth.id]; !exists {
-			if baseModel, exists := catalog.byID[synth.baseID]; exists {
-				synthModel := baseModel
-				synthModel.ID = synth.id
-				synthModel.UpstreamID = synth.baseID
-				synthModel.DisplayName = synth.displayName
-				catalog.byID[synth.id] = synthModel
-				catalog.byDisplay[strings.ToLower(synth.displayName)] = synthModel
-				syntheticModels = append(syntheticModels, synthModel)
-			}
-		}
-	}
-	if len(syntheticModels) > 0 {
-		catalog.selectable = append(syntheticModels, catalog.selectable...)
-	}
+	applyGemini37(catalog, document.Models)
 
 	if len(catalog.selectable) == 0 {
 		return nil, errors.New("Cloud Code catalog has no selectable agent models")
@@ -321,6 +298,14 @@ func (catalog *Catalog) ResolveWithRequest(requested string, request map[string]
 	effort, budget, hasBudget, disabled := ExtractReasoningParams(request)
 
 	if disabled {
+		if isGemini37Flash(model.ID) || isGemini37Flash(requested) {
+			if variant, err := catalog.Resolve("gemini-3.7-flash-low"); err == nil {
+				return variant, nil
+			}
+			model.ThinkingLevel = "LOW"
+			model.SupportsThinking = true
+			return model, nil
+		}
 		model.SupportsThinking = false
 		model.ThinkingBudget = 0
 		return model, nil
@@ -408,4 +393,75 @@ func (catalog *Catalog) PublicModels() []Model {
 func isAgentFamily(id string) bool {
 	lower := strings.ToLower(id)
 	return strings.Contains(lower, "claude") || strings.Contains(lower, "gemini") || strings.Contains(lower, "gpt")
+}
+
+func isGemini37Flash(id string) bool {
+	return strings.HasPrefix(strings.ToLower(id), "gemini-3.7-flash")
+}
+
+func modelFromDetails(id string, details modelDetails) Model {
+	model := Model{
+		ID: id, DisplayName: details.DisplayName, Description: details.Description,
+		Disabled: details.Disabled, Recommended: details.Recommended,
+		SupportsThinking:         details.SupportsThinking,
+		SupportsAdaptiveThinking: details.SupportsAdaptiveThinking,
+		ThinkingBudget:           details.ThinkingBudget, MinThinkingBudget: details.MinThinkingBudget,
+		MaxTokens: details.MaxTokens, MaxOutputTokens: details.MaxOutputTokens,
+		QuotaRemainingFraction: details.QuotaInfo.RemainingFraction,
+		QuotaResetTime:         details.QuotaInfo.ResetTime,
+	}
+	if model.DisplayName == "" {
+		model.DisplayName = id
+	}
+	return model
+}
+
+// applyGemini37 publishes gemini-3.7-flash-{high,medium,low}. Cloud Code serves
+// 3.7 as a single gemini-3.7-flash-tiered runtime plus thinkingLevel; agy's
+// high/medium/low slugs are not in agentModelSorts. Fall back to the matching
+// 3.6 Flash ID only when the tiered model is absent from the catalog.
+func applyGemini37(catalog *Catalog, models map[string]modelDetails) {
+	variants := []struct {
+		id, displayName, level, fallback string
+	}{
+		{"gemini-3.7-flash-high", "Gemini 3.7 Flash (High)", "HIGH", "gemini-3.6-flash-high"},
+		{"gemini-3.7-flash-medium", "Gemini 3.7 Flash (Medium)", "MEDIUM", "gemini-3.6-flash-medium"},
+		{"gemini-3.7-flash-low", "Gemini 3.7 Flash (Low)", "LOW", "gemini-3.6-flash-low"},
+	}
+
+	tiered, hasTiered := models[gemini37TieredID]
+	hasTiered = hasTiered && !tiered.Disabled
+
+	present := make(map[string]int, len(catalog.selectable))
+	for i, model := range catalog.selectable {
+		present[model.ID] = i
+	}
+
+	var prepend []Model
+	for _, variant := range variants {
+		var model Model
+		if hasTiered {
+			model = modelFromDetails(gemini37TieredID, tiered)
+			model.UpstreamID = gemini37TieredID
+			model.ThinkingLevel = variant.level
+		} else if base, ok := catalog.byID[variant.fallback]; ok {
+			model = base
+			model.UpstreamID = variant.fallback
+		} else {
+			continue
+		}
+		model.ID = variant.id
+		model.DisplayName = variant.displayName
+		catalog.byID[variant.id] = model
+		catalog.byDisplay[strings.ToLower(variant.displayName)] = model
+		if index, exists := present[variant.id]; exists {
+			catalog.selectable[index] = model
+			continue
+		}
+		prepend = append(prepend, model)
+		present[variant.id] = -1
+	}
+	if len(prepend) > 0 {
+		catalog.selectable = append(prepend, catalog.selectable...)
+	}
 }
