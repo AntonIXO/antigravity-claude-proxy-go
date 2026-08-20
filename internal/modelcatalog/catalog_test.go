@@ -1,6 +1,9 @@
 package modelcatalog
 
-import "testing"
+import (
+	"strings"
+	"testing"
+)
 
 func TestParseUsesAgyAgentModelOrderAndResolvesRoutingAlias(t *testing.T) {
 	t.Parallel()
@@ -166,5 +169,15 @@ func TestGemini37UsesTieredUpstreamWhenPresent(t *testing.T) {
 	}
 	if low.ID != "gemini-3.7-flash-low" || low.GetUpstreamID() != "gemini-3.7-flash-tiered" || low.ThinkingLevel != "LOW" || !low.SupportsThinking {
 		t.Fatalf("3.7 disabled→low: %#v", low)
+	}
+	for _, m := range catalog.PublicModels() {
+		if strings.Contains(m.ID, "tiered") || strings.Contains(m.DisplayName, "tiered") {
+			t.Fatalf("public catalog leaked tiered id: %#v", m)
+		}
+	}
+	for _, m := range catalog.Selectable() {
+		if strings.Contains(m.ID, "tiered") {
+			t.Fatalf("selectable id leaked tiered: %q", m.ID)
+		}
 	}
 }
