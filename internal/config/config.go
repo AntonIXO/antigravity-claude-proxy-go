@@ -9,6 +9,11 @@ import (
 	"sync"
 )
 
+type EndpointConfig struct {
+	URL    string `json:"url"`
+	APIKey string `json:"apiKey,omitempty"`
+}
+
 type AccountSelectionConfig struct {
 	Strategy    string         `json:"strategy,omitempty"`
 	HealthScore map[string]any `json:"healthScore,omitempty"`
@@ -39,6 +44,7 @@ type Config struct {
 	MaxCapacityRetries       int                    `json:"maxCapacityRetries,omitempty"`
 	SwitchAccountDelayMs     int                    `json:"switchAccountDelayMs,omitempty"`
 	CapacityBackoffTiersMs   []int                  `json:"capacityBackoffTiersMs,omitempty"`
+	CustomEndpoints          map[string]EndpointConfig `json:"customEndpoints,omitempty"`
 	ModelMapping             map[string]any         `json:"modelMapping,omitempty"`
 	AccountSelection         AccountSelectionConfig `json:"accountSelection,omitempty"`
 }
@@ -66,6 +72,7 @@ func DefaultConfig() Config {
 		MaxCapacityRetries:     5,
 		SwitchAccountDelayMs:   5000,
 		CapacityBackoffTiersMs: []int{5000, 10000, 20000, 30000, 60000},
+		CustomEndpoints:        make(map[string]EndpointConfig),
 		ModelMapping:           make(map[string]any),
 		AccountSelection: AccountSelectionConfig{
 			Strategy: "hybrid",
@@ -163,7 +170,7 @@ func Save(updates map[string]any) (Config, error) {
 
 	// Merge updates
 	for k, v := range updates {
-		if k == "modelMapping" {
+		if k == "modelMapping" || k == "customEndpoints" {
 			currentMap[k] = v
 			continue
 		}
@@ -216,5 +223,28 @@ func GetPublicConfig() map[string]any {
 		result["hasPassword"] = false
 	}
 	delete(result, "webuiPassword")
+
+	if ce, ok := result["customEndpoints"].(map[string]any); ok {
+		redacted := make(map[string]any)
+		for model, ep := range ce {
+			if epMap, ok := ep.(map[string]any); ok {
+				epCopy := make(map[string]any)
+				for ek, ev := range epMap {
+					if ek == "apiKey" {
+						if strKey, isStr := ev.(string); isStr && strKey != "" {
+							epCopy["hasApiKey"] = true
+						}
+					} else {
+						epCopy[ek] = ev
+					}
+				}
+				redacted[model] = epCopy
+			} else {
+				redacted[model] = ep
+			}
+		}
+		result["customEndpoints"] = redacted
+	}
+
 	return result
 }

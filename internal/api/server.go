@@ -8,8 +8,11 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"log/slog"
 	"net/http"
+	"net/http/httputil"
+	"net/url"
 	"strconv"
 	"strings"
 	"sync"
@@ -452,6 +455,16 @@ func (server *Server) messages(writer http.ResponseWriter, request *http.Request
 	}
 
 	model := stringFrom(anthropicRequest["model"])
+	if endpoint, exists := cfg.CustomEndpoints[model]; exists && endpoint.URL != "" {
+		reqBody, err := json.Marshal(anthropicRequest)
+		if err != nil {
+			writeAPIError(writer, http.StatusBadRequest, "invalid_request_error", "Failed to marshal request: "+err.Error())
+			return
+		}
+		server.forwardToCustomEndpoint(writer, request, endpoint, reqBody)
+		return
+	}
+
 	var send streamSender
 	if server.backend != nil {
 		send = func(ctx context.Context, consume func(cloudcode.SSEEvent) error) (cloudcode.Response, error) {
@@ -485,6 +498,40 @@ func (server *Server) messages(writer http.ResponseWriter, request *http.Request
 		return
 	}
 	server.unaryMessage(writer, request, send, model)
+}
+
+func (server *Server) forwardToCustomEndpoint(writer http.ResponseWriter, request *http.Request, endpoint config.EndpointConfig, reqBody []byte) {
+	targetURL, err := url.Parse(endpoint.URL)
+	if err != nil {
+		writeAPIError(writer, http.StatusBadRequest, "invalid_request_error", "Invalid custom endpoint URL: "+err.Error())
+		return
+	}
+	if !strings.HasSuffix(targetURL.Path, "/v1/messages") {
+		targetURL.Path = strings.TrimSuffix(targetURL.Path, "/") + "/v1/messages"
+	}
+
+	proxy := &httputil.ReverseProxy{
+		Director: func(req *http.Request) {
+			req.URL.Scheme = targetURL.Scheme
+			req.URL.Host = targetURL.Host
+			req.URL.Path = targetURL.Path
+			req.URL.RawQuery = targetURL.RawQuery
+			req.Host = targetURL.Host
+
+			req.Body = io.NopCloser(bytes.NewReader(reqBody))
+			req.ContentLength = int64(len(reqBody))
+
+			if endpoint.APIKey != "" {
+				req.Header.Set("x-api-key", endpoint.APIKey)
+			}
+		},
+		ErrorHandler: func(w http.ResponseWriter, r *http.Request, proxyErr error) {
+			server.logger.Error("custom endpoint proxy error", "error", proxyErr, "url", targetURL.String())
+			writeAPIError(w, http.StatusBadGateway, "api_error", "Custom endpoint forwarding error: "+proxyErr.Error())
+		},
+	}
+
+	proxy.ServeHTTP(writer, request)
 }
 
 type streamSender func(context.Context, func(cloudcode.SSEEvent) error) (cloudcode.Response, error)
