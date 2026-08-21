@@ -12,6 +12,7 @@ import (
 
 	"antigravity-go-proxy/internal/auth"
 	"antigravity-go-proxy/internal/cloudcode"
+	"antigravity-go-proxy/internal/config"
 )
 
 func TestParseResetTimeAndClassifiers(t *testing.T) {
@@ -358,5 +359,57 @@ func testRequest() map[string]any {
 	return map[string]any{
 		"model": "claude-sonnet-4-6", "max_tokens": float64(128),
 		"messages": []any{map[string]any{"role": "user", "content": "hello"}},
+	}
+}
+
+func TestDispatcherRequestThrottlingAndConfigUpdate(t *testing.T) {
+	now := time.Date(2026, 7, 14, 12, 0, 0, 0, time.UTC)
+	account := testAccount("throttled@example.com")
+	manager, err := New(Options{Accounts: []*Account{account}, Strategy: StrategySticky, Now: func() time.Time { return now }})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	var sleepDurations []time.Duration
+	var mu sync.Mutex
+	sleep := func(ctx context.Context, d time.Duration) error {
+		mu.Lock()
+		sleepDurations = append(sleepDurations, d)
+		mu.Unlock()
+		return nil
+	}
+
+	client := &scriptedClient{
+		results: []scriptedResult{
+			{events: [][]byte{[]byte(`{}`)}},
+		},
+	}
+
+	resolver := &staticResolver{tokens: map[string]string{"throttled@example.com": "tok-throttled"}}
+	dispatcher := newTestDispatcher(t, manager, resolver, map[string]*scriptedClient{"tok-throttled": client}, now, sleep)
+
+	// Update config to enable throttling with 250ms delay
+	dispatcher.UpdateConfig(config.Config{
+		RequestThrottlingEnabled: true,
+		RequestDelayMs:           250,
+	})
+
+	_, err = dispatcher.StreamGenerateContent(context.Background(), testRequest(), func(e cloudcode.SSEEvent) error { return nil })
+	if err != nil {
+		t.Fatalf("StreamGenerateContent failed: %v", err)
+	}
+
+	mu.Lock()
+	throttled := false
+	for _, d := range sleepDurations {
+		if d == 250*time.Millisecond {
+			throttled = true
+			break
+		}
+	}
+	mu.Unlock()
+
+	if !throttled {
+		t.Errorf("expected 250ms throttling delay in sleep durations, got: %v", sleepDurations)
 	}
 }

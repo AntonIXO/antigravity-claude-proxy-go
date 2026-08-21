@@ -51,6 +51,10 @@ type AccountRefresher interface {
 	RefreshAccount(context.Context, string) (*accounts.Account, error)
 }
 
+type ConfigUpdater interface {
+	UpdateConfig(cfg config.Config)
+}
+
 type Options struct {
 	APIKey         string
 	ProjectID      string

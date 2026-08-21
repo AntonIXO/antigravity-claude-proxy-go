@@ -6,6 +6,8 @@ import (
 	"reflect"
 	"testing"
 	"time"
+
+	"antigravity-go-proxy/internal/config"
 )
 
 func TestLoadIsReadOnlyAndResetsTransientStartupState(t *testing.T) {
@@ -269,5 +271,125 @@ func testAccount(email string) *Account {
 		ModelRateLimits: make(map[string]*RateLimit),
 		ModelThreshold:  make(map[string]float64),
 		Quota:           Quota{Models: make(map[string]ModelQuota)},
+	}
+}
+
+func TestColdStartManagerPersistence(t *testing.T) {
+	tempDir := t.TempDir()
+	t.Setenv("ANTIGRAVITY_CONFIG_DIR", tempDir)
+
+	tokenPath := filepath.Join(tempDir, "antigravity-oauth-token")
+	if err := os.WriteFile(tokenPath, []byte(`{"token":{"access_token":"token","expiry":"2030-01-01T00:00:00Z"}}`), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("AGY_TOKEN_PATH", tokenPath)
+
+	mgr, err := NewDefault("", StrategyHybrid, nil)
+	if err != nil {
+		t.Fatalf("NewDefault failed: %v", err)
+	}
+
+	expectedConfigPath := filepath.Join(tempDir, "accounts.json")
+	if mgr.ConfigPath() != expectedConfigPath {
+		t.Errorf("expected configPath %s, got %s", expectedConfigPath, mgr.ConfigPath())
+	}
+
+	newAcc := &Account{
+		Email:        "user@example.com",
+		Source:       "oauth",
+		RefreshToken: "refresh-token-123",
+		Enabled:      true,
+	}
+	if err := mgr.AddOrUpdateAccount(newAcc); err != nil {
+		t.Fatalf("AddOrUpdateAccount failed: %v", err)
+	}
+
+	if _, err := os.Stat(expectedConfigPath); err != nil {
+		t.Fatalf("accounts.json not created on disk: %v", err)
+	}
+
+	// Simulate restart
+	restartedMgr, err := NewDefault("", StrategyHybrid, nil)
+	if err != nil {
+		t.Fatalf("restarted NewDefault failed: %v", err)
+	}
+
+	accountsList := restartedMgr.GetAllAccounts()
+	found := false
+	for _, acc := range accountsList {
+		if acc.Email == "user@example.com" && acc.RefreshToken == "refresh-token-123" {
+			found = true
+			break
+		}
+	}
+	if !found {
+		t.Errorf("user@example.com was not persisted across restart")
+	}
+}
+
+func TestDynamicScoringAndThresholds(t *testing.T) {
+	now := time.Date(2026, 8, 20, 12, 0, 0, 0, time.UTC)
+	account := testAccount("custom-scoring@example.com")
+	mgr, err := New(Options{
+		Accounts: []*Account{account},
+		Strategy: StrategyHybrid,
+		Now:      func() time.Time { return now },
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Verify default score calculation
+	defaultScore := mgr.scoreLocked(account, "claude")
+
+	// Update weights and verify score change
+	mgr.SetSelectionConfig(config.AccountSelectionConfig{
+		Strategy: StrategyHybrid,
+		Weights: map[string]any{
+			"health": 10.0,
+			"tokens": 1.0,
+			"quota":  1.0,
+			"lru":    0.0,
+		},
+		HealthScore: map[string]any{
+			"initial": 90.0,
+		},
+	}, 0.20)
+
+	customScore := mgr.scoreLocked(account, "claude")
+	if customScore == defaultScore {
+		t.Errorf("expected score to change with custom weights, got %f == %f", customScore, defaultScore)
+	}
+
+	// Verify global quota threshold propagation
+	half := 0.15
+	account.Quota.Models["claude"] = ModelQuota{RemainingFraction: &half}
+	account.Quota.LastChecked = float64(now.UnixMilli())
+
+	// Threshold is 0.20, so 0.15 should be critical
+	if !mgr.quotaCriticalLocked(account, "claude") {
+		t.Errorf("expected 0.15 to be quota critical with 0.20 threshold")
+	}
+
+	// Lower threshold to 0.10, so 0.15 is no longer critical
+	mgr.SetSelectionConfig(mgr.GetSelectionConfig(), 0.10)
+	if mgr.quotaCriticalLocked(account, "claude") {
+		t.Errorf("expected 0.15 not to be quota critical with 0.10 threshold")
+	}
+
+	// Verify tokensLocked fallback with non-positive maxTokens
+	mgr.SetSelectionConfig(config.AccountSelectionConfig{
+		Strategy: StrategyHybrid,
+		TokenBucket: map[string]any{
+			"maxTokens": 0.0,
+		},
+	}, 0.05)
+
+	tokens := mgr.tokensLocked(account.Email)
+	if tokens <= 0 {
+		t.Errorf("expected tokens > 0 with fallback, got %f", tokens)
+	}
+	if tokens != 50 {
+		t.Errorf("expected default tokens 50, got %f", tokens)
 	}
 }

@@ -13,6 +13,7 @@ import (
 
 	"antigravity-go-proxy/internal/auth"
 	"antigravity-go-proxy/internal/cloudcode"
+	"antigravity-go-proxy/internal/config"
 	proxyformat "antigravity-go-proxy/internal/format"
 	"antigravity-go-proxy/internal/logger"
 	"antigravity-go-proxy/internal/modelcatalog"
@@ -32,19 +33,21 @@ type Resolver interface {
 type SleepFunc func(context.Context, time.Duration) error
 
 type DispatcherOptions struct {
-	Manager            *Manager
-	Resolver           Resolver
-	Builder            *proxyformat.Builder
-	NewClient          func(string) CloudClient
-	ProjectID          string
-	MaxRetries         int
-	MaxWait            time.Duration
-	CapacityBackoffs   []time.Duration
-	MaxCapacityRetries int
-	SwitchDelay        time.Duration
-	Sleep              SleepFunc
-	Now                func() time.Time
-	ModelCacheTTL      time.Duration
+	Manager                  *Manager
+	Resolver                 Resolver
+	Builder                  *proxyformat.Builder
+	NewClient                func(string) CloudClient
+	ProjectID                string
+	MaxRetries               int
+	MaxWait                  time.Duration
+	CapacityBackoffs         []time.Duration
+	MaxCapacityRetries       int
+	SwitchDelay              time.Duration
+	RequestThrottlingEnabled bool
+	RequestDelay             time.Duration
+	Sleep                    SleepFunc
+	Now                      func() time.Time
+	ModelCacheTTL            time.Duration
 }
 
 type accountClient struct {
@@ -53,19 +56,21 @@ type accountClient struct {
 }
 
 type Dispatcher struct {
-	manager            *Manager
-	resolver           Resolver
-	builder            *proxyformat.Builder
-	newClient          func(string) CloudClient
-	projectID          string
-	maxRetries         int
-	maxWait            time.Duration
-	capacityBackoffs   []time.Duration
-	maxCapacityRetries int
-	switchDelay        time.Duration
-	sleep              SleepFunc
-	now                func() time.Time
-	modelCacheTTL      time.Duration
+	manager                  *Manager
+	resolver                 Resolver
+	builder                  *proxyformat.Builder
+	newClient                func(string) CloudClient
+	projectID                string
+	maxRetries               int
+	maxWait                  time.Duration
+	capacityBackoffs         []time.Duration
+	maxCapacityRetries       int
+	switchDelay              time.Duration
+	requestThrottlingEnabled bool
+	requestDelay             time.Duration
+	sleep                    SleepFunc
+	now                      func() time.Time
+	modelCacheTTL            time.Duration
 
 	mu        sync.RWMutex
 	clients   map[string]accountClient
@@ -105,14 +110,54 @@ func NewDispatcher(options DispatcherOptions) (*Dispatcher, error) {
 		options.ModelCacheTTL = 5 * time.Minute
 	}
 	return &Dispatcher{
-		manager: options.Manager, resolver: options.Resolver, builder: options.Builder,
-		newClient: options.NewClient, projectID: options.ProjectID,
-		maxRetries: options.MaxRetries, maxWait: options.MaxWait,
-		capacityBackoffs: options.CapacityBackoffs, maxCapacityRetries: options.MaxCapacityRetries,
-		switchDelay: options.SwitchDelay, sleep: options.Sleep, now: options.Now,
-		modelCacheTTL: options.ModelCacheTTL,
-		clients:       make(map[string]accountClient),
+		manager:                  options.Manager,
+		resolver:                 options.Resolver,
+		builder:                  options.Builder,
+		newClient:                options.NewClient,
+		projectID:                options.ProjectID,
+		maxRetries:               options.MaxRetries,
+		maxWait:                  options.MaxWait,
+		capacityBackoffs:         options.CapacityBackoffs,
+		maxCapacityRetries:       options.MaxCapacityRetries,
+		switchDelay:              options.SwitchDelay,
+		requestThrottlingEnabled: options.RequestThrottlingEnabled,
+		requestDelay:             options.RequestDelay,
+		sleep:                    options.Sleep,
+		now:                      options.Now,
+		modelCacheTTL:            options.ModelCacheTTL,
+		clients:                  make(map[string]accountClient),
 	}, nil
+}
+
+func (dispatcher *Dispatcher) UpdateConfig(cfg config.Config) {
+	dispatcher.mu.Lock()
+	defer dispatcher.mu.Unlock()
+
+	if cfg.MaxRetries > 0 {
+		dispatcher.maxRetries = cfg.MaxRetries
+	}
+	if cfg.MaxWaitBeforeErrorMs > 0 {
+		dispatcher.maxWait = time.Duration(cfg.MaxWaitBeforeErrorMs) * time.Millisecond
+	}
+	if cfg.MaxCapacityRetries > 0 {
+		dispatcher.maxCapacityRetries = cfg.MaxCapacityRetries
+	}
+	if cfg.SwitchAccountDelayMs > 0 {
+		dispatcher.switchDelay = time.Duration(cfg.SwitchAccountDelayMs) * time.Millisecond
+	}
+	if len(cfg.CapacityBackoffTiersMs) > 0 {
+		backoffs := make([]time.Duration, len(cfg.CapacityBackoffTiersMs))
+		for i, ms := range cfg.CapacityBackoffTiersMs {
+			backoffs[i] = time.Duration(ms) * time.Millisecond
+		}
+		dispatcher.capacityBackoffs = backoffs
+	}
+	dispatcher.requestThrottlingEnabled = cfg.RequestThrottlingEnabled
+	if cfg.RequestDelayMs > 0 {
+		dispatcher.requestDelay = time.Duration(cfg.RequestDelayMs) * time.Millisecond
+	} else {
+		dispatcher.requestDelay = 0
+	}
 }
 
 func (dispatcher *Dispatcher) FetchAvailableModels(ctx context.Context) (cloudcode.Response, error) {
@@ -130,6 +175,15 @@ func (dispatcher *Dispatcher) FetchAvailableModels(ctx context.Context) (cloudco
 			dispatcher.manager.MarkFailure(selection.Account, "")
 			lastError = err
 			continue
+		}
+		dispatcher.mu.RLock()
+		throttling := dispatcher.requestThrottlingEnabled
+		delay := dispatcher.requestDelay
+		dispatcher.mu.RUnlock()
+		if throttling && delay > 0 {
+			if err := dispatcher.sleep(ctx, delay); err != nil {
+				return cloudcode.Response{}, err
+			}
 		}
 		response, err := dispatcher.client(selection.Account, credentials.AccessToken).FetchAvailableModels(ctx, dispatcher.project(selection.Account))
 		if err == nil {
@@ -222,6 +276,15 @@ func (dispatcher *Dispatcher) StreamGenerateContent(ctx context.Context, request
 		capacityAttempt := 0
 		for {
 			eventCount := 0
+			dispatcher.mu.RLock()
+			throttling := dispatcher.requestThrottlingEnabled
+			delay := dispatcher.requestDelay
+			dispatcher.mu.RUnlock()
+			if throttling && delay > 0 {
+				if err := dispatcher.sleep(ctx, delay); err != nil {
+					return cloudcode.Response{}, err
+				}
+			}
 			response, requestErr := client.StreamGenerateContent(ctx, payload, options, func(event cloudcode.SSEEvent) error {
 				eventCount++
 				return consume(event)

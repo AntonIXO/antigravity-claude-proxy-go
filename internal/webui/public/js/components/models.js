@@ -297,5 +297,233 @@ window.Components.models = () => ({
      */
     async updateModelConfig(modelId, configUpdates) {
         return window.ModelConfigUtils.updateModelConfig(modelId, configUpdates);
+    },
+
+    // Custom Endpoints state and methods
+    endpointModal: {
+        show: false,
+        isEdit: false,
+        modelId: '',
+        url: '',
+        apiKey: '',
+        hasApiKey: false,
+        saving: false,
+        error: ''
+    },
+
+    openAddEndpointModal() {
+        this.endpointModal = {
+            show: true,
+            isEdit: false,
+            modelId: '',
+            url: '',
+            apiKey: '',
+            hasApiKey: false,
+            saving: false,
+            error: ''
+        };
+        const dialog = document.getElementById('custom_endpoint_modal');
+        if (dialog && typeof dialog.showModal === 'function') {
+            dialog.showModal();
+        }
+    },
+
+    openEditEndpointModal(modelId, ep) {
+        this.endpointModal = {
+            show: true,
+            isEdit: true,
+            modelId: modelId,
+            url: ep?.url || '',
+            apiKey: '',
+            hasApiKey: !!ep?.hasApiKey,
+            saving: false,
+            error: ''
+        };
+        const dialog = document.getElementById('custom_endpoint_modal');
+        if (dialog && typeof dialog.showModal === 'function') {
+            dialog.showModal();
+        }
+    },
+
+    closeEndpointModal() {
+        this.endpointModal.show = false;
+        const dialog = document.getElementById('custom_endpoint_modal');
+        if (dialog && typeof dialog.close === 'function') {
+            dialog.close();
+        }
+    },
+
+    async saveEndpoint() {
+        const { modelId, url, apiKey, hasApiKey, isEdit } = this.endpointModal;
+        const store = Alpine.store('global');
+        const dataStore = Alpine.store('data');
+
+        const cleanModelId = (modelId || '').trim();
+        const cleanUrl = (url || '').trim();
+
+        if (!cleanModelId) {
+            this.endpointModal.error = store.t('modelIdRequired') || 'Model ID is required';
+            return;
+        }
+        if (!cleanUrl) {
+            this.endpointModal.error = store.t('urlRequired') || 'Endpoint URL is required';
+            return;
+        }
+
+        this.endpointModal.saving = true;
+        this.endpointModal.error = '';
+
+        try {
+            const currentEndpoints = { ...(dataStore.customEndpoints || {}) };
+            const epData = {
+                url: cleanUrl
+            };
+            if (apiKey && apiKey.trim()) {
+                epData.apiKey = apiKey.trim();
+            } else if (hasApiKey && isEdit) {
+                epData.hasApiKey = true;
+                epData.apiKey = '';
+            }
+
+            currentEndpoints[cleanModelId] = epData;
+
+            await window.ModelConfigUtils.saveCustomEndpoints(currentEndpoints);
+            store.showToast(store.t('endpointSavedSuccess') || `Endpoint for ${cleanModelId} saved`, 'success');
+            this.closeEndpointModal();
+        } catch (e) {
+            this.endpointModal.error = e.message || 'Failed to save endpoint';
+        } finally {
+            this.endpointModal.saving = false;
+        }
+    },
+
+    async deleteEndpoint(modelId) {
+        const store = Alpine.store('global');
+        const dataStore = Alpine.store('data');
+
+        if (!confirm(store.t('confirmDeleteEndpoint') || `Are you sure you want to remove the custom endpoint for ${modelId}?`)) {
+            return;
+        }
+
+        try {
+            const currentEndpoints = { ...(dataStore.customEndpoints || {}) };
+            delete currentEndpoints[modelId];
+
+            await window.ModelConfigUtils.saveCustomEndpoints(currentEndpoints);
+            store.showToast(store.t('endpointDeletedSuccess') || `Endpoint for ${modelId} removed`, 'success');
+        } catch (e) {
+            store.showToast((store.t('failedToDeleteEndpoint') || 'Failed to delete endpoint') + ': ' + e.message, 'error');
+        }
+    },
+
+    // Model Alias state and methods
+    aliasModal: {
+        show: false,
+        sourceModel: '',
+        targetModel: '',
+        saving: false,
+        error: ''
+    },
+
+    openAddAliasModal() {
+        this.aliasModal = {
+            show: true,
+            sourceModel: '',
+            targetModel: '',
+            saving: false,
+            error: ''
+        };
+        const dialog = document.getElementById('add_model_alias_modal');
+        if (dialog && typeof dialog.showModal === 'function') {
+            dialog.showModal();
+        }
+    },
+
+    closeAliasModal() {
+        this.aliasModal.show = false;
+        const dialog = document.getElementById('add_model_alias_modal');
+        if (dialog && typeof dialog.close === 'function') {
+            dialog.close();
+        }
+    },
+
+    async saveAlias() {
+        const { sourceModel, targetModel } = this.aliasModal;
+        const store = Alpine.store('global');
+
+        const cleanSource = (sourceModel || '').trim();
+        const cleanTarget = (targetModel || '').trim();
+
+        if (!cleanSource) {
+            this.aliasModal.error = store.t('sourceModelRequired') || 'Source Model ID is required';
+            return;
+        }
+        if (!cleanTarget) {
+            this.aliasModal.error = store.t('targetModelRequired') || 'Target Model ID is required';
+            return;
+        }
+
+        this.aliasModal.saving = true;
+        this.aliasModal.error = '';
+
+        try {
+            await window.ModelConfigUtils.updateModelConfig(cleanSource, { mapping: cleanTarget });
+            store.showToast(store.t('aliasSavedSuccess') || `Alias ${cleanSource} -> ${cleanTarget} saved`, 'success');
+            this.closeAliasModal();
+        } catch (e) {
+            this.aliasModal.error = e.message || 'Failed to save alias';
+        } finally {
+            this.aliasModal.saving = false;
+        }
+    },
+
+    async deleteModelAlias(modelId) {
+        const store = Alpine.store('global');
+
+        if (!confirm(store.t('confirmDeleteAlias') || `Are you sure you want to remove model alias ${modelId}?`)) {
+            return;
+        }
+
+        try {
+            await window.ModelConfigUtils.deleteModelConfig(modelId);
+            store.showToast(store.t('aliasDeletedSuccess') || `Alias ${modelId} removed`, 'success');
+        } catch (e) {
+            store.showToast((store.t('failedToDeleteModelAlias') || 'Failed to delete model alias') + ': ' + e.message, 'error');
+        }
+    },
+
+    /**
+     * Get list of all models (discovered + custom alias keys)
+     */
+    get allConfiguredModels() {
+        const dataStore = Alpine.store('data');
+        const modelSet = new Set(dataStore.models || []);
+
+        if (dataStore.modelConfig) {
+            Object.keys(dataStore.modelConfig).forEach(m => modelSet.add(m));
+        }
+
+        return Array.from(modelSet).sort();
+    },
+
+    /**
+     * Get list of custom endpoints as an array
+     */
+    get customEndpointsList() {
+        const dataStore = Alpine.store('data');
+        const endpoints = dataStore.customEndpoints || {};
+        return Object.keys(endpoints).map(modelId => ({
+            modelId,
+            ...endpoints[modelId]
+        }));
+    },
+
+    /**
+     * Check if a model is a purely custom alias (not in discovered cloudcode models)
+     */
+    isCustomAlias(modelId) {
+        const dataStore = Alpine.store('data');
+        const discovered = dataStore.models || [];
+        return !discovered.includes(modelId);
     }
 });

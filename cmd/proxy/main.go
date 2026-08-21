@@ -9,6 +9,8 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"path/filepath"
+	"strings"
 	"syscall"
 	"time"
 
@@ -21,7 +23,6 @@ import (
 	"antigravity-go-proxy/internal/logger"
 	"antigravity-go-proxy/internal/stats"
 	"antigravity-go-proxy/internal/webui"
-	"path/filepath"
 )
 
 var startPprof func(*slog.Logger)
@@ -118,6 +119,17 @@ func runServer(args []string) {
 	logLevel := slog.LevelInfo
 	if cfg.Debug || cfg.DevMode || os.Getenv("DEBUG") != "" || os.Getenv("ANTIGRAVITY_DEV_MODE") == "true" {
 		logLevel = slog.LevelDebug
+	} else if cfg.LogLevel != "" {
+		switch strings.ToLower(cfg.LogLevel) {
+		case "debug":
+			logLevel = slog.LevelDebug
+		case "warn", "warning":
+			logLevel = slog.LevelWarn
+		case "error":
+			logLevel = slog.LevelError
+		case "info":
+			logLevel = slog.LevelInfo
+		}
 	}
 	baseHandler := slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{Level: logLevel})
 	streamHandler := logger.NewStreamHandler(baseHandler, broadcaster)
@@ -138,18 +150,57 @@ func runServer(args []string) {
 		startPprof(slogger)
 	}
 
-	accountManager, err := accounts.NewDefault(*accountsPath, *strategy, nil)
+	strategyExplicit := false
+	fs.Visit(func(f *flag.Flag) {
+		if f.Name == "strategy" {
+			strategyExplicit = true
+		}
+	})
+	effectiveStrategy := *strategy
+	if !strategyExplicit && os.Getenv("ACCOUNT_STRATEGY") == "" && cfg.AccountSelection.Strategy != "" {
+		effectiveStrategy = cfg.AccountSelection.Strategy
+	}
+
+	accountManager, err := accounts.NewDefault(*accountsPath, effectiveStrategy, nil)
 	if err != nil {
 		slogger.Error("load account pool", "error", err)
 		os.Exit(2)
 	}
+	accountManager.SetSelectionConfig(cfg.AccountSelection, cfg.GlobalQuotaThreshold)
+
+	var backoffs []time.Duration
+	if len(cfg.CapacityBackoffTiersMs) > 0 {
+		backoffs = make([]time.Duration, len(cfg.CapacityBackoffTiersMs))
+		for i, ms := range cfg.CapacityBackoffTiersMs {
+			backoffs[i] = time.Duration(ms) * time.Millisecond
+		}
+	}
+	var maxWait time.Duration
+	if cfg.MaxWaitBeforeErrorMs > 0 {
+		maxWait = time.Duration(cfg.MaxWaitBeforeErrorMs) * time.Millisecond
+	}
+	var switchDelay time.Duration
+	if cfg.SwitchAccountDelayMs > 0 {
+		switchDelay = time.Duration(cfg.SwitchAccountDelayMs) * time.Millisecond
+	}
+	var requestDelay time.Duration
+	if cfg.RequestDelayMs > 0 {
+		requestDelay = time.Duration(cfg.RequestDelayMs) * time.Millisecond
+	}
 
 	builder := proxyformat.NewBuilder()
 	dispatcher, err := accounts.NewDispatcher(accounts.DispatcherOptions{
-		Manager:   accountManager,
-		Resolver:  accounts.NewCredentialResolver(auth.Manager{}, nil),
-		Builder:   builder,
-		ProjectID: *projectID,
+		Manager:                  accountManager,
+		Resolver:                 accounts.NewCredentialResolver(auth.Manager{}, nil),
+		Builder:                  builder,
+		ProjectID:                *projectID,
+		MaxRetries:               cfg.MaxRetries,
+		MaxWait:                  maxWait,
+		CapacityBackoffs:         backoffs,
+		MaxCapacityRetries:       cfg.MaxCapacityRetries,
+		SwitchDelay:              switchDelay,
+		RequestThrottlingEnabled: cfg.RequestThrottlingEnabled,
+		RequestDelay:             requestDelay,
 		NewClient: func(accessToken string) accounts.CloudClient {
 			return cloudcode.New(cloudcode.Options{AccessToken: accessToken, Timeout: *upstreamTimeout})
 		},

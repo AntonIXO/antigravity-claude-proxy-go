@@ -11,6 +11,7 @@ document.addEventListener('alpine:init', () => {
         accounts: [],
         models: [], // Source of truth
         modelConfig: {}, // Model metadata (hidden, pinned, alias)
+        customEndpoints: {}, // Transparent forwarding custom endpoints
         quotaRows: [], // Filtered view
         usageHistory: {}, // Usage statistics history (from /account-limits?includeHistory=true)
         globalQuotaThreshold: 0, // Global minimum quota threshold (fraction 0-0.99)
@@ -80,6 +81,7 @@ document.addEventListener('alpine:init', () => {
                         this.accounts = data.accounts;
                         this.models = data.models;
                         this.modelConfig = data.modelConfig || {};
+                        this.customEndpoints = data.customEndpoints || {};
                         this.usageHistory = data.usageHistory || {};
 
                         // Don't show loading on initial load if we have cache
@@ -99,6 +101,7 @@ document.addEventListener('alpine:init', () => {
                     accounts: this.accounts,
                     models: this.models,
                     modelConfig: this.modelConfig,
+                    customEndpoints: this.customEndpoints,
                     usageHistory: this.usageHistory,
                     timestamp: Date.now()
                 };
@@ -131,6 +134,7 @@ document.addEventListener('alpine:init', () => {
                     this.models = data.models;
                 }
                 this.modelConfig = data.modelConfig || {};
+                this.customEndpoints = data.customEndpoints || {};
                 this.globalQuotaThreshold = data.globalQuotaThreshold || 0;
 
                 // Store usage history if included (for dashboard)
@@ -387,6 +391,8 @@ document.addEventListener('alpine:init', () => {
         },
 
         getModelFamily(modelId) {
+            if (!modelId) return 'other';
+            if (this.customEndpoints && this.customEndpoints[modelId]) return 'forwarded';
             const lower = modelId.toLowerCase();
             if (lower.includes('claude')) return 'claude';
             if (lower.includes('gemini')) return 'gemini';

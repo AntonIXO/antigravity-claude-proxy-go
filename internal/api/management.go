@@ -184,12 +184,14 @@ func (server *Server) handleAccountLimits(writer http.ResponseWriter, request *h
 		if modelMapping == nil {
 			modelMapping = make(map[string]any)
 		}
+		publicCfg := config.GetPublicConfig()
 		res := map[string]any{
 			"status":               "ok",
 			"timestamp":            server.now().UTC().Format(time.RFC3339Nano),
 			"totalAccounts":        0,
 			"models":               []string{},
 			"modelConfig":          modelMapping,
+			"customEndpoints":      publicCfg["customEndpoints"],
 			"globalQuotaThreshold": cfg.GlobalQuotaThreshold,
 			"accounts":             []any{},
 		}
@@ -327,12 +329,14 @@ func (server *Server) handleAccountLimits(writer http.ResponseWriter, request *h
 		modelMapping = make(map[string]any)
 	}
 
+	publicCfg := config.GetPublicConfig()
 	res := map[string]any{
 		"status":               "ok",
 		"timestamp":            server.now().UTC().Format(time.RFC3339Nano),
 		"totalAccounts":        len(accountsList),
 		"models":               sortedModels,
 		"modelConfig":          modelMapping,
+		"customEndpoints":      publicCfg["customEndpoints"],
 		"globalQuotaThreshold": cfg.GlobalQuotaThreshold,
 		"accounts":             result,
 	}
@@ -632,8 +636,11 @@ func (server *Server) handleConfigSave(writer http.ResponseWriter, request *http
 		return
 	}
 
-	if server.accountManager != nil && updated.AccountSelection.Strategy != "" {
-		server.accountManager.SetStrategy(updated.AccountSelection.Strategy)
+	if server.accountManager != nil {
+		server.accountManager.SetSelectionConfig(updated.AccountSelection, updated.GlobalQuotaThreshold)
+	}
+	if updater, ok := server.backend.(ConfigUpdater); ok {
+		updater.UpdateConfig(updated)
 	}
 
 	writeJSON(writer, http.StatusOK, map[string]any{
@@ -880,6 +887,17 @@ func (server *Server) handleModelsConfigPost(writer http.ResponseWriter, request
 	if cfg.ModelMapping == nil {
 		cfg.ModelMapping = make(map[string]any)
 	}
+
+	if del, ok := body.Config["delete"].(bool); ok && del {
+		delete(cfg.ModelMapping, body.ModelID)
+		if _, err := config.Save(map[string]any{"modelMapping": cfg.ModelMapping}); err != nil {
+			writeJSON(writer, http.StatusInternalServerError, map[string]any{"status": "error", "error": "Failed to save configuration"})
+			return
+		}
+		writeJSON(writer, http.StatusOK, map[string]any{"status": "ok", "deleted": true, "modelId": body.ModelID})
+		return
+	}
+
 	existing, _ := cfg.ModelMapping[body.ModelID].(map[string]any)
 	if existing == nil {
 		existing = make(map[string]any)

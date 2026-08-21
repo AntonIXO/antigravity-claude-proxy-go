@@ -395,3 +395,99 @@ func TestManagement_StatsHistory(t *testing.T) {
 		}
 	})
 }
+
+func TestManagement_CustomEndpointsAndModelMapping(t *testing.T) {
+	server, _, _ := newTestServerWithManager(t)
+	handler := server.Handler()
+
+	t.Run("POST /api/config with customEndpoints", func(t *testing.T) {
+		payload := `{"customEndpoints":{"claude-3-opus-20240229":{"url":"https://api.anthropic.com","apiKey":"secret-key"}}}`
+		req := httptest.NewRequest(http.MethodPost, "/api/config", strings.NewReader(payload))
+		req.Header.Set("Content-Type", "application/json")
+		rec := httptest.NewRecorder()
+		handler.ServeHTTP(rec, req)
+
+		if rec.Code != http.StatusOK {
+			t.Fatalf("expected 200, got %d: %s", rec.Code, rec.Body.String())
+		}
+	})
+
+	t.Run("GET /account-limits includes customEndpoints", func(t *testing.T) {
+		req := httptest.NewRequest(http.MethodGet, "/account-limits", nil)
+		rec := httptest.NewRecorder()
+		handler.ServeHTTP(rec, req)
+
+		if rec.Code != http.StatusOK {
+			t.Fatalf("expected 200, got %d", rec.Code)
+		}
+		var res map[string]any
+		if err := json.Unmarshal(rec.Body.Bytes(), &res); err != nil {
+			t.Fatal(err)
+		}
+		ce, ok := res["customEndpoints"].(map[string]any)
+		if !ok {
+			t.Fatalf("expected customEndpoints in /account-limits response, got %v", res["customEndpoints"])
+		}
+		opusEp, exists := ce["claude-3-opus-20240229"].(map[string]any)
+		if !exists {
+			t.Fatalf("expected claude-3-opus-20240229 in customEndpoints, got %v", ce)
+		}
+		if opusEp["hasApiKey"] != true {
+			t.Errorf("expected hasApiKey: true, got %v", opusEp["hasApiKey"])
+		}
+		if _, hasRawKey := opusEp["apiKey"]; hasRawKey {
+			t.Errorf("apiKey secret should not be exposed in /account-limits")
+		}
+	})
+
+	t.Run("POST /api/models/config and delete", func(t *testing.T) {
+		// Add model alias
+		payload := `{"modelId":"claude-opus-4-6","config":{"mapping":"claude-3-opus-20240229"}}`
+		req := httptest.NewRequest(http.MethodPost, "/api/models/config", strings.NewReader(payload))
+		req.Header.Set("Content-Type", "application/json")
+		rec := httptest.NewRecorder()
+		handler.ServeHTTP(rec, req)
+
+		if rec.Code != http.StatusOK {
+			t.Fatalf("expected 200, got %d: %s", rec.Code, rec.Body.String())
+		}
+
+		// Delete model alias
+		delPayload := `{"modelId":"claude-opus-4-6","config":{"delete":true}}`
+		delReq := httptest.NewRequest(http.MethodPost, "/api/models/config", strings.NewReader(delPayload))
+		delReq.Header.Set("Content-Type", "application/json")
+		delRec := httptest.NewRecorder()
+		handler.ServeHTTP(delRec, delReq)
+
+		if delRec.Code != http.StatusOK {
+			t.Fatalf("expected 200, got %d: %s", delRec.Code, delRec.Body.String())
+		}
+		var delRes map[string]any
+		if err := json.Unmarshal(delRec.Body.Bytes(), &delRes); err != nil {
+			t.Fatal(err)
+		}
+		if delRes["deleted"] != true {
+			t.Errorf("expected deleted: true, got %v", delRes)
+		}
+	})
+
+	t.Run("POST /api/config updates account selection config and global threshold", func(t *testing.T) {
+		payload := `{"accountSelection":{"strategy":"round-robin","weights":{"health":10}},"globalQuotaThreshold":0.15}`
+		req := httptest.NewRequest(http.MethodPost, "/api/config", strings.NewReader(payload))
+		req.Header.Set("Content-Type", "application/json")
+		rec := httptest.NewRecorder()
+		handler.ServeHTTP(rec, req)
+
+		if rec.Code != http.StatusOK {
+			t.Fatalf("expected 200, got %d: %s", rec.Code, rec.Body.String())
+		}
+
+		selCfg := server.accountManager.GetSelectionConfig()
+		if selCfg.Strategy != "round-robin" {
+			t.Errorf("expected strategy round-robin, got %q", selCfg.Strategy)
+		}
+		if server.accountManager.GlobalQuotaThreshold() != 0.15 {
+			t.Errorf("expected globalQuotaThreshold 0.15, got %v", server.accountManager.GlobalQuotaThreshold())
+		}
+	})
+}

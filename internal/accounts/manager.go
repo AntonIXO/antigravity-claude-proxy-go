@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"antigravity-go-proxy/internal/auth"
+	"antigravity-go-proxy/internal/config"
 )
 
 const (
@@ -116,11 +117,7 @@ type File struct {
 }
 
 func DefaultConfigPath() (string, error) {
-	home, err := os.UserHomeDir()
-	if err != nil {
-		return "", err
-	}
-	return filepath.Join(home, ".config", "antigravity-proxy", "accounts.json"), nil
+	return filepath.Join(config.GetConfigDir(), "accounts.json"), nil
 }
 
 // Load reads the account-pool configuration without ever opening it for
@@ -189,12 +186,14 @@ func Load(path string) (File, error) {
 }
 
 type Options struct {
-	Accounts    []*Account
-	ActiveIndex int
-	Strategy    string
-	ConfigPath  string
-	Settings    map[string]any
-	Now         func() time.Time
+	Accounts             []*Account
+	ActiveIndex          int
+	Strategy             string
+	ConfigPath           string
+	Settings             map[string]any
+	SelectionConfig      config.AccountSelectionConfig
+	GlobalQuotaThreshold float64
+	Now                  func() time.Time
 }
 
 type Selection struct {
@@ -213,17 +212,44 @@ type tokenBucket struct {
 }
 
 type Manager struct {
-	mu           sync.RWMutex
-	configPath   string
-	accounts     []*Account
-	settings     map[string]any
-	strategy     string
-	currentIndex int
-	cursor       int
-	now          func() time.Time
-	health       map[string]healthRecord
-	buckets      map[string]tokenBucket
-	projects     map[string]string
+	mu                   sync.RWMutex
+	configPath           string
+	accounts             []*Account
+	settings             map[string]any
+	strategy             string
+	selectionConfig      config.AccountSelectionConfig
+	globalQuotaThreshold float64
+	currentIndex         int
+	cursor               int
+	now                  func() time.Time
+	health               map[string]healthRecord
+	buckets              map[string]tokenBucket
+	projects             map[string]string
+}
+
+func mapFloat(m map[string]any, key string, fallback float64) float64 {
+	if m == nil {
+		return fallback
+	}
+	v, ok := m[key]
+	if !ok || v == nil {
+		return fallback
+	}
+	switch n := v.(type) {
+	case float64:
+		return n
+	case float32:
+		return float64(n)
+	case int:
+		return float64(n)
+	case int64:
+		return float64(n)
+	case json.Number:
+		if f, err := n.Float64(); err == nil {
+			return f
+		}
+	}
+	return fallback
 }
 
 func New(options Options) (*Manager, error) {
@@ -254,11 +280,26 @@ func New(options Options) (*Manager, error) {
 	if options.ActiveIndex < 0 || options.ActiveIndex >= len(options.Accounts) {
 		options.ActiveIndex = 0
 	}
+	selectionConfig := options.SelectionConfig
+	if selectionConfig.Strategy == "" {
+		selectionConfig = config.Get().AccountSelection
+	}
+	globalQuotaThreshold := options.GlobalQuotaThreshold
+	if globalQuotaThreshold <= 0 {
+		globalQuotaThreshold = config.Get().GlobalQuotaThreshold
+	}
 	return &Manager{
-		configPath: options.ConfigPath, accounts: options.Accounts, settings: options.Settings,
-		strategy: strategy, currentIndex: options.ActiveIndex,
-		now: options.Now, health: make(map[string]healthRecord),
-		buckets: make(map[string]tokenBucket), projects: make(map[string]string),
+		configPath:           options.ConfigPath,
+		accounts:             options.Accounts,
+		settings:             options.Settings,
+		strategy:             strategy,
+		selectionConfig:      selectionConfig,
+		globalQuotaThreshold: globalQuotaThreshold,
+		currentIndex:         options.ActiveIndex,
+		now:                  options.Now,
+		health:               make(map[string]healthRecord),
+		buckets:              make(map[string]tokenBucket),
+		projects:             make(map[string]string),
 	}, nil
 }
 
@@ -294,9 +335,10 @@ func NewDefault(path, strategy string, now func() time.Time) (*Manager, error) {
 		return nil, fmt.Errorf("no account configuration and no agy login token at %q: %w", tokenPath, err)
 	}
 	return New(Options{
-		Accounts: []*Account{{Email: "agy", Source: "agy", Enabled: true, AgyTokenPath: tokenPath}},
-		Strategy: strategy,
-		Now:      now,
+		Accounts:   []*Account{{Email: "agy", Source: "agy", Enabled: true, AgyTokenPath: tokenPath}},
+		ConfigPath: configPath,
+		Strategy:   strategy,
+		Now:        now,
 	})
 }
 
@@ -650,8 +692,9 @@ func (manager *Manager) selectHybridLocked(model string) Selection {
 		score   float64
 	}
 	candidates := make([]candidate, 0)
+	minUsable := mapFloat(manager.selectionConfig.HealthScore, "minUsable", 50)
 	for index, account := range manager.accounts {
-		if !manager.usableLocked(account, model) || manager.healthScoreLocked(account.Email) < 50 || manager.tokensLocked(account.Email) < 1 {
+		if !manager.usableLocked(account, model) || manager.healthScoreLocked(account.Email) < minUsable || manager.tokensLocked(account.Email) < 1 {
 			continue
 		}
 		if manager.quotaCriticalLocked(account, model) {
@@ -708,35 +751,77 @@ func (manager *Manager) clearExpiredLocked() {
 
 func (manager *Manager) healthScoreLocked(email string) float64 {
 	record, exists := manager.health[email]
+	hs := manager.selectionConfig.HealthScore
+	initial := mapFloat(hs, "initial", 70)
+	recovery := mapFloat(hs, "recoveryPerHour", 10)
+	maxScore := mapFloat(hs, "maxScore", 100)
 	if !exists {
-		return 70
+		return initial
 	}
 	hours := manager.now().Sub(record.LastUpdated).Hours()
-	return min(100, record.Score+hours*10)
+	return min(maxScore, record.Score+hours*recovery)
 }
 
 func (manager *Manager) recordSuccessLocked(email string) {
-	manager.health[email] = healthRecord{Score: min(100, manager.healthScoreLocked(email)+1), LastUpdated: manager.now()}
+	hs := manager.selectionConfig.HealthScore
+	reward := mapFloat(hs, "successReward", 1)
+	maxScore := mapFloat(hs, "maxScore", 100)
+	manager.health[email] = healthRecord{
+		Score:       min(maxScore, manager.healthScoreLocked(email)+reward),
+		LastUpdated: manager.now(),
+	}
 }
 
 func (manager *Manager) recordRateLimitLocked(email string) {
-	manager.health[email] = healthRecord{Score: max(0, manager.healthScoreLocked(email)-10), LastUpdated: manager.now()}
+	hs := manager.selectionConfig.HealthScore
+	penalty := mapFloat(hs, "rateLimitPenalty", -10)
+	var newScore float64
+	if penalty < 0 {
+		newScore = manager.healthScoreLocked(email) + penalty
+	} else {
+		newScore = manager.healthScoreLocked(email) - penalty
+	}
+	manager.health[email] = healthRecord{
+		Score:       max(0, newScore),
+		LastUpdated: manager.now(),
+	}
 }
 
 func (manager *Manager) recordFailureLocked(email string) {
-	manager.health[email] = healthRecord{Score: max(0, manager.healthScoreLocked(email)-20), LastUpdated: manager.now()}
+	hs := manager.selectionConfig.HealthScore
+	penalty := mapFloat(hs, "failurePenalty", -20)
+	var newScore float64
+	if penalty < 0 {
+		newScore = manager.healthScoreLocked(email) + penalty
+	} else {
+		newScore = manager.healthScoreLocked(email) - penalty
+	}
+	manager.health[email] = healthRecord{
+		Score:       max(0, newScore),
+		LastUpdated: manager.now(),
+	}
 }
 
 func (manager *Manager) tokensLocked(email string) float64 {
+	tb := manager.selectionConfig.TokenBucket
+	maxTokens := mapFloat(tb, "maxTokens", 50)
+	if maxTokens <= 0 {
+		maxTokens = 50
+	}
+	rate := mapFloat(tb, "tokensPerMinute", 6)
+	initial := mapFloat(tb, "initialTokens", maxTokens)
 	bucket, exists := manager.buckets[email]
 	if !exists {
-		return 50
+		return initial
 	}
-	return min(50, bucket.Tokens+manager.now().Sub(bucket.LastUpdated).Minutes()*6)
+	return min(maxTokens, bucket.Tokens+manager.now().Sub(bucket.LastUpdated).Minutes()*rate)
 }
 
 func (manager *Manager) consumeTokenLocked(email string) {
-	manager.buckets[email] = tokenBucket{Tokens: max(0, manager.tokensLocked(email)-1), LastUpdated: manager.now()}
+	manager.buckets[email] = tokenBucket{
+		Tokens:      max(0, manager.tokensLocked(email)-1),
+		LastUpdated: manager.now(),
+	}
 }
 
 func (manager *Manager) quotaCriticalLocked(account *Account, model string) bool {
@@ -745,6 +830,11 @@ func (manager *Manager) quotaCriticalLocked(account *Account, model string) bool
 		return false
 	}
 	threshold := 0.05
+	if manager.globalQuotaThreshold > 0 {
+		threshold = manager.globalQuotaThreshold
+	} else if qCfg := manager.selectionConfig.Quota; qCfg != nil {
+		threshold = mapFloat(qCfg, "criticalThreshold", 0.05)
+	}
 	if value, exists := account.ModelThreshold[model]; exists && value > 0 {
 		threshold = value
 	} else if account.QuotaThreshold != nil && *account.QuotaThreshold > 0 {
@@ -754,8 +844,20 @@ func (manager *Manager) quotaCriticalLocked(account *Account, model string) bool
 }
 
 func (manager *Manager) scoreLocked(account *Account, model string) float64 {
-	health := manager.healthScoreLocked(account.Email) * 2
-	tokens := manager.tokensLocked(account.Email) / 50 * 100 * 5
+	w := manager.selectionConfig.Weights
+	wHealth := mapFloat(w, "health", 2)
+	wTokens := mapFloat(w, "tokens", 5)
+	wQuota := mapFloat(w, "quota", 3)
+	wLru := mapFloat(w, "lru", 0.1)
+
+	tb := manager.selectionConfig.TokenBucket
+	maxTokens := mapFloat(tb, "maxTokens", 50)
+	if maxTokens <= 0 {
+		maxTokens = 50
+	}
+
+	health := manager.healthScoreLocked(account.Email) * wHealth
+	tokens := manager.tokensLocked(account.Email) / maxTokens * 100 * wTokens
 	quotaScore := 50.0
 	if quota, exists := account.Quota.Models[model]; exists && quota.RemainingFraction != nil {
 		quotaScore = *quota.RemainingFraction * 100
@@ -763,8 +865,8 @@ func (manager *Manager) scoreLocked(account *Account, model string) float64 {
 			quotaScore *= .9
 		}
 	}
-	lru := min(float64(time.Hour.Milliseconds()), float64(manager.now().UnixMilli()-account.LastUsedMS)) / 1000 * .1
-	return health + tokens + quotaScore*3 + lru
+	lru := min(float64(time.Hour.Milliseconds()), float64(manager.now().UnixMilli()-account.LastUsedMS)) / 1000 * wLru
+	return health + tokens + quotaScore*wQuota + lru
 }
 
 func normalizeStrategy(strategy string) string {
@@ -969,6 +1071,29 @@ func (manager *Manager) SetStrategy(strategy string) {
 	manager.mu.Lock()
 	defer manager.mu.Unlock()
 	manager.strategy = normalizeStrategy(strategy)
+	manager.selectionConfig.Strategy = manager.strategy
+}
+
+func (manager *Manager) SetSelectionConfig(cfg config.AccountSelectionConfig, globalThreshold float64) {
+	manager.mu.Lock()
+	defer manager.mu.Unlock()
+	manager.selectionConfig = cfg
+	manager.globalQuotaThreshold = globalThreshold
+	if cfg.Strategy != "" {
+		manager.strategy = normalizeStrategy(cfg.Strategy)
+	}
+}
+
+func (manager *Manager) GetSelectionConfig() config.AccountSelectionConfig {
+	manager.mu.RLock()
+	defer manager.mu.RUnlock()
+	return manager.selectionConfig
+}
+
+func (manager *Manager) GlobalQuotaThreshold() float64 {
+	manager.mu.RLock()
+	defer manager.mu.RUnlock()
+	return manager.globalQuotaThreshold
 }
 
 func (manager *Manager) ActiveIndex() int {
