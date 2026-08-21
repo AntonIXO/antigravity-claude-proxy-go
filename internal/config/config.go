@@ -93,8 +93,14 @@ func DefaultConfig() Config {
 	}
 }
 
-// GetConfigDir returns path to ~/.config/antigravity-proxy directory.
+// GetConfigDir returns path to ~/.config/antigravity-proxy directory or custom ANTIGRAVITY_CONFIG_DIR.
 func GetConfigDir() string {
+	if custom := os.Getenv("ANTIGRAVITY_CONFIG_DIR"); custom != "" {
+		return custom
+	}
+	if custom := os.Getenv("CONFIG_DIR"); custom != "" {
+		return custom
+	}
 	home, err := os.UserHomeDir()
 	if err != nil {
 		return filepath.Join(".", ".config", "antigravity-proxy")

@@ -172,3 +172,17 @@ func TestCustomEndpointsConfig(t *testing.T) {
 		t.Errorf("expected secret APIKey secret-key-123 to be preserved when saving public config, got %s", ep2.APIKey)
 	}
 }
+
+func TestGetConfigDirEnvOverrides(t *testing.T) {
+	customDir := t.TempDir()
+	t.Setenv("ANTIGRAVITY_CONFIG_DIR", customDir)
+	if got := GetConfigDir(); got != customDir {
+		t.Errorf("expected %s, got %s", customDir, got)
+	}
+
+	t.Setenv("ANTIGRAVITY_CONFIG_DIR", "")
+	t.Setenv("CONFIG_DIR", customDir)
+	if got := GetConfigDir(); got != customDir {
+		t.Errorf("expected %s from CONFIG_DIR, got %s", customDir, got)
+	}
+}

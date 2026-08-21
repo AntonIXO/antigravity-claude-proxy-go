@@ -33,8 +33,19 @@ window.Components.modelDropdown = (field, labelKey, accentColor) => ({
         return this.config?.env?.[this.field] || '';
     },
 
+    get allAvailableModels() {
+        const modelSet = new Set(this.$store.data.models || []);
+        if (this.$store.data.customEndpoints) {
+            Object.keys(this.$store.data.customEndpoints).forEach(m => modelSet.add(m));
+        }
+        if (this.$store.data.modelConfig) {
+            Object.keys(this.$store.data.modelConfig).forEach(m => modelSet.add(m));
+        }
+        return Array.from(modelSet);
+    },
+
     get filteredModels() {
-        const models = this.$store.data.models || [];
+        const models = this.allAvailableModels;
         if (!this.searchTerm) return models;
         const term = this.searchTerm.toLowerCase();
         return models.filter(m => m.toLowerCase().includes(term));
@@ -42,13 +53,14 @@ window.Components.modelDropdown = (field, labelKey, accentColor) => ({
 
     get groupedModels() {
         const groups = [
-            { family: 'claude', label: this.$store.global.t('familyClaude'), items: [] },
-            { family: 'gemini', label: this.$store.global.t('familyGemini'), items: [] },
-            { family: 'other', label: this.$store.global.t('familyOther'), items: [] }
+            { family: 'forwarded', label: this.$store.global.t('familyForwarded') || 'Forwarded / Custom', items: [] },
+            { family: 'claude', label: this.$store.global.t('familyClaude') || 'Claude', items: [] },
+            { family: 'gemini', label: this.$store.global.t('familyGemini') || 'Gemini', items: [] },
+            { family: 'other', label: this.$store.global.t('familyOther') || 'Other', items: [] }
         ];
         for (const modelId of this.filteredModels) {
             const fam = this.$store.data.getModelFamily(modelId);
-            const group = groups.find(g => g.family === fam) || groups[2];
+            const group = groups.find(g => g.family === fam) || groups[3];
             group.items.push(modelId);
         }
         return groups.filter(g => g.items.length > 0);

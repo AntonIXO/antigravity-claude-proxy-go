@@ -18,6 +18,8 @@ NoNewPrivileges=true
 PrivateTmp=true
 ProtectSystem=strict
 ProtectHome=read-only
+ReadWritePaths=%h/.config/antigravity-proxy
+ConfigurationDirectory=antigravity-proxy
 
 [Install]
 WantedBy=multi-user.target
