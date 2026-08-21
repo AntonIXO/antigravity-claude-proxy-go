@@ -170,7 +170,38 @@ func Save(updates map[string]any) (Config, error) {
 
 	// Merge updates
 	for k, v := range updates {
-		if k == "modelMapping" || k == "customEndpoints" {
+		if k == "customEndpoints" {
+			if vMap, ok := v.(map[string]any); ok {
+				existingEndpoints, _ := currentMap["customEndpoints"].(map[string]any)
+				mergedEndpoints := make(map[string]any)
+				for model, epVal := range vMap {
+					if epMap, ok := epVal.(map[string]any); ok {
+						epCopy := make(map[string]any)
+						for ek, ev := range epMap {
+							epCopy[ek] = ev
+						}
+						hasApiKey, _ := epCopy["hasApiKey"].(bool)
+						apiKey, _ := epCopy["apiKey"].(string)
+						if hasApiKey && apiKey == "" && existingEndpoints != nil {
+							if existingEp, ok := existingEndpoints[model].(map[string]any); ok {
+								if existingKey, ok := existingEp["apiKey"].(string); ok && existingKey != "" {
+									epCopy["apiKey"] = existingKey
+								}
+							}
+						}
+						delete(epCopy, "hasApiKey")
+						mergedEndpoints[model] = epCopy
+					} else {
+						mergedEndpoints[model] = epVal
+					}
+				}
+				currentMap[k] = mergedEndpoints
+			} else {
+				currentMap[k] = v
+			}
+			continue
+		}
+		if k == "modelMapping" {
 			currentMap[k] = v
 			continue
 		}

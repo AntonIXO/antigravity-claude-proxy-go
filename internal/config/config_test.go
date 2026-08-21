@@ -158,4 +158,17 @@ func TestCustomEndpointsConfig(t *testing.T) {
 	if opusMap["url"] != "http://localhost:8080/mock" {
 		t.Errorf("expected url preserved in public config")
 	}
+
+	// Verify saving redacted public config back (as Web UI does) preserves secret API key
+	saved2, err := Save(pub)
+	if err != nil {
+		t.Fatalf("Save error on public config: %v", err)
+	}
+	ep2, ok := saved2.CustomEndpoints["claude-3-opus-20240229"]
+	if !ok {
+		t.Fatalf("expected custom endpoint to remain after public config save")
+	}
+	if ep2.APIKey != "secret-key-123" {
+		t.Errorf("expected secret APIKey secret-key-123 to be preserved when saving public config, got %s", ep2.APIKey)
+	}
 }
