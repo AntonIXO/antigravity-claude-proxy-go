@@ -166,7 +166,19 @@ func convertAnthropicToGoogle(request map[string]any, cache *SignatureCache, opt
 		isDisabled = true
 	}
 
-	if isDisabled {
+	thinkingLevel := ""
+	if options != nil {
+		thinkingLevel = options.ThinkingLevel
+	}
+	if thinkingLevel != "" {
+		if isDisabled {
+			thinkingLevel = "LOW"
+		}
+		generation["thinkingConfig"] = map[string]any{
+			"includeThoughts": true,
+			"thinkingLevel":   thinkingLevel,
+		}
+	} else if isDisabled {
 		delete(generation, "thinkingConfig")
 	} else if isThinking && family == FamilyClaude {
 		if defaultThinkingBudget <= 0 {

@@ -358,6 +358,37 @@ func TestConvertAnthropicToGoogleAudioSupport(t *testing.T) {
 	}
 }
 
+func TestGemini37ThinkingLevelOmitsBudget(t *testing.T) {
+	t.Parallel()
+	request := map[string]any{
+		"model": "gemini-3.7-flash-high", "max_tokens": float64(1024),
+		"messages": []any{map[string]any{"role": "user", "content": "ping"}},
+	}
+	converted := ConvertAnthropicToGoogleWithModel(request, NewSignatureCache(), ModelOptions{
+		SupportsThinking: true, ThinkingBudget: -1, ThinkingLevel: "HIGH", MaxOutputTokens: 65536,
+	})
+	thinking := asMap(asMap(converted["generationConfig"])["thinkingConfig"])
+	if thinking["thinkingLevel"] != "HIGH" || thinking["includeThoughts"] != true {
+		t.Fatalf("thinkingConfig=%#v", thinking)
+	}
+	if _, hasBudget := thinking["thinkingBudget"]; hasBudget {
+		t.Fatalf("3.7 thinkingConfig must not include thinkingBudget: %#v", thinking)
+	}
+
+	disabledReq := map[string]any{
+		"model": "gemini-3.7-flash-high", "max_tokens": float64(1024),
+		"thinking": map[string]any{"type": "disabled"},
+		"messages": []any{map[string]any{"role": "user", "content": "ping"}},
+	}
+	disabled := ConvertAnthropicToGoogleWithModel(disabledReq, NewSignatureCache(), ModelOptions{
+		SupportsThinking: true, ThinkingLevel: "HIGH",
+	})
+	got := asMap(asMap(disabled["generationConfig"])["thinkingConfig"])
+	if got["thinkingLevel"] != "LOW" {
+		t.Fatalf("disabled 3.7 should emit thinkingLevel LOW, got %#v", got)
+	}
+}
+
 func readObjectFixture(t *testing.T, path string) map[string]any {
 	t.Helper()
 	contents, err := os.ReadFile(path)

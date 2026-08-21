@@ -73,13 +73,17 @@ func ClassifyError(body string, status int) ErrorReason {
 		return ReasonServer
 	}
 	lower := strings.ToLower(body)
-	if containsAny(lower, "quota_exhausted", "quotaresetdelay", "quotaresettimestamp", "resource_exhausted", "daily limit", "quota exceeded") {
+	// Bare RESOURCE_EXHAUSTED / "check quota" is Google's RPM/capacity 429.
+	// Daily quota actually carries quotaResetDelay / daily-limit language.
+	// Treating the bare status as quota invented 5–120 minute locks while agy
+	// still showed remainingFraction ≈ 1.
+	if containsAny(lower, "quotaresetdelay", "quotaresettimestamp", "daily limit", "quota exceeded", "quota_exhausted") {
 		return ReasonQuota
 	}
 	if IsCapacityExhausted(body) {
 		return ReasonCapacity
 	}
-	if containsAny(lower, "rate_limit_exceeded", "rate limit", "too many requests", "throttl") {
+	if status == http.StatusTooManyRequests || containsAny(lower, "rate_limit_exceeded", "rate limit", "too many requests", "throttl", "resource_exhausted") {
 		return ReasonRateLimit
 	}
 	if containsAny(lower, "internal server error", "server error", "503", "502", "504") {
