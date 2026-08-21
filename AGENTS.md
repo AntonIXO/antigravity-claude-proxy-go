@@ -51,3 +51,18 @@ The non-negotiable requirement is **packet-verified JA4 match**. Never
 fabricate the proto schema — if it can't be recovered from the binary, stop and
 report rather than inventing one (a wrong schema fails silently, looks like a
 ban).
+
+## Agent skills
+
+### Issue tracker
+
+GitHub issues via `gh` CLI. See `docs/agents/issue-tracker.md`.
+
+### Triage labels
+
+Default five-role triage labels. See `docs/agents/triage-labels.md`.
+
+### Domain docs
+
+Single-context layout (`CONTEXT.md` + `docs/adr/`). See `docs/agents/domain.md`.
+
