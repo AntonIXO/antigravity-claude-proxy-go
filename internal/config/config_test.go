@@ -110,3 +110,65 @@ func TestClaudeConfigOperations(t *testing.T) {
 		t.Errorf("expected CUSTOM_VAR to be preserved")
 	}
 }
+
+func TestCustomEndpointsConfig(t *testing.T) {
+	tmpDir := t.TempDir()
+	t.Setenv("HOME", tmpDir)
+
+	updates := map[string]any{
+		"customEndpoints": map[string]any{
+			"claude-3-opus-20240229": map[string]any{
+				"url":    "http://localhost:8080/mock",
+				"apiKey": "secret-key-123",
+			},
+		},
+	}
+
+	saved, err := Save(updates)
+	if err != nil {
+		t.Fatalf("Save error: %v", err)
+	}
+
+	ep, ok := saved.CustomEndpoints["claude-3-opus-20240229"]
+	if !ok {
+		t.Fatalf("expected custom endpoint for claude-3-opus-20240229")
+	}
+	if ep.URL != "http://localhost:8080/mock" {
+		t.Errorf("expected URL http://localhost:8080/mock, got %s", ep.URL)
+	}
+	if ep.APIKey != "secret-key-123" {
+		t.Errorf("expected APIKey secret-key-123, got %s", ep.APIKey)
+	}
+
+	pub := GetPublicConfig()
+	ceMap, ok := pub["customEndpoints"].(map[string]any)
+	if !ok {
+		t.Fatalf("expected customEndpoints map in GetPublicConfig")
+	}
+	opusMap, ok := ceMap["claude-3-opus-20240229"].(map[string]any)
+	if !ok {
+		t.Fatalf("expected opus map in public config")
+	}
+	if _, exists := opusMap["apiKey"]; exists {
+		t.Errorf("apiKey secret should be redacted from public config")
+	}
+	if opusMap["hasApiKey"] != true {
+		t.Errorf("expected hasApiKey = true in public config")
+	}
+	if opusMap["url"] != "http://localhost:8080/mock" {
+		t.Errorf("expected url preserved in public config")
+	}
+
+	// Verify saving redacted public config back (as Web UI does) preserves secret API key
+	saved2, err := Save(pub)
+	if err != nil {
+		t.Fatalf("Save error on public config: %v", err)
+	}
+	ep2, ok := saved2.CustomEndpoints["claude-3-opus-20240229"]
+	if !ok {
+		t.Fatalf("expected custom endpoint to remain after public config save")
+	}
+	if ep2.APIKey != "secret-key-123" {
+		t.Errorf("expected secret APIKey secret-key-123 to be preserved when saving public config, got %s", ep2.APIKey)
+	}
+}

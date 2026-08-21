@@ -9,6 +9,11 @@ import (
 	"sync"
 )
 
+type EndpointConfig struct {
+	URL    string `json:"url"`
+	APIKey string `json:"apiKey,omitempty"`
+}
+
 type AccountSelectionConfig struct {
 	Strategy    string         `json:"strategy,omitempty"`
 	HealthScore map[string]any `json:"healthScore,omitempty"`
@@ -39,6 +44,7 @@ type Config struct {
 	MaxCapacityRetries       int                    `json:"maxCapacityRetries,omitempty"`
 	SwitchAccountDelayMs     int                    `json:"switchAccountDelayMs,omitempty"`
 	CapacityBackoffTiersMs   []int                  `json:"capacityBackoffTiersMs,omitempty"`
+	CustomEndpoints          map[string]EndpointConfig `json:"customEndpoints,omitempty"`
 	ModelMapping             map[string]any         `json:"modelMapping,omitempty"`
 	AccountSelection         AccountSelectionConfig `json:"accountSelection,omitempty"`
 }
@@ -66,6 +72,7 @@ func DefaultConfig() Config {
 		MaxCapacityRetries:     5,
 		SwitchAccountDelayMs:   5000,
 		CapacityBackoffTiersMs: []int{5000, 10000, 20000, 30000, 60000},
+		CustomEndpoints:        make(map[string]EndpointConfig),
 		ModelMapping:           make(map[string]any),
 		AccountSelection: AccountSelectionConfig{
 			Strategy: "hybrid",
@@ -163,6 +170,37 @@ func Save(updates map[string]any) (Config, error) {
 
 	// Merge updates
 	for k, v := range updates {
+		if k == "customEndpoints" {
+			if vMap, ok := v.(map[string]any); ok {
+				existingEndpoints, _ := currentMap["customEndpoints"].(map[string]any)
+				mergedEndpoints := make(map[string]any)
+				for model, epVal := range vMap {
+					if epMap, ok := epVal.(map[string]any); ok {
+						epCopy := make(map[string]any)
+						for ek, ev := range epMap {
+							epCopy[ek] = ev
+						}
+						hasApiKey, _ := epCopy["hasApiKey"].(bool)
+						apiKey, _ := epCopy["apiKey"].(string)
+						if hasApiKey && apiKey == "" && existingEndpoints != nil {
+							if existingEp, ok := existingEndpoints[model].(map[string]any); ok {
+								if existingKey, ok := existingEp["apiKey"].(string); ok && existingKey != "" {
+									epCopy["apiKey"] = existingKey
+								}
+							}
+						}
+						delete(epCopy, "hasApiKey")
+						mergedEndpoints[model] = epCopy
+					} else {
+						mergedEndpoints[model] = epVal
+					}
+				}
+				currentMap[k] = mergedEndpoints
+			} else {
+				currentMap[k] = v
+			}
+			continue
+		}
 		if k == "modelMapping" {
 			currentMap[k] = v
 			continue
@@ -216,5 +254,28 @@ func GetPublicConfig() map[string]any {
 		result["hasPassword"] = false
 	}
 	delete(result, "webuiPassword")
+
+	if ce, ok := result["customEndpoints"].(map[string]any); ok {
+		redacted := make(map[string]any)
+		for model, ep := range ce {
+			if epMap, ok := ep.(map[string]any); ok {
+				epCopy := make(map[string]any)
+				for ek, ev := range epMap {
+					if ek == "apiKey" {
+						if strKey, isStr := ev.(string); isStr && strKey != "" {
+							epCopy["hasApiKey"] = true
+						}
+					} else {
+						epCopy[ek] = ev
+					}
+				}
+				redacted[model] = epCopy
+			} else {
+				redacted[model] = ep
+			}
+		}
+		result["customEndpoints"] = redacted
+	}
+
 	return result
 }

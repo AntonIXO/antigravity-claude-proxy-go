@@ -577,3 +577,81 @@ func TestModelMappingRedirection(t *testing.T) {
 		t.Fatalf("expected model to be mapped to gemini-3.5-flash-low, got %v", sentModel2)
 	}
 }
+
+func TestTransparentForwardingToCustomEndpoint(t *testing.T) {
+	tmpDir := t.TempDir()
+	t.Setenv("HOME", tmpDir)
+
+	var receivedPath string
+	var receivedAPIKey string
+	var receivedBody []byte
+
+	mockTarget := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		receivedPath = r.URL.Path
+		receivedAPIKey = r.Header.Get("x-api-key")
+		receivedBody, _ = io.ReadAll(r.Body)
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write([]byte(`{"type":"message","id":"msg_forwarded","content":[{"type":"text","text":"forwarded_ok"}]}`))
+	}))
+	defer mockTarget.Close()
+
+	_, err := config.Save(map[string]any{
+		"customEndpoints": map[string]any{
+			"claude-custom-model": map[string]any{
+				"url":    mockTarget.URL,
+				"apiKey": "target-secret-key",
+			},
+		},
+	})
+	if err != nil {
+		t.Fatalf("failed to save custom endpoint config: %v", err)
+	}
+
+	upstream := &fakeUpstream{streamData: standardStream()}
+	handler := newTestHandler(t, upstream, "test-proj")
+
+	// 1. Forwarded model request
+	req := httptest.NewRequest(http.MethodPost, "/v1/messages", strings.NewReader(`{
+		"model":"claude-custom-model",
+		"messages":[{"role":"user","content":"hello custom"}]
+	}`))
+	req.Header.Set("x-api-key", "local-key")
+	rec := httptest.NewRecorder()
+	handler.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected 200 OK from transparent proxy, got %d: %s", rec.Code, rec.Body.String())
+	}
+	if receivedPath != "/v1/messages" {
+		t.Errorf("expected target path /v1/messages, got %s", receivedPath)
+	}
+	if receivedAPIKey != "target-secret-key" {
+		t.Errorf("expected target API key target-secret-key, got %s", receivedAPIKey)
+	}
+	if !strings.Contains(string(receivedBody), "claude-custom-model") {
+		t.Errorf("expected body to contain model, got %s", string(receivedBody))
+	}
+
+	var resMsg map[string]any
+	decodeBody(t, rec.Body, &resMsg)
+	if resMsg["id"] != "msg_forwarded" {
+		t.Errorf("expected response from mock target, got %#v", resMsg)
+	}
+
+	// 2. Normal model request should NOT be forwarded to custom endpoint
+	reqNormal := httptest.NewRequest(http.MethodPost, "/v1/messages", strings.NewReader(`{
+		"model":"claude-sonnet-4-6",
+		"messages":[{"role":"user","content":"hello normal"}]
+	}`))
+	reqNormal.Header.Set("x-api-key", "local-key")
+	recNormal := httptest.NewRecorder()
+	handler.ServeHTTP(recNormal, reqNormal)
+
+	if recNormal.Code != http.StatusOK {
+		t.Fatalf("expected 200 OK from normal handler, got %d", recNormal.Code)
+	}
+	if upstream.streamCalls != 1 {
+		t.Errorf("expected normal request to use fakeUpstream, streamCalls=%d", upstream.streamCalls)
+	}
+}
