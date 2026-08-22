@@ -25,6 +25,7 @@ import (
 	proxyformat "antigravity-go-proxy/internal/format"
 	"antigravity-go-proxy/internal/logger"
 	"antigravity-go-proxy/internal/modelcatalog"
+	"antigravity-go-proxy/internal/openrouter"
 	"antigravity-go-proxy/internal/stats"
 )
 
@@ -290,6 +291,44 @@ func (server *Server) models(writer http.ResponseWriter, request *http.Request) 
 			"supports_thinking": details.SupportsThinking,
 		})
 	}
+	cfg := config.Get()
+	if cfg.OpenRouter.Enabled {
+		for _, item := range cfg.OpenRouter.Allowlist {
+			if !item.Enabled {
+				continue
+			}
+			desc := item.DisplayName
+			if desc == "" {
+				desc = item.ID
+			}
+			contextLen := item.ContextLen
+			if contextLen <= 0 {
+				contextLen = 200000
+			}
+			models = append(models, map[string]any{
+				"id":                item.ID,
+				"object":            "model",
+				"created":           server.now().Unix(),
+				"owned_by":          "openrouter",
+				"description":       desc,
+				"context_window":    contextLen,
+				"max_output_tokens": 8192,
+				"supports_thinking": true,
+			})
+			if item.Alias != "" && item.Alias != item.ID {
+				models = append(models, map[string]any{
+					"id":                item.Alias,
+					"object":            "model",
+					"created":           server.now().Unix(),
+					"owned_by":          "openrouter",
+					"description":       desc + " (Alias)",
+					"context_window":    contextLen,
+					"max_output_tokens": 8192,
+					"supports_thinking": true,
+				})
+			}
+		}
+	}
 	writeJSON(writer, http.StatusOK, map[string]any{"object": "list", "data": models})
 }
 
@@ -459,6 +498,24 @@ func (server *Server) messages(writer http.ResponseWriter, request *http.Request
 	}
 
 	model := stringFrom(anthropicRequest["model"])
+	if cfg.OpenRouter.Enabled {
+		for _, item := range cfg.OpenRouter.Allowlist {
+			if !item.Enabled {
+				continue
+			}
+			if item.ID == model || (item.Alias != "" && item.Alias == model) {
+				anthropicRequest["model"] = item.ID
+				reqBody, err := json.Marshal(anthropicRequest)
+				if err != nil {
+					writeAPIError(writer, http.StatusBadRequest, "invalid_request_error", "Failed to marshal request: "+err.Error())
+					return
+				}
+				server.forwardToOpenRouter(writer, request, cfg.OpenRouter, reqBody)
+				return
+			}
+		}
+	}
+
 	if endpoint, exists := cfg.CustomEndpoints[model]; exists && endpoint.URL != "" {
 		reqBody, err := json.Marshal(anthropicRequest)
 		if err != nil {
@@ -532,6 +589,46 @@ func (server *Server) forwardToCustomEndpoint(writer http.ResponseWriter, reques
 		ErrorHandler: func(w http.ResponseWriter, r *http.Request, proxyErr error) {
 			server.logger.Error("custom endpoint proxy error", "error", proxyErr, "url", targetURL.String())
 			writeAPIError(w, http.StatusBadGateway, "api_error", "Custom endpoint forwarding error: "+proxyErr.Error())
+		},
+	}
+
+	proxy.ServeHTTP(writer, request)
+}
+
+func (server *Server) forwardToOpenRouter(writer http.ResponseWriter, request *http.Request, openRouterCfg config.OpenRouterConfig, reqBody []byte) {
+	baseURL := openrouter.NormalizeBaseURL(openRouterCfg.BaseURL)
+	targetURL, err := url.Parse(baseURL + "/v1/messages")
+	if err != nil {
+		writeAPIError(writer, http.StatusBadRequest, "invalid_request_error", "Invalid OpenRouter target URL: "+err.Error())
+		return
+	}
+
+	proxy := &httputil.ReverseProxy{
+		Director: func(req *http.Request) {
+			req.URL.Scheme = targetURL.Scheme
+			req.URL.Host = targetURL.Host
+			req.URL.Path = targetURL.Path
+			req.URL.RawQuery = targetURL.RawQuery
+			req.Host = targetURL.Host
+
+			req.Body = io.NopCloser(bytes.NewReader(reqBody))
+			req.ContentLength = int64(len(reqBody))
+
+			if openRouterCfg.APIKey != "" {
+				apiKey := strings.TrimSpace(openRouterCfg.APIKey)
+				req.Header.Set("Authorization", "Bearer "+apiKey)
+				req.Header.Set("x-api-key", apiKey)
+			}
+			if anthropicVer := request.Header.Get("anthropic-version"); anthropicVer != "" {
+				req.Header.Set("anthropic-version", anthropicVer)
+			}
+			if anthropicBeta := request.Header.Get("anthropic-beta"); anthropicBeta != "" {
+				req.Header.Set("anthropic-beta", anthropicBeta)
+			}
+		},
+		ErrorHandler: func(w http.ResponseWriter, r *http.Request, proxyErr error) {
+			server.logger.Error("OpenRouter proxy error", "error", proxyErr, "url", targetURL.String())
+			writeAPIError(w, http.StatusBadGateway, "api_error", "OpenRouter forwarding error: "+proxyErr.Error())
 		},
 	}
 

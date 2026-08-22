@@ -282,11 +282,222 @@ window.Components.models = () => ({
             }
         });
 
+        this.$watch('$store.global.settingsTab', (val) => {
+            if (val === 'models') {
+                this.fetchOpenRouterConfig();
+            }
+        });
+
         // Initial compute if already on models tab
         if (this.$store.global.activeTab === 'models') {
             this.$nextTick(() => {
                 Alpine.store('data').computeQuotaRows();
             });
+        }
+        if (this.$store.global.settingsTab === 'models') {
+            this.fetchOpenRouterConfig();
+        }
+    },
+
+    // OpenRouter State & Methods
+    openRouterConfig: {
+        enabled: false,
+        baseUrl: 'https://openrouter.ai/api',
+        apiKey: '',
+        hasApiKey: false,
+        allowlist: []
+    },
+    openRouterSaving: false,
+    openRouterError: '',
+    discoveredModels: [],
+    discoveryLoading: false,
+    discoveryError: '',
+    discoverySearch: '',
+    discoveryProvider: 'all',
+    addAllowlistAliasMap: {},
+
+    async fetchOpenRouterConfig() {
+        const password = Alpine.store('global').webuiPassword;
+        try {
+            const { response, newPassword } = await window.utils.request('/api/openrouter/config', {}, password);
+            if (newPassword) Alpine.store('global').webuiPassword = newPassword;
+            if (!response.ok) throw new Error(`HTTP ${response.status}`);
+            const data = await response.json();
+            if (data.config) {
+                this.openRouterConfig = {
+                    enabled: !!data.config.enabled,
+                    baseUrl: data.config.baseUrl || 'https://openrouter.ai/api',
+                    apiKey: '',
+                    hasApiKey: !!data.config.hasApiKey,
+                    allowlist: data.config.allowlist || []
+                };
+                Alpine.store('data').openrouter = this.openRouterConfig;
+            }
+        } catch (e) {
+            console.error('Failed to fetch OpenRouter config:', e);
+        }
+    },
+
+    async saveOpenRouterConfig() {
+        const store = Alpine.store('global');
+        const password = store.webuiPassword;
+        this.openRouterSaving = true;
+        this.openRouterError = '';
+        try {
+            const payload = {
+                enabled: this.openRouterConfig.enabled,
+                baseUrl: this.openRouterConfig.baseUrl,
+                hasApiKey: this.openRouterConfig.hasApiKey,
+                allowlist: this.openRouterConfig.allowlist || []
+            };
+            if (this.openRouterConfig.apiKey && this.openRouterConfig.apiKey.trim()) {
+                payload.apiKey = this.openRouterConfig.apiKey.trim();
+            }
+            const { response, newPassword } = await window.utils.request('/api/openrouter/config', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            }, password);
+            if (newPassword) store.webuiPassword = newPassword;
+            if (!response.ok) {
+                const errData = await response.json().catch(() => ({}));
+                throw new Error(errData.error || `HTTP ${response.status}`);
+            }
+            const data = await response.json();
+            if (data.config) {
+                this.openRouterConfig.hasApiKey = !!data.config.hasApiKey;
+                if (payload.apiKey) {
+                    this.openRouterConfig.apiKey = '';
+                }
+                Alpine.store('data').openrouter = this.openRouterConfig;
+            }
+            store.showToast(store.t('openRouterSavedSuccess') || 'OpenRouter settings saved', 'success');
+        } catch (e) {
+            this.openRouterError = e.message || 'Failed to save OpenRouter settings';
+            store.showToast(this.openRouterError, 'error');
+        } finally {
+            this.openRouterSaving = false;
+        }
+    },
+
+    async openDiscoverModal() {
+        this.discoveryError = '';
+        const dialog = document.getElementById('openrouter_discover_modal');
+        if (dialog && typeof dialog.showModal === 'function') {
+            dialog.showModal();
+        }
+        if (!this.discoveredModels || this.discoveredModels.length === 0) {
+            await this.fetchDiscoveredModels(false);
+        }
+    },
+
+    closeDiscoverModal() {
+        const dialog = document.getElementById('openrouter_discover_modal');
+        if (dialog && typeof dialog.close === 'function') {
+            dialog.close();
+        }
+    },
+
+    async fetchDiscoveredModels(forceFresh = false) {
+        this.discoveryLoading = true;
+        this.discoveryError = '';
+        const password = Alpine.store('global').webuiPassword;
+
+        try {
+            if (!forceFresh) {
+                const { response: cachedResp } = await window.utils.request('/api/openrouter/models/cached', {}, password);
+                if (cachedResp.ok) {
+                    const cachedData = await cachedResp.json();
+                    if (cachedData.models && cachedData.models.length > 0) {
+                        this.discoveredModels = cachedData.models;
+                        this.discoveryLoading = false;
+                        return;
+                    }
+                }
+            }
+
+            const payload = {
+                baseUrl: this.openRouterConfig.baseUrl
+            };
+            if (this.openRouterConfig.apiKey) {
+                payload.apiKey = this.openRouterConfig.apiKey;
+            }
+
+            const { response, newPassword } = await window.utils.request('/api/openrouter/models/fetch', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            }, password);
+            if (newPassword) Alpine.store('global').webuiPassword = newPassword;
+
+            if (!response.ok) {
+                const errData = await response.json().catch(() => ({}));
+                throw new Error(errData.error || `HTTP ${response.status}`);
+            }
+
+            const data = await response.json();
+            this.discoveredModels = data.models || [];
+        } catch (e) {
+            this.discoveryError = e.message || 'Failed to fetch models from OpenRouter';
+        } finally {
+            this.discoveryLoading = false;
+        }
+    },
+
+    get filteredDiscoveredModels() {
+        let list = this.discoveredModels || [];
+        if (this.discoveryProvider !== 'all') {
+            const prov = this.discoveryProvider.toLowerCase();
+            list = list.filter(m => m.id.toLowerCase().startsWith(prov + '/'));
+        }
+        if (this.discoverySearch && this.discoverySearch.trim()) {
+            const q = this.discoverySearch.trim().toLowerCase();
+            list = list.filter(m =>
+                (m.id && m.id.toLowerCase().includes(q)) ||
+                (m.name && m.name.toLowerCase().includes(q)) ||
+                (m.description && m.description.toLowerCase().includes(q))
+            );
+        }
+        return list;
+    },
+
+    isAllowlisted(modelId) {
+        return (this.openRouterConfig.allowlist || []).some(m => m.id === modelId);
+    },
+
+    async addToAllowlist(discoveredModel, alias = '') {
+        if (this.isAllowlisted(discoveredModel.id)) return;
+        const newItem = {
+            id: discoveredModel.id,
+            alias: (alias || '').trim(),
+            displayName: discoveredModel.name || discoveredModel.id,
+            contextLength: discoveredModel.context_length || 0,
+            enabled: true
+        };
+        this.openRouterConfig.allowlist.push(newItem);
+        await this.saveOpenRouterConfig();
+    },
+
+    async removeFromAllowlist(modelId) {
+        const store = Alpine.store('global');
+        if (!confirm(store.t('confirmRemoveAllowlist') || `Remove ${modelId} from allowlist?`)) return;
+        this.openRouterConfig.allowlist = (this.openRouterConfig.allowlist || []).filter(m => m.id !== modelId);
+        await this.saveOpenRouterConfig();
+    },
+
+    async toggleAllowlistModel(modelId) {
+        const item = (this.openRouterConfig.allowlist || []).find(m => m.id === modelId);
+        if (item) {
+            item.enabled = !item.enabled;
+            await this.saveOpenRouterConfig();
+        }
+    },
+
+    async updateAllowlistAlias(modelId, alias) {
+        const item = (this.openRouterConfig.allowlist || []).find(m => m.id === modelId);
+        if (item) {
+            item.alias = (alias || '').trim();
+            await this.saveOpenRouterConfig();
         }
     },
 

@@ -161,6 +161,9 @@ func RestoreClaudeConfig() (map[string]any, error) {
 		"CLAUDE_CODE_SUBAGENT_MODEL", "ANTHROPIC_DEFAULT_OPUS_MODEL",
 		"ANTHROPIC_DEFAULT_SONNET_MODEL", "ANTHROPIC_DEFAULT_HAIKU_MODEL",
 		"ENABLE_EXPERIMENTAL_MCP_CLI",
+		"CLAUDE_CODE_ENABLE_GATEWAY_MODEL_DISCOVERY",
+		"CLAUDE_CODE_SKIP_FAST_MODE_ORG_CHECK",
+		"ANTHROPIC_API_KEY",
 	}
 	if env, ok := current["env"].(map[string]any); ok {
 		for _, key := range proxyVars {

@@ -14,6 +14,21 @@ type EndpointConfig struct {
 	APIKey string `json:"apiKey,omitempty"`
 }
 
+type OpenRouterModelConfig struct {
+	ID          string `json:"id"`
+	Alias       string `json:"alias,omitempty"`
+	DisplayName string `json:"displayName,omitempty"`
+	ContextLen  int    `json:"contextLength,omitempty"`
+	Enabled     bool   `json:"enabled"`
+}
+
+type OpenRouterConfig struct {
+	Enabled   bool                    `json:"enabled"`
+	APIKey    string                  `json:"apiKey,omitempty"`
+	BaseURL   string                  `json:"baseUrl,omitempty"`
+	Allowlist []OpenRouterModelConfig `json:"allowlist,omitempty"`
+}
+
 type AccountSelectionConfig struct {
 	Strategy    string         `json:"strategy,omitempty"`
 	HealthScore map[string]any `json:"healthScore,omitempty"`
@@ -46,6 +61,7 @@ type Config struct {
 	CapacityBackoffTiersMs   []int                  `json:"capacityBackoffTiersMs,omitempty"`
 	CustomEndpoints          map[string]EndpointConfig `json:"customEndpoints,omitempty"`
 	ModelMapping             map[string]any         `json:"modelMapping,omitempty"`
+	OpenRouter               OpenRouterConfig       `json:"openrouter,omitempty"`
 	AccountSelection         AccountSelectionConfig `json:"accountSelection,omitempty"`
 }
 
@@ -74,6 +90,11 @@ func DefaultConfig() Config {
 		CapacityBackoffTiersMs: []int{5000, 10000, 20000, 30000, 60000},
 		CustomEndpoints:        make(map[string]EndpointConfig),
 		ModelMapping:           make(map[string]any),
+		OpenRouter: OpenRouterConfig{
+			Enabled:   false,
+			BaseURL:   "https://openrouter.ai/api",
+			Allowlist: []OpenRouterModelConfig{},
+		},
 		AccountSelection: AccountSelectionConfig{
 			Strategy: "hybrid",
 			HealthScore: map[string]any{
@@ -207,6 +228,27 @@ func Save(updates map[string]any) (Config, error) {
 			}
 			continue
 		}
+		if k == "openrouter" {
+			if vMap, ok := v.(map[string]any); ok {
+				orCopy := make(map[string]any)
+				for okk, ovv := range vMap {
+					orCopy[okk] = ovv
+				}
+				hasApiKey, _ := orCopy["hasApiKey"].(bool)
+				apiKey, _ := orCopy["apiKey"].(string)
+				existingOpenRouter, _ := currentMap["openrouter"].(map[string]any)
+				if (hasApiKey || apiKey == "") && existingOpenRouter != nil {
+					if existingKey, ok := existingOpenRouter["apiKey"].(string); ok && existingKey != "" && apiKey == "" {
+						orCopy["apiKey"] = existingKey
+					}
+				}
+				delete(orCopy, "hasApiKey")
+				currentMap[k] = orCopy
+			} else {
+				currentMap[k] = v
+			}
+			continue
+		}
 		if k == "modelMapping" {
 			currentMap[k] = v
 			continue
@@ -281,6 +323,20 @@ func GetPublicConfig() map[string]any {
 			}
 		}
 		result["customEndpoints"] = redacted
+	}
+
+	if orMap, ok := result["openrouter"].(map[string]any); ok {
+		orCopy := make(map[string]any)
+		for okk, ovv := range orMap {
+			if okk == "apiKey" {
+				if strKey, isStr := ovv.(string); isStr && strKey != "" {
+					orCopy["hasApiKey"] = true
+				}
+			} else {
+				orCopy[okk] = ovv
+			}
+		}
+		result["openrouter"] = orCopy
 	}
 
 	return result

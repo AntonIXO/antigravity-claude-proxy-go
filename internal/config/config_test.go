@@ -186,3 +186,71 @@ func TestGetConfigDirEnvOverrides(t *testing.T) {
 		t.Errorf("expected %s from CONFIG_DIR, got %s", customDir, got)
 	}
 }
+
+func TestOpenRouterConfig(t *testing.T) {
+	tmpDir := t.TempDir()
+	t.Setenv("HOME", tmpDir)
+
+	cfg := DefaultConfig()
+	if cfg.OpenRouter.BaseURL != "https://openrouter.ai/api" {
+		t.Errorf("expected default BaseURL https://openrouter.ai/api, got %s", cfg.OpenRouter.BaseURL)
+	}
+	if cfg.OpenRouter.Enabled {
+		t.Errorf("expected OpenRouter to be disabled by default")
+	}
+
+	updates := map[string]any{
+		"openrouter": map[string]any{
+			"enabled": true,
+			"apiKey":  "sk-or-v1-secretkey123",
+			"baseUrl": "https://openrouter.ai/api",
+			"allowlist": []map[string]any{
+				{
+					"id":            "anthropic/claude-3.7-sonnet",
+					"alias":         "claude-3-7-openrouter",
+					"displayName":   "Claude 3.7 Sonnet (OpenRouter)",
+					"contextLength": 200000,
+					"enabled":       true,
+				},
+			},
+		},
+	}
+
+	saved, err := Save(updates)
+	if err != nil {
+		t.Fatalf("Save error: %v", err)
+	}
+	if !saved.OpenRouter.Enabled {
+		t.Errorf("expected OpenRouter.Enabled to be true")
+	}
+	if saved.OpenRouter.APIKey != "sk-or-v1-secretkey123" {
+		t.Errorf("expected APIKey sk-or-v1-secretkey123, got %s", saved.OpenRouter.APIKey)
+	}
+	if len(saved.OpenRouter.Allowlist) != 1 {
+		t.Fatalf("expected 1 allowlist item, got %d", len(saved.OpenRouter.Allowlist))
+	}
+	if saved.OpenRouter.Allowlist[0].Alias != "claude-3-7-openrouter" {
+		t.Errorf("expected alias claude-3-7-openrouter, got %s", saved.OpenRouter.Allowlist[0].Alias)
+	}
+
+	pub := GetPublicConfig()
+	orPub, ok := pub["openrouter"].(map[string]any)
+	if !ok {
+		t.Fatalf("expected openrouter in public config")
+	}
+	if _, exists := orPub["apiKey"]; exists {
+		t.Errorf("apiKey secret should be redacted from public config")
+	}
+	if orPub["hasApiKey"] != true {
+		t.Errorf("expected hasApiKey = true in public config")
+	}
+
+	// Verify saving redacted public config back preserves secret API key
+	saved2, err := Save(pub)
+	if err != nil {
+		t.Fatalf("Save error on public config: %v", err)
+	}
+	if saved2.OpenRouter.APIKey != "sk-or-v1-secretkey123" {
+		t.Errorf("expected secret APIKey to be preserved when saving public config, got %s", saved2.OpenRouter.APIKey)
+	}
+}

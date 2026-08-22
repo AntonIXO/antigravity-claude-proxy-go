@@ -761,6 +761,52 @@
                     </div>
                 </div>
 
+                <!-- Gateway Model Discovery Toggle -->
+                <div x-show="currentMode === 'proxy'" class="card bg-space-900/30 border border-space-border/50 p-5">
+                    <div class="flex items-center justify-between">
+                        <div class="flex flex-col gap-1">
+                            <span class="text-sm font-medium transition-colors"
+                                :class="config.env.CLAUDE_CODE_ENABLE_GATEWAY_MODEL_DISCOVERY === 'true' ? 'text-neon-green' : 'text-gray-300'"
+                                x-text="$store.global.t('gatewayDiscovery') || 'Gateway Model Discovery'">Gateway Model Discovery</span>
+                            <span class="text-[11px] text-gray-500" x-text="$store.global.t('gatewayDiscoveryDesc') || 'Allows Claude Code to discover allowlisted OpenRouter and proxy models dynamically.'">
+                                Allows Claude Code to discover allowlisted OpenRouter and proxy models dynamically.
+                            </span>
+                        </div>
+                        <label class="relative inline-flex items-center cursor-pointer">
+                            <input type="checkbox" class="sr-only peer"
+                                :checked="config.env.CLAUDE_CODE_ENABLE_GATEWAY_MODEL_DISCOVERY === 'true'"
+                                @change="config.env.CLAUDE_CODE_ENABLE_GATEWAY_MODEL_DISCOVERY = $event.target.checked ? 'true' : 'false'"
+                                aria-label="Gateway model discovery toggle">
+                            <div
+                                class="w-9 h-5 bg-space-800 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-gray-600 after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-neon-purple peer-checked:after:bg-white">
+                            </div>
+                        </label>
+                    </div>
+                </div>
+
+                <!-- Skip Fast Mode Org Check Toggle -->
+                <div x-show="currentMode === 'proxy'" class="card bg-space-900/30 border border-space-border/50 p-5">
+                    <div class="flex items-center justify-between">
+                        <div class="flex flex-col gap-1">
+                            <span class="text-sm font-medium transition-colors"
+                                :class="config.env.CLAUDE_CODE_SKIP_FAST_MODE_ORG_CHECK === 'true' ? 'text-neon-green' : 'text-gray-300'"
+                                x-text="$store.global.t('skipFastModeOrgCheck') || 'Skip Fast Mode Org Check'">Skip Fast Mode Org Check</span>
+                            <span class="text-[11px] text-gray-500" x-text="$store.global.t('skipFastModeOrgCheckDesc') || 'Skips Anthropic organization validation when using fast mode models via proxy.'">
+                                Skips Anthropic organization validation when using fast mode models via proxy.
+                            </span>
+                        </div>
+                        <label class="relative inline-flex items-center cursor-pointer">
+                            <input type="checkbox" class="sr-only peer"
+                                :checked="config.env.CLAUDE_CODE_SKIP_FAST_MODE_ORG_CHECK === 'true'"
+                                @change="config.env.CLAUDE_CODE_SKIP_FAST_MODE_ORG_CHECK = $event.target.checked ? 'true' : 'false'"
+                                aria-label="Skip fast mode org check toggle">
+                            <div
+                                class="w-9 h-5 bg-space-800 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-gray-600 after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-neon-purple peer-checked:after:bg-white">
+                            </div>
+                        </label>
+                    </div>
+                </div>
+
                 <div x-show="currentMode === 'proxy'" class="flex justify-end pt-2 gap-3">
                     <button
                         class="btn btn-sm btn-ghost border border-space-border/50 hover:border-red-500/30 hover:bg-red-500/5 text-gray-400 hover:text-red-400 px-6 gap-2"
@@ -892,6 +938,136 @@
             <!-- Tab 3: Models Configuration -->
             <div x-show="$store.global.settingsTab === 'models'" x-data="window.Components.models()"
                 class="space-y-8 animate-fade-in pb-10">
+
+                <!-- Section 0: OpenRouter Gateway & Anthropic Skin -->
+                <div class="card bg-space-900/30 border border-neon-purple/40 p-6 space-y-5">
+                    <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                        <div class="space-y-1">
+                            <div class="flex items-center gap-2">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5 text-neon-purple" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
+                                </svg>
+                                <h4 class="text-sm font-bold text-white uppercase tracking-wider" x-text="$store.global.t('openRouterGateway') || 'OpenRouter Gateway & Anthropic Skin'">OpenRouter Gateway & Anthropic Skin</h4>
+                            </div>
+                            <p class="text-xs text-gray-400" x-text="$store.global.t('openRouterDesc') || 'Transparently forward allowlisted models directly to OpenRouter\'s Anthropic Skin endpoint with SSE streaming.'">
+                                Transparently forward allowlisted models directly to OpenRouter's Anthropic Skin endpoint with SSE streaming.
+                            </p>
+                        </div>
+                        <div class="flex items-center gap-3">
+                            <button class="btn btn-sm bg-space-800 hover:bg-space-700 border border-neon-purple/50 text-neon-purple font-medium px-4 gap-2"
+                                @click="openDiscoverModal()">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                                </svg>
+                                <span x-text="$store.global.t('discoverModels') || 'Discover Models'">Discover Models</span>
+                            </button>
+                            <label class="relative inline-flex items-center cursor-pointer">
+                                <input type="checkbox" class="sr-only peer"
+                                    :checked="openRouterConfig.enabled"
+                                    @change="openRouterConfig.enabled = $event.target.checked; saveOpenRouterConfig()"
+                                    aria-label="OpenRouter Gateway enabled toggle">
+                                <div class="w-9 h-5 bg-space-800 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-gray-600 after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-neon-purple peer-checked:after:bg-white"></div>
+                            </label>
+                        </div>
+                    </div>
+
+                    <!-- OpenRouter Base URL & API Key Fields -->
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4 pt-2 border-t border-space-border/40">
+                        <div class="form-control">
+                            <label class="label pt-0 pb-1 text-xs text-gray-400 font-semibold" x-text="$store.global.t('openRouterBaseUrl') || 'Base URL'">Base URL</label>
+                            <input type="text" x-model="openRouterConfig.baseUrl"
+                                class="input input-sm input-bordered bg-space-800 border-space-border text-white font-mono text-xs w-full"
+                                placeholder="https://openrouter.ai/api">
+                        </div>
+
+                        <div class="form-control">
+                            <div class="flex items-center justify-between pb-1">
+                                <label class="text-xs text-gray-400 font-semibold" x-text="$store.global.t('openRouterApiKey') || 'API Key'">API Key</label>
+                                <template x-if="openRouterConfig.hasApiKey">
+                                    <span class="badge badge-xs bg-neon-green/10 text-neon-green border-neon-green/30 text-[9px] font-mono gap-1">
+                                        <svg xmlns="http://www.w3.org/2000/svg" class="w-2.5 h-2.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
+                                        </svg>
+                                        <span x-text="$store.global.t('keyConfigured') || 'Key Configured'">Key Configured</span>
+                                    </span>
+                                </template>
+                            </div>
+                            <div class="flex gap-2">
+                                <input type="password" x-model="openRouterConfig.apiKey"
+                                    class="input input-sm input-bordered bg-space-800 border-space-border text-white font-mono text-xs flex-1"
+                                    :placeholder="openRouterConfig.hasApiKey ? '•••••••••••••••• (Leave blank to keep)' : 'sk-or-v1-...'">
+                                <button class="btn btn-sm bg-neon-purple hover:bg-purple-600 border-none text-white text-xs px-4"
+                                    @click="saveOpenRouterConfig()" :disabled="openRouterSaving">
+                                    <span x-show="!openRouterSaving" x-text="$store.global.t('save') || 'Save'">Save</span>
+                                    <span x-show="openRouterSaving" class="loading loading-spinner loading-xs"></span>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- OpenRouter Allowlist Table -->
+                    <div class="space-y-2 pt-2">
+                        <div class="flex items-center justify-between">
+                            <label class="text-xs font-semibold text-gray-300 uppercase tracking-wider" x-text="$store.global.t('openRouterAllowlist') || 'Allowlisted Models & Aliases'">Allowlisted Models & Aliases</label>
+                            <span class="text-xs font-mono text-gray-500" x-text="(openRouterConfig.allowlist || []).length + ' models'"></span>
+                        </div>
+
+                        <div class="view-card !p-0 overflow-hidden border border-space-border/60">
+                            <table class="standard-table">
+                                <thead>
+                                    <tr>
+                                        <th class="pl-4 w-12 text-center" x-text="$store.global.t('status') || 'Status'">Status</th>
+                                        <th class="w-5/12" x-text="$store.global.t('modelId') || 'Model ID'">Model ID</th>
+                                        <th class="w-4/12" x-text="$store.global.t('localAlias') || 'Local Alias'">Local Alias</th>
+                                        <th class="w-2/12" x-text="$store.global.t('contextLength') || 'Context'">Context</th>
+                                        <th class="w-12 text-right pr-4" x-text="$store.global.t('actions') || 'Actions'">Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <template x-for="item in (openRouterConfig.allowlist || [])" :key="item.id">
+                                        <tr class="hover:bg-white/5 transition-colors">
+                                            <td class="pl-4 text-center">
+                                                <input type="checkbox" class="toggle toggle-xs toggle-primary"
+                                                    :checked="item.enabled"
+                                                    @change="toggleAllowlistModel(item.id)">
+                                            </td>
+                                            <td class="font-mono text-xs text-gray-200">
+                                                <div class="flex items-center gap-2">
+                                                    <span class="w-2 h-2 rounded-full bg-neon-purple shadow-[0_0_6px_rgba(168,85,247,0.6)]"></span>
+                                                    <span class="font-semibold text-white" x-text="item.id"></span>
+                                                </div>
+                                                <div class="text-[10px] text-gray-500 font-sans mt-0.5" x-text="item.displayName || ''" x-show="item.displayName && item.displayName !== item.id"></div>
+                                            </td>
+                                            <td class="font-mono text-xs text-neon-purple">
+                                                <input type="text" :value="item.alias || ''"
+                                                    @change="updateAllowlistAlias(item.id, $event.target.value)"
+                                                    class="input input-xs bg-space-800 border-space-border text-neon-purple font-mono text-xs w-full focus:border-neon-purple"
+                                                    placeholder="e.g. claude-3-7-openrouter">
+                                            </td>
+                                            <td class="font-mono text-xs text-gray-400">
+                                                <span x-text="item.contextLength ? (Math.round(item.contextLength / 1000) + 'k tokens') : '-'"></span>
+                                            </td>
+                                            <td class="text-right pr-4">
+                                                <button class="btn btn-xs btn-ghost text-gray-400 hover:text-red-400"
+                                                    @click="removeFromAllowlist(item.id)"
+                                                    :title="$store.global.t('remove') || 'Remove'">
+                                                    <svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                                                    </svg>
+                                                </button>
+                                            </td>
+                                        </tr>
+                                    </template>
+                                    <tr x-show="!openRouterConfig.allowlist || openRouterConfig.allowlist.length === 0">
+                                        <td colspan="5" class="text-center py-6 text-gray-500 text-xs font-mono">
+                                            NO OPENROUTER MODELS ALLOWLISTED. CLICK "DISCOVER MODELS" TO ADD.
+                                        </td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
 
                 <!-- Section 1: Transparent Forwarding (Custom Endpoints) -->
                 <div class="card bg-space-900/30 border border-neon-cyan/30 p-6 space-y-4">
@@ -1343,6 +1519,125 @@
                     </div>
                     <form method="dialog" class="modal-backdrop">
                         <button @click="closeAliasModal()">close</button>
+                    </form>
+                </dialog>
+
+                <!-- Discover OpenRouter Models Modal -->
+                <dialog id="openrouter_discover_modal" class="modal">
+                    <div class="modal-box bg-space-900 border-2 border-neon-purple/50 max-w-4xl max-h-[85vh] flex flex-col p-6">
+                        <div class="flex items-center justify-between pb-3 border-b border-space-border/60">
+                            <h3 class="font-bold text-lg text-neon-purple flex items-center gap-2">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                                </svg>
+                                <span x-text="$store.global.t('discoverModalTitle') || 'Discover OpenRouter Models'">Discover OpenRouter Models</span>
+                            </h3>
+                            <button class="btn btn-xs btn-circle btn-ghost text-gray-400 hover:text-white" @click="closeDiscoverModal()">✕</button>
+                        </div>
+
+                        <!-- Search & Filter Controls -->
+                        <div class="py-4 space-y-3 shrink-0">
+                            <div class="flex flex-col sm:flex-row gap-3">
+                                <div class="relative flex-1">
+                                    <input type="text" x-model="discoverySearch"
+                                        class="input input-sm input-bordered bg-space-800 border-space-border text-white w-full pr-8 font-mono text-xs focus:border-neon-purple"
+                                        :placeholder="$store.global.t('searchModelsPlaceholder') || 'Search models by name, ID, or description...'" />
+                                    <button x-show="discoverySearch" @click="discoverySearch = ''" class="absolute right-2 top-2 text-gray-500 hover:text-white">✕</button>
+                                </div>
+                                <button class="btn btn-sm bg-space-800 hover:bg-space-700 border border-space-border text-gray-300 gap-1"
+                                    @click="fetchDiscoveredModels(true)" :disabled="discoveryLoading">
+                                    <svg x-show="!discoveryLoading" xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                                    </svg>
+                                    <span x-show="discoveryLoading" class="loading loading-spinner loading-xs"></span>
+                                    <span x-text="$store.global.t('refresh') || 'Refresh'">Refresh</span>
+                                </button>
+                            </div>
+
+                            <!-- Provider filter chips -->
+                            <div class="flex flex-wrap gap-1.5 items-center pt-1">
+                                <span class="text-[10px] text-gray-500 uppercase font-semibold mr-1">Provider:</span>
+                                <template x-for="p in ['all', 'anthropic', 'openai', 'meta-llama', 'deepseek', 'mistralai', 'google', 'qwen']" :key="p">
+                                    <button class="btn btn-xs px-2.5 py-0.5 rounded text-[10px] uppercase font-mono transition-all"
+                                        :class="discoveryProvider === p ? 'bg-neon-purple text-white border-none' : 'bg-space-800 text-gray-400 border border-space-border hover:text-white hover:bg-space-700'"
+                                        @click="discoveryProvider = p"
+                                        x-text="p === 'meta-llama' ? 'Meta' : (p === 'mistralai' ? 'Mistral' : p)"></button>
+                                </template>
+                            </div>
+                        </div>
+
+                        <!-- Error Alert -->
+                        <div x-show="discoveryError" class="alert alert-error bg-red-900/30 border border-red-500/50 text-xs text-red-300 py-2 mb-3 shrink-0">
+                            <span x-text="discoveryError"></span>
+                        </div>
+
+                        <!-- Discovered Models Table -->
+                        <div class="flex-1 overflow-y-auto custom-scrollbar border border-space-border/60 rounded-lg">
+                            <table class="standard-table">
+                                <thead class="sticky top-0 bg-space-900 z-10">
+                                    <tr>
+                                        <th class="pl-4 w-4/12" x-text="$store.global.t('model') || 'Model'">Model</th>
+                                        <th class="w-2/12" x-text="$store.global.t('contextLength') || 'Context'">Context</th>
+                                        <th class="w-4/12" x-text="$store.global.t('alias') || 'Custom Local Alias'">Custom Local Alias</th>
+                                        <th class="w-2/12 text-right pr-4" x-text="$store.global.t('actions') || 'Action'">Action</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <template x-for="m in filteredDiscoveredModels" :key="m.id">
+                                        <tr class="hover:bg-white/5 transition-colors">
+                                            <td class="pl-4">
+                                                <div class="font-mono text-xs font-semibold text-white" x-text="m.id"></div>
+                                                <div class="text-[11px] text-gray-300 mt-0.5" x-text="m.name"></div>
+                                                <div class="text-[10px] text-gray-500 line-clamp-1 mt-0.5" x-text="m.description || ''"></div>
+                                            </td>
+                                            <td class="font-mono text-xs text-gray-400">
+                                                <span x-text="m.context_length ? (Math.round(m.context_length / 1000) + 'k') : '-'"></span>
+                                            </td>
+                                            <td>
+                                                <input type="text" x-model="addAllowlistAliasMap[m.id]"
+                                                    :disabled="isAllowlisted(m.id)"
+                                                    class="input input-xs bg-space-800 border-space-border text-neon-purple font-mono text-xs w-full focus:border-neon-purple"
+                                                    :placeholder="isAllowlisted(m.id) ? 'Allowlisted' : 'Optional alias...'">
+                                            </td>
+                                            <td class="text-right pr-4">
+                                                <template x-if="isAllowlisted(m.id)">
+                                                    <span class="badge badge-sm bg-neon-green/10 text-neon-green border-neon-green/30 text-[10px] font-mono">
+                                                        ✓ Added
+                                                    </span>
+                                                </template>
+                                                <template x-if="!isAllowlisted(m.id)">
+                                                    <button class="btn btn-xs bg-neon-purple hover:bg-purple-600 border-none text-white font-medium"
+                                                        @click="addToAllowlist(m, addAllowlistAliasMap[m.id])">
+                                                        + Allowlist
+                                                    </button>
+                                                </template>
+                                            </td>
+                                        </tr>
+                                    </template>
+                                    <tr x-show="!discoveryLoading && filteredDiscoveredModels.length === 0">
+                                        <td colspan="4" class="text-center py-8 text-gray-500 text-xs font-mono">
+                                            NO MODELS MATCHING CURRENT FILTER.
+                                        </td>
+                                    </tr>
+                                    <tr x-show="discoveryLoading">
+                                        <td colspan="4" class="text-center py-8 text-gray-400 text-xs font-mono">
+                                            <span class="loading loading-spinner loading-sm text-neon-purple inline-block align-middle mr-2"></span>
+                                            FETCHING OPENROUTER CATALOG...
+                                        </td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+
+                        <div class="modal-action mt-4 pt-2 border-t border-space-border/60 flex items-center justify-between shrink-0">
+                            <span class="text-xs font-mono text-gray-500" x-text="filteredDiscoveredModels.length + ' models available'"></span>
+                            <button type="button" class="btn btn-sm btn-ghost text-gray-400"
+                                @click="closeDiscoverModal()"
+                                x-text="$store.global.t('close') || 'Close'">Close</button>
+                        </div>
+                    </div>
+                    <form method="dialog" class="modal-backdrop">
+                        <button @click="closeDiscoverModal()">close</button>
                     </form>
                 </dialog>
             </div>

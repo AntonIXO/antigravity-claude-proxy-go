@@ -41,6 +41,14 @@ window.Components.modelDropdown = (field, labelKey, accentColor) => ({
         if (this.$store.data.modelConfig) {
             Object.keys(this.$store.data.modelConfig).forEach(m => modelSet.add(m));
         }
+        if (this.$store.data.openrouter && this.$store.data.openrouter.allowlist) {
+            this.$store.data.openrouter.allowlist.forEach(m => {
+                if (m.enabled) {
+                    modelSet.add(m.id);
+                    if (m.alias) modelSet.add(m.alias);
+                }
+            });
+        }
         return Array.from(modelSet);
     },
 
@@ -53,6 +61,7 @@ window.Components.modelDropdown = (field, labelKey, accentColor) => ({
 
     get groupedModels() {
         const groups = [
+            { family: 'openrouter', label: this.$store.global.t('familyOpenRouter') || 'OpenRouter Gateway', items: [] },
             { family: 'forwarded', label: this.$store.global.t('familyForwarded') || 'Forwarded / Custom', items: [] },
             { family: 'claude', label: this.$store.global.t('familyClaude') || 'Claude', items: [] },
             { family: 'gemini', label: this.$store.global.t('familyGemini') || 'Gemini', items: [] },
@@ -60,7 +69,7 @@ window.Components.modelDropdown = (field, labelKey, accentColor) => ({
         ];
         for (const modelId of this.filteredModels) {
             const fam = this.$store.data.getModelFamily(modelId);
-            const group = groups.find(g => g.family === fam) || groups[3];
+            const group = groups.find(g => g.family === fam) || groups[4];
             group.items.push(modelId);
         }
         return groups.filter(g => g.items.length > 0);

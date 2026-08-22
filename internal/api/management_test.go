@@ -3,6 +3,7 @@ package api
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -488,6 +489,120 @@ func TestManagement_CustomEndpointsAndModelMapping(t *testing.T) {
 		}
 		if server.accountManager.GlobalQuotaThreshold() != 0.15 {
 			t.Errorf("expected globalQuotaThreshold 0.15, got %v", server.accountManager.GlobalQuotaThreshold())
+		}
+	})
+}
+
+func TestManagement_OpenRouterEndpoints(t *testing.T) {
+	server, _, _ := newTestServerWithManager(t)
+	handler := server.Handler()
+
+	mockOR := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(map[string]any{
+			"data": []map[string]any{
+				{
+					"id":             "anthropic/claude-3.7-sonnet",
+					"name":           "Claude 3.7 Sonnet",
+					"context_length": 200000,
+				},
+			},
+		})
+	}))
+	defer mockOR.Close()
+
+	t.Run("POST /api/openrouter/config", func(t *testing.T) {
+		payload := fmt.Sprintf(`{
+			"enabled": true,
+			"apiKey": "sk-or-test-key",
+			"baseUrl": "%s",
+			"allowlist": [
+				{
+					"id": "anthropic/claude-3.7-sonnet",
+					"alias": "claude-3-7-openrouter",
+					"displayName": "Claude 3.7 Sonnet",
+					"contextLength": 200000,
+					"enabled": true
+				}
+			]
+		}`, mockOR.URL)
+
+		req := httptest.NewRequest(http.MethodPost, "/api/openrouter/config", strings.NewReader(payload))
+		req.Header.Set("Content-Type", "application/json")
+		rec := httptest.NewRecorder()
+		handler.ServeHTTP(rec, req)
+
+		if rec.Code != http.StatusOK {
+			t.Fatalf("expected 200, got %d: %s", rec.Code, rec.Body.String())
+		}
+	})
+
+	t.Run("GET /api/openrouter/config", func(t *testing.T) {
+		req := httptest.NewRequest(http.MethodGet, "/api/openrouter/config", nil)
+		rec := httptest.NewRecorder()
+		handler.ServeHTTP(rec, req)
+
+		if rec.Code != http.StatusOK {
+			t.Fatalf("expected 200, got %d: %s", rec.Code, rec.Body.String())
+		}
+		var res map[string]any
+		if err := json.Unmarshal(rec.Body.Bytes(), &res); err != nil {
+			t.Fatal(err)
+		}
+		cfg, ok := res["config"].(map[string]any)
+		if !ok {
+			t.Fatalf("expected config in response, got %v", res)
+		}
+		if cfg["hasApiKey"] != true {
+			t.Errorf("expected hasApiKey = true")
+		}
+		if _, hasKey := cfg["apiKey"]; hasKey {
+			t.Errorf("apiKey secret should be redacted")
+		}
+		if cfg["activeModelCount"] != float64(1) {
+			t.Errorf("expected activeModelCount = 1, got %v", cfg["activeModelCount"])
+		}
+	})
+
+	t.Run("POST /api/openrouter/models/fetch", func(t *testing.T) {
+		payload := fmt.Sprintf(`{"baseUrl":"%s","apiKey":"sk-or-test-key"}`, mockOR.URL)
+		req := httptest.NewRequest(http.MethodPost, "/api/openrouter/models/fetch", strings.NewReader(payload))
+		req.Header.Set("Content-Type", "application/json")
+		rec := httptest.NewRecorder()
+		handler.ServeHTTP(rec, req)
+
+		if rec.Code != http.StatusOK {
+			t.Fatalf("expected 200, got %d: %s", rec.Code, rec.Body.String())
+		}
+		var res struct {
+			Status string `json:"status"`
+			Total  int    `json:"total"`
+		}
+		if err := json.Unmarshal(rec.Body.Bytes(), &res); err != nil {
+			t.Fatal(err)
+		}
+		if res.Total != 1 {
+			t.Errorf("expected total 1, got %d", res.Total)
+		}
+	})
+
+	t.Run("GET /api/openrouter/models/cached", func(t *testing.T) {
+		req := httptest.NewRequest(http.MethodGet, "/api/openrouter/models/cached", nil)
+		rec := httptest.NewRecorder()
+		handler.ServeHTTP(rec, req)
+
+		if rec.Code != http.StatusOK {
+			t.Fatalf("expected 200, got %d: %s", rec.Code, rec.Body.String())
+		}
+		var res struct {
+			Status string `json:"status"`
+			Total  int    `json:"total"`
+		}
+		if err := json.Unmarshal(rec.Body.Bytes(), &res); err != nil {
+			t.Fatal(err)
+		}
+		if res.Total != 1 {
+			t.Errorf("expected total 1 cached models, got %d", res.Total)
 		}
 	})
 }

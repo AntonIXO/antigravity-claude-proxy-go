@@ -12,6 +12,7 @@ document.addEventListener('alpine:init', () => {
         models: [], // Source of truth
         modelConfig: {}, // Model metadata (hidden, pinned, alias)
         customEndpoints: {}, // Transparent forwarding custom endpoints
+        openrouter: {}, // OpenRouter Gateway and allowlist configuration
         quotaRows: [], // Filtered view
         usageHistory: {}, // Usage statistics history (from /account-limits?includeHistory=true)
         globalQuotaThreshold: 0, // Global minimum quota threshold (fraction 0-0.99)
@@ -82,6 +83,7 @@ document.addEventListener('alpine:init', () => {
                         this.models = data.models;
                         this.modelConfig = data.modelConfig || {};
                         this.customEndpoints = data.customEndpoints || {};
+                        this.openrouter = data.openrouter || {};
                         this.usageHistory = data.usageHistory || {};
 
                         // Don't show loading on initial load if we have cache
@@ -102,6 +104,7 @@ document.addEventListener('alpine:init', () => {
                     models: this.models,
                     modelConfig: this.modelConfig,
                     customEndpoints: this.customEndpoints,
+                    openrouter: this.openrouter,
                     usageHistory: this.usageHistory,
                     timestamp: Date.now()
                 };
@@ -135,6 +138,7 @@ document.addEventListener('alpine:init', () => {
                 }
                 this.modelConfig = data.modelConfig || {};
                 this.customEndpoints = data.customEndpoints || {};
+                this.openrouter = data.openrouter || {};
                 this.globalQuotaThreshold = data.globalQuotaThreshold || 0;
 
                 // Store usage history if included (for dashboard)
@@ -393,6 +397,7 @@ document.addEventListener('alpine:init', () => {
         getModelFamily(modelId) {
             if (!modelId) return 'other';
             if (this.customEndpoints && this.customEndpoints[modelId]) return 'forwarded';
+            if (this.openrouter && this.openrouter.allowlist && this.openrouter.allowlist.some(m => m.id === modelId || m.alias === modelId)) return 'openrouter';
             const lower = modelId.toLowerCase();
             if (lower.includes('claude')) return 'claude';
             if (lower.includes('gemini')) return 'gemini';
