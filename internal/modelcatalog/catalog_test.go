@@ -181,3 +181,109 @@ func TestGemini37UsesTieredUpstreamWhenPresent(t *testing.T) {
 		}
 	}
 }
+
+func TestSynthetic38AndReasoningResolution(t *testing.T) {
+	t.Parallel()
+	catalog, err := Parse([]byte(`{
+		"defaultAgentModelId":"gemini-3.6-flash-high",
+		"agentModelSorts":[{"displayName":"Recommended","groups":[{"modelIds":[
+			"gemini-3.6-flash-high","gemini-3.6-flash-medium","gemini-3.6-flash-low"
+		]}]}],
+		"models":{
+			"gemini-3.6-flash-high":{"displayName":"Gemini 3.6 Flash (High)","supportsThinking":true,"thinkingBudget":16000},
+			"gemini-3.6-flash-medium":{"displayName":"Gemini 3.6 Flash (Medium)","supportsThinking":true,"thinkingBudget":8000},
+			"gemini-3.6-flash-low":{"displayName":"Gemini 3.6 Flash (Low)","supportsThinking":true,"thinkingBudget":1024}
+		}
+	}`))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// 1. Verify synthetic gemini-3.8-flash-high falls back through 3.7 to 3.6 upstream
+	m38High, err := catalog.Resolve("gemini-3.8-flash-high")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if m38High.ID != "gemini-3.8-flash-high" || m38High.GetUpstreamID() != "gemini-3.6-flash-high" {
+		t.Fatalf("expected ID=gemini-3.8-flash-high UpstreamID=gemini-3.6-flash-high, got ID=%q UpstreamID=%q", m38High.ID, m38High.GetUpstreamID())
+	}
+
+	// 2. Base model gemini-3.8-flash resolves to gemini-3.8-flash-high by default
+	base38, err := catalog.ResolveWithRequest("gemini-3.8-flash", nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if base38.ID != "gemini-3.8-flash-high" || base38.GetUpstreamID() != "gemini-3.6-flash-high" {
+		t.Fatalf("base model default resolution failed: ID=%q UpstreamID=%q", base38.ID, base38.GetUpstreamID())
+	}
+
+	// 3. reasoning_effort="medium" resolves gemini-3.8-flash to gemini-3.8-flash-medium
+	med38, err := catalog.ResolveWithRequest("gemini-3.8-flash", map[string]any{"reasoning_effort": "medium"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if med38.ID != "gemini-3.8-flash-medium" || med38.GetUpstreamID() != "gemini-3.6-flash-medium" {
+		t.Fatalf("reasoning_effort medium failed: ID=%q UpstreamID=%q", med38.ID, med38.GetUpstreamID())
+	}
+
+	// 4. thinking={"type": "disabled"} clamps to low
+	dis38, err := catalog.ResolveWithRequest("gemini-3.8-flash", map[string]any{"thinking": map[string]any{"type": "disabled"}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if dis38.ID != "gemini-3.8-flash-low" || !dis38.SupportsThinking {
+		t.Fatalf("disabled 3.8 should clamp to low with thinking on, got ID=%q SupportsThinking=%v", dis38.ID, dis38.SupportsThinking)
+	}
+}
+
+func TestGemini38UsesTieredUpstreamWhenPresent(t *testing.T) {
+	t.Parallel()
+	catalog, err := Parse([]byte(`{
+		"defaultAgentModelId":"gemini-3.6-flash-high",
+		"agentModelSorts":[{"displayName":"Recommended","groups":[{"modelIds":[
+			"gemini-3.6-flash-high","gemini-3.6-flash-medium","gemini-3.6-flash-low"
+		]}]}],
+		"models":{
+			"gemini-3.6-flash-high":{"displayName":"Gemini 3.6 Flash (High)","supportsThinking":true,"thinkingBudget":-1},
+			"gemini-3.6-flash-medium":{"displayName":"Gemini 3.6 Flash (Medium)","supportsThinking":true,"thinkingBudget":4000},
+			"gemini-3.6-flash-low":{"displayName":"Gemini 3.6 Flash (Low)","supportsThinking":true,"thinkingBudget":1000},
+			"gemini-3.7-flash-tiered":{"supportsThinking":true,"thinkingBudget":-1,"minThinkingBudget":32,"maxTokens":1048576,"maxOutputTokens":65536},
+			"gemini-3.8-flash-tiered":{"supportsThinking":true,"thinkingBudget":-1,"minThinkingBudget":32,"maxTokens":1048576,"maxOutputTokens":65536}
+		}
+	}`))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	high, err := catalog.Resolve("gemini-3.8-flash-high")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if high.ID != "gemini-3.8-flash-high" || high.GetUpstreamID() != "gemini-3.8-flash-tiered" || high.ThinkingLevel != "HIGH" {
+		t.Fatalf("3.8 high: ID=%q UpstreamID=%q ThinkingLevel=%q", high.ID, high.GetUpstreamID(), high.ThinkingLevel)
+	}
+
+	base, err := catalog.ResolveWithRequest("gemini-3.8-flash", nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if base.ID != "gemini-3.8-flash-high" || base.GetUpstreamID() != "gemini-3.8-flash-tiered" || base.ThinkingLevel != "HIGH" {
+		t.Fatalf("3.8 default: ID=%q UpstreamID=%q ThinkingLevel=%q", base.ID, base.GetUpstreamID(), base.ThinkingLevel)
+	}
+
+	med, err := catalog.ResolveWithRequest("gemini-3.8-flash", map[string]any{"reasoning_effort": "medium"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if med.ID != "gemini-3.8-flash-medium" || med.GetUpstreamID() != "gemini-3.8-flash-tiered" || med.ThinkingLevel != "MEDIUM" {
+		t.Fatalf("3.8 medium: ID=%q UpstreamID=%q ThinkingLevel=%q", med.ID, med.GetUpstreamID(), med.ThinkingLevel)
+	}
+
+	low, err := catalog.ResolveWithRequest("gemini-3.8-flash", map[string]any{"thinking": map[string]any{"type": "disabled"}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if low.ID != "gemini-3.8-flash-low" || low.GetUpstreamID() != "gemini-3.8-flash-tiered" || low.ThinkingLevel != "LOW" || !low.SupportsThinking {
+		t.Fatalf("3.8 disabled→low: %#v", low)
+	}
+}

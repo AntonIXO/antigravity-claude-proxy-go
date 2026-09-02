@@ -100,9 +100,16 @@ var routingAliases = map[string]string{
 	"gemini-3.7-flash-high":      "Gemini 3.7 Flash (High)",
 	"gemini-3.7-flash-medium":    "Gemini 3.7 Flash (Medium)",
 	"gemini-3.7-flash-low":       "Gemini 3.7 Flash (Low)",
+	"gemini-3.8-flash":           "Gemini 3.8 Flash (High)",
+	"gemini-3.8-flash-high":      "Gemini 3.8 Flash (High)",
+	"gemini-3.8-flash-medium":    "Gemini 3.8 Flash (Medium)",
+	"gemini-3.8-flash-low":       "Gemini 3.8 Flash (Low)",
 }
 
-const gemini37TieredID = "gemini-3.7-flash-tiered"
+const (
+	gemini37TieredID = "gemini-3.7-flash-tiered"
+	gemini38TieredID = "gemini-3.8-flash-tiered"
+)
 
 func Parse(body []byte) (*Catalog, error) {
 	var document responseDocument
@@ -166,6 +173,7 @@ func Parse(body []byte) (*Catalog, error) {
 	}
 
 	applyGemini37(catalog, document.Models)
+	applyGemini38(catalog, document.Models)
 
 	if len(catalog.selectable) == 0 {
 		return nil, errors.New("Cloud Code catalog has no selectable agent models")
@@ -298,6 +306,14 @@ func (catalog *Catalog) ResolveWithRequest(requested string, request map[string]
 	effort, budget, hasBudget, disabled := ExtractReasoningParams(request)
 
 	if disabled {
+		if isGemini38Flash(model.ID) || isGemini38Flash(requested) {
+			if variant, err := catalog.Resolve("gemini-3.8-flash-low"); err == nil {
+				return variant, nil
+			}
+			model.ThinkingLevel = "LOW"
+			model.SupportsThinking = true
+			return model, nil
+		}
 		if isGemini37Flash(model.ID) || isGemini37Flash(requested) {
 			if variant, err := catalog.Resolve("gemini-3.7-flash-low"); err == nil {
 				return variant, nil
@@ -315,6 +331,8 @@ func (catalog *Catalog) ResolveWithRequest(requested string, request map[string]
 		targetID := ""
 		lowerReq := strings.ToLower(strings.TrimSpace(requested))
 		switch {
+		case strings.HasPrefix(lowerReq, "gemini-3.8-flash"):
+			targetID = "gemini-3.8-flash-" + effort
 		case strings.HasPrefix(lowerReq, "gemini-3.7-flash"):
 			targetID = "gemini-3.7-flash-" + effort
 		case strings.HasPrefix(lowerReq, "gemini-3.6-flash"):
@@ -344,6 +362,9 @@ func CleanModelIDAndName(id, displayName string) (string, string) {
 	cleanName := displayName
 
 	switch {
+	case strings.HasPrefix(lowerID, "gemini-3.8-flash"):
+		cleanID = "gemini-3.8-flash"
+		cleanName = "Gemini 3.8 Flash"
 	case strings.HasPrefix(lowerID, "gemini-3.7-flash"):
 		cleanID = "gemini-3.7-flash"
 		cleanName = "Gemini 3.7 Flash"
@@ -399,6 +420,10 @@ func isGemini37Flash(id string) bool {
 	return strings.HasPrefix(strings.ToLower(id), "gemini-3.7-flash")
 }
 
+func isGemini38Flash(id string) bool {
+	return strings.HasPrefix(strings.ToLower(id), "gemini-3.8-flash")
+}
+
 func modelFromDetails(id string, details modelDetails) Model {
 	model := Model{
 		ID: id, DisplayName: details.DisplayName, Description: details.Description,
@@ -447,6 +472,60 @@ func applyGemini37(catalog *Catalog, models map[string]modelDetails) {
 		} else if base, ok := catalog.byID[variant.fallback]; ok {
 			model = base
 			model.UpstreamID = variant.fallback
+		} else {
+			continue
+		}
+		model.ID = variant.id
+		model.DisplayName = variant.displayName
+		catalog.byID[variant.id] = model
+		catalog.byDisplay[strings.ToLower(variant.displayName)] = model
+		if index, exists := present[variant.id]; exists {
+			catalog.selectable[index] = model
+			continue
+		}
+		prepend = append(prepend, model)
+		present[variant.id] = -1
+	}
+	if len(prepend) > 0 {
+		catalog.selectable = append(prepend, catalog.selectable...)
+	}
+}
+
+// applyGemini38 publishes gemini-3.8-flash-{high,medium,low}. Cloud Code serves
+// 3.8 as a single gemini-3.8-flash-tiered runtime plus thinkingLevel if present.
+// Fall back to the matching 3.7 Flash ID when the tiered model is absent.
+func applyGemini38(catalog *Catalog, models map[string]modelDetails) {
+	variants := []struct {
+		id, displayName, level, fallback string
+	}{
+		{"gemini-3.8-flash-high", "Gemini 3.8 Flash (High)", "HIGH", "gemini-3.7-flash-high"},
+		{"gemini-3.8-flash-medium", "Gemini 3.8 Flash (Medium)", "MEDIUM", "gemini-3.7-flash-medium"},
+		{"gemini-3.8-flash-low", "Gemini 3.8 Flash (Low)", "LOW", "gemini-3.7-flash-low"},
+	}
+
+	tiered, hasTiered := models[gemini38TieredID]
+	hasTiered = hasTiered && !tiered.Disabled
+
+	present := make(map[string]int, len(catalog.selectable))
+	for i, model := range catalog.selectable {
+		present[model.ID] = i
+	}
+
+	var prepend []Model
+	for _, variant := range variants {
+		var model Model
+		if hasTiered {
+			model = modelFromDetails(gemini38TieredID, tiered)
+			model.UpstreamID = gemini38TieredID
+			model.ThinkingLevel = variant.level
+		} else if base, ok := catalog.byID[variant.fallback]; ok {
+			model = base
+			model.UpstreamID = base.GetUpstreamID()
+			if base.ThinkingLevel != "" {
+				model.ThinkingLevel = base.ThinkingLevel
+			} else {
+				model.ThinkingLevel = variant.level
+			}
 		} else {
 			continue
 		}
